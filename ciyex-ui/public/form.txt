@@ -1,0 +1,24 @@
+This is for the patient’s to fill out
+OurTopClinic Patient Intake Form
+Please fill out this form thoroughly to assist us in providing you with tailored and effective healthcare services.
+Reason for today’s visit
+●	Chief Complaint: ____________________
+○	Brief description of current symptoms.
+Allergies
+●	Allergies: ____________________
+○	Please list any drug, food, or environmental allergies and reaction
+Medical History
+●	Current Medications: ____________________
+●	Past Medical Conditions: ____________________
+●	Last Blood Pressure Reading and Date: ____________________
+●	Last Temperature Reading and Date: ____________________
+Preferred Pharmacy
+●	Pharmacy Name: ____________________
+●	Pharmacy Address: _______(Integrated with Google Maps API for location verification- if possible for stage 1 if not stage 2)
+●	Pharmacy Phone: ____________________
+Do you have insurance? 
+Yes / no ( if yes please provide your Member ID or group ID)
+* To ensure a smooth visit, please note that OurTopClinic accepts a limited number of insurance plans. Call us to confirm your benefits at (888) 932-4771
+Attachments
+●	File Upload: Please attach any relevant documents or images that will assist with the consultation especially for medication refills and/or if you have any insurance.
+○	Note: To ensure the security of our platform, all uploaded files are scanned for viruses. Only image files (jpg, png) or PDF documents are accepted to reduce the risk of malicious uploads. ( if you think it will cause security threat, we can remove)
