@@ -43,7 +43,7 @@ const Contact = () => {
     document.title = 'Contact Us - OurTopClinic';
     if (!recaptchaSiteKey) {
       setRecaptchaError('reCAPTCHA site key is not configured');
-      console.error('reCAPTCHA site key is missing. Please add NEXT_PUBLIC_RECAPTCHA_SITE_KEY to your .env.local file');
+      console.error('reCAPTCHA site key is missing. Please add NEXT_PUBLIC_RECAPTCHA_SITE_KEY to your .env file');
     }
   }, [recaptchaSiteKey]);
   

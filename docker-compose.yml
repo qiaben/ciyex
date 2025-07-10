@@ -14,5 +14,18 @@ services:
       - databasevolume:/var/lib/mysql
     environment:
       MYSQL_ROOT_PASSWORD: root
+  postgres:
+    image: postgres:16
+    container_name: postgres_prisma
+    restart: always
+    environment:
+      POSTGRES_USER: prisma
+      POSTGRES_PASSWORD: prisma
+      POSTGRES_DB: prisma_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
 volumes:
   databasevolume: {}
+  postgres_data:
