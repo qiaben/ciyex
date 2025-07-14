@@ -21,7 +21,7 @@ const columns = [
   },
   {
     header: "Role",
-    key: "role",
+    key: "roleName",
   },
   {
     header: "Status",
@@ -40,16 +40,16 @@ export default function UserTableClient({ initialUsers, totalCount, initialRole 
   initialRole: string;
 }) {
   const [users, setUsers] = useState(initialUsers);
-  const [role, setRole] = useState(initialRole);
+  const [roleName, setRole] = useState(initialRole);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const perPage = 10;
   const totalPages = Math.ceil(totalCount / perPage);
 
-  const fetchUsers = async (role: string, page: number) => {
+  const fetchUsers = async (roleName: string, page: number) => {
     setLoading(true);
     const params = new URLSearchParams();
-    if (role) params.set("role", role);
+    if (roleName) params.set("roleName", roleName);
     params.set("page", page.toString());
     const res = await fetch(`/api/users?${params.toString()}`);
     const data = await res.json();
@@ -66,7 +66,7 @@ export default function UserTableClient({ initialUsers, totalCount, initialRole 
 
   const handlePageChange = (newPage: number) => {
     setPage(newPage);
-    fetchUsers(role, newPage);
+    fetchUsers(roleName, newPage);
   };
 
   // Card layout for mobile
@@ -94,7 +94,7 @@ export default function UserTableClient({ initialUsers, totalCount, initialRole 
       </div>
       <div className="flex flex-wrap gap-2 text-sm mt-2">
         <span className="px-3 py-1.5 rounded-full bg-gray-50/50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-300 font-light">
-          {item?.publicMetadata.role}
+          {item?.publicMetadata.roleName}
         </span>
         <span className="px-3 py-1.5 rounded-full bg-emerald-50/50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 font-light">
           Active
@@ -138,7 +138,7 @@ export default function UserTableClient({ initialUsers, totalCount, initialRole 
       <td className="py-5 px-8 text-sm text-gray-600 dark:text-gray-400 hidden md:table-cell font-light tracking-wide">{item?.emailAddresses[0].emailAddress}</td>
       <td className="py-5 px-8">
         <span className="text-sm text-gray-600 dark:text-gray-300 font-light tracking-wide px-3 py-1.5 rounded-full bg-gray-50/50 dark:bg-gray-800/50">
-          {item?.publicMetadata.role}
+          {item?.publicMetadata.roleName}
         </span>
       </td>
       <td className="py-5 px-8">
@@ -187,8 +187,8 @@ export default function UserTableClient({ initialUsers, totalCount, initialRole 
           <Search className="absolute left-4 top-3 h-4 w-4 text-gray-400 dark:text-gray-500 group-focus-within:text-gray-500 transition-colors duration-200" />
         </div>
         <select
-          name="role"
-          value={role}
+          name="roleName"
+          value={roleName}
           className="px-5 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-light text-gray-600 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:focus:ring-gray-700 focus:border-gray-300 dark:focus:border-gray-600 bg-white dark:bg-gray-900"
           onChange={handleRoleChange}
           disabled={loading}

@@ -9,13 +9,13 @@ const AUTH_URL = process.env.AUTH_URL!; // The ! assumes it's always defined
 export default function SignUpPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const role = searchParams?.get('role') || '';
+  const roleName = searchParams?.get('roleName') || '';
 
   const [form, setForm] = useState({
     email: "",
     password: "",
     name: "",
-    role: role,
+    roleName: roleName,
   });
 
   const [loading, setLoading] = useState(false);
@@ -23,7 +23,7 @@ export default function SignUpPage() {
 
   // Redirect after successful signup
   const handleRedirect = () => {
-    if (form.role === 'doctor') {
+    if (form.roleName === 'doctor') {
       router.push('/doctor-registration');
     } else {
       router.push('/patient/registration');
@@ -105,8 +105,8 @@ export default function SignUpPage() {
             />
             <input
                 type="hidden"
-                name="role"
-                value={form.role}
+                name="roleName"
+                value={form.roleName}
             />
             <button
                 type="submit"
