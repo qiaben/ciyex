@@ -16,3 +16,4 @@ services:
       MYSQL_ROOT_PASSWORD: root
 volumes:
   databasevolume: {}
+  postgres_data:
