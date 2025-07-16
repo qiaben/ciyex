@@ -1,16 +1,22 @@
-import { auth } from "@clerk/nextjs/server";
+import { getCurrentUserFromToken } from "@/utils/auth";
 import { getPatientAppointments } from "@/utils/services/appointment";
 import MessagesClient from "./MessagesClient";
 
 export default async function MessagesPage() {
-  const { userId } = await auth();
+  // Use JWT-based auth instead of Clerk
+  const user = await getCurrentUserFromToken();
+  if (!user?.id) {
+    return <div>Please sign in to continue</div>;
+  }
+
   const { data: appointments = [] } = await getPatientAppointments({
     page: 1,
     limit: 1000,
-    id: userId!,
+    id: user.id,
   });
+
   const filtered = (appointments || []).filter(
-    (a: any) => a.status === "SCHEDULED" || a.status === "COMPLETED"
+      (a: any) => a.status === "SCHEDULED" || a.status === "COMPLETED"
   );
   const doctorMap = new Map();
   for (const a of filtered) {

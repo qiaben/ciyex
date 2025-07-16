@@ -7,13 +7,11 @@ import {
   WorkingDaysSchema,
 } from "@/lib/schema";
 import { generateRandomColor } from "@/utils";
-import { checkRole } from "@/utils/roles";
-import { auth, clerkClient } from "@clerk/nextjs/server";
 
+// Clerk-free createNewDoctor
 export async function createNewDoctor(data: any) {
   try {
     const values = DoctorSchema.safeParse(data);
-
     const workingDaysValues = WorkingDaysSchema.safeParse(data?.work_schedule);
 
     if (!values.success || !workingDaysValues.success) {
@@ -27,22 +25,14 @@ export async function createNewDoctor(data: any) {
     const validatedValues = values.data;
     const workingDayData = workingDaysValues.data!;
 
-    const client = await clerkClient();
-
-    const user = await client.users.createUser({
-      emailAddress: [validatedValues.email],
-      password: validatedValues.password,
-      firstName: validatedValues.name.split(" ")[0],
-      lastName: validatedValues.name.split(" ")[1],
-      publicMetadata: { role: "doctor" },
-    });
-
+    // Remove password before DB write (never store plaintext passwords!)
     delete validatedValues["password"];
 
+    // Create doctor in database (generate ID if not provided)
     const doctor = await db.doctor.create({
       data: {
         ...validatedValues,
-        id: user.id,
+        // id: ...  // if you want to generate a UUID, use: id: uuidv4(),
         city: validatedValues.city,
         state: validatedValues.state,
         zip: validatedValues.zip,
@@ -51,12 +41,13 @@ export async function createNewDoctor(data: any) {
       },
     });
 
+    // Create working days for the doctor
     await Promise.all(
-      workingDayData?.map((el) =>
-        db.workingDays.create({
-          data: { ...el, doctor_id: doctor.id },
-        })
-      )
+        workingDayData?.map((el) =>
+            db.workingDays.create({
+              data: { ...el, doctor_id: doctor.id },
+            })
+        )
     );
 
     return {
@@ -65,22 +56,16 @@ export async function createNewDoctor(data: any) {
       error: false,
     };
   } catch (error: any) {
-    console.error("Full error object:", error);
-    if (error && error.errors) {
-      try {
-        console.error("Clerk errors:", JSON.stringify(error.errors, null, 2));
-      } catch (e) {
-        console.error("Clerk errors (raw):", error.errors);
-      }
-    }
-    return { success: false, error: true, msg: error?.message || (error.errors && JSON.stringify(error.errors)) };
+    console.error("Error creating doctor:", error);
+    return { success: false, error: true, msg: error?.message };
   }
 }
 
-export async function addNewService(data: any) {
+// Clerk-free addNewService
+export async function addNewService(data: any, doctorId: string, doctorName: string) {
   try {
-    const { userId } = await auth();
-    if (!userId) {
+    // You must pass doctorId and doctorName from JWT/user session
+    if (!doctorId) {
       return { success: false, msg: "Unauthorized" };
     }
 
@@ -90,11 +75,7 @@ export async function addNewService(data: any) {
     }
 
     const validatedData = isValidData.data;
-    const client = await clerkClient();
-    const clerkUser = await client.users.getUser(userId);
-    const providerName = clerkUser?.firstName && clerkUser?.lastName
-      ? `${clerkUser.firstName} ${clerkUser.lastName}`
-      : clerkUser?.firstName || clerkUser?.lastName || "Provider";
+    const providerName = doctorName || "Provider";
 
     await db.services.create({
       data: {
@@ -103,7 +84,7 @@ export async function addNewService(data: any) {
         providerName,
         doctor: {
           connect: {
-            id: userId
+            id: doctorId
           }
         }
       },

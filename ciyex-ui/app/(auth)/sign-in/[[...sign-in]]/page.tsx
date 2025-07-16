@@ -8,8 +8,7 @@ const LOGIN_PATH = "/api/auth/login";
 const LOGIN_URL = `${API_URL}${LOGIN_PATH}`;
 
 export default function SignInPage() {
-  // Router is NOT used for redirect now, only for later.
-  // const router = useRouter();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const urlRole = (searchParams.get("role") || "").toLowerCase();
 
@@ -40,14 +39,12 @@ export default function SignInPage() {
         data = await res.json();
       } catch (jsonErr) {
         console.error("[SignIn] Error parsing JSON:", jsonErr);
-        alert("[SignIn] Error parsing JSON: " + jsonErr);
         setError("Invalid server response.");
         setLoading(false);
         return;
       }
 
       console.log("[SignIn] API response:", data);
-      alert("[DEBUG] API response: " + JSON.stringify(data, null, 2));
 
       if (!res.ok || !data.success) {
         setError(data.message || "Invalid email or password.");
@@ -71,31 +68,26 @@ export default function SignInPage() {
           .filter(Boolean);
 
       console.log("[SignIn] userRoles (lowercased and filtered):", userRoles);
-      alert(`[DEBUG] userRoles: ${JSON.stringify(userRoles)}, urlRole: ${urlRole}`);
+      console.log("[SignIn] urlRole from query string:", urlRole);
 
       if (urlRole && userRoles.includes(urlRole)) {
-        console.log(`[SignIn] Would redirect to /${urlRole} (user has role)`);
-        alert(`[DEBUG] Would redirect to /${urlRole} (user has role)`);
-        // router.push(`/${urlRole}`);
+        console.log(`[SignIn] Redirecting to /${urlRole} (user has role)`);
+        router.push(`/${urlRole}`);
       } else if (urlRole && !userRoles.includes(urlRole)) {
         console.warn(`[SignIn] User does NOT have urlRole: ${urlRole}`);
-        alert(`[DEBUG] User does NOT have urlRole: ${urlRole}`);
         setError(`You do not have access as ${urlRole}.`);
         setLoading(false);
         return;
       } else if (userRoles.length > 0 && !!userRoles[0]) {
-        console.log(`[SignIn] Would redirect to /${userRoles[0]} (first user role)`);
-        alert(`[DEBUG] Would redirect to /${userRoles[0]} (first user role)`);
-        // router.push(`/${userRoles[0]}`);
+        console.log(`[SignIn] Redirecting to /${userRoles[0]} (first user role)`);
+        router.push(`/${userRoles[0]}`);
       } else {
-        console.warn("[SignIn] No valid roles found. Would redirect to /dashboard");
-        alert("[DEBUG] No valid roles found. Would redirect to /dashboard");
-        // router.push("/dashboard");
+        console.warn("[SignIn] No valid roles found. Redirecting to /dashboard");
+        router.push("/dashboard");
       }
       setLoading(false);
     } catch (err) {
       console.error("[SignIn] Unexpected error during login:", err);
-      alert("[SignIn] Unexpected error: " + err);
       setError("Login failed. Please try again.");
       setLoading(false);
     }

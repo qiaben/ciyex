@@ -1,26 +1,26 @@
-import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
+import { getCurrentUserFromToken } from "@/utils/auth"; // Your JWT-based helper
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const patientId = searchParams.get("patientId");
-    const { userId } = await auth();
+    const user = await getCurrentUserFromToken();
 
-    if (!userId) {
+    if (!user?.userId) {
       return NextResponse.json(
-        { success: false, message: "Unauthorized" },
-        { status: 401 }
+          { success: false, message: "Unauthorized" },
+          { status: 401 }
       );
     }
 
     const data = await db.rating.findMany({
       take: 10,
-      where: { 
-        patient_id: patientId || userId 
+      where: {
+        patient_id: patientId || String(user.userId)
       },
-      include: { 
+      include: {
         patient: {
           select: {
             id: true,
@@ -37,8 +37,8 @@ export async function GET(request: Request) {
           }
         }
       },
-      orderBy: { 
-        created_at: "desc" 
+      orderBy: {
+        created_at: "desc"
       },
     });
 
@@ -46,8 +46,8 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error("Error fetching ratings:", error);
     return NextResponse.json(
-      { success: false, message: "Internal Server Error" },
-      { status: 500 }
+        { success: false, message: "Internal Server Error" },
+        { status: 500 }
     );
   }
-} 
+}

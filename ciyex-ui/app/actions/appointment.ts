@@ -3,8 +3,8 @@
 import { VitalSignsFormData } from "@/components/dialogs/add-vital-signs";
 import db from "@/lib/db";
 import { AppointmentSchema, VitalSignsSchema } from "@/lib/schema";
-import { auth, currentUser } from "@clerk/nextjs/server";
 import { AppointmentStatus } from "@prisma/client";
+import { getCurrentUserFromToken } from "@/utils/auth"; // <-- JWT helper
 
 export async function createNewAppointment(data: any) {
   try {
@@ -113,10 +113,9 @@ export async function createNewAppointment(data: any) {
 }
 
 export async function appointmentAction(
-  id: string | number,
-
-  status: AppointmentStatus,
-  reason: string
+    id: string | number,
+    status: AppointmentStatus,
+    reason: string
 ) {
   try {
     await db.appointment.update({
@@ -139,14 +138,14 @@ export async function appointmentAction(
 }
 
 export async function addVitalSigns(
-  data: VitalSignsFormData,
-  appointmentId: string,
-  doctorId: string
+    data: VitalSignsFormData,
+    appointmentId: string,
+    doctorId: string
 ) {
   try {
-    const { userId } = await auth();
-
-    if (!userId) {
+    // Clerk removed: use JWT utility
+    const user = await getCurrentUserFromToken();
+    if (!user?.userId) {
       return { success: false, msg: "Unauthorized" };
     }
 

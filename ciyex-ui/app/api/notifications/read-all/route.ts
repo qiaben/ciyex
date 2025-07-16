@@ -1,17 +1,17 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getCurrentUserFromToken } from "@/utils/auth"; // Your JWT utility
 import { prisma } from "@/lib/prisma";
 
 export async function POST() {
   try {
-    const { userId } = await auth();
-    if (!userId) {
+    const user = await getCurrentUserFromToken();
+    if (!user?.userId) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
     await prisma.notification.updateMany({
       where: {
-        userId,
+        userId: String(user.userId),
         read: false
       },
       data: {
@@ -24,4 +24,4 @@ export async function POST() {
     console.error("Error marking notifications as read:", error);
     return new NextResponse("Internal Server Error", { status: 500 });
   }
-} 
+}

@@ -3,7 +3,6 @@ import type { Metadata } from "next";
 import { Analytics } from "@vercel/analytics/react"
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { ClerkProvider } from "@clerk/nextjs";
 import { Providers } from "./provider";
 import ClientThemeWrapper from "./ClientThemeWrapper";
 import { CartProvider } from "@/components/context/CartContext";
@@ -37,49 +36,35 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <ClerkProvider
-      appearance={{
-        baseTheme: undefined,
-        variables: {
-          colorPrimary: '#0EA5E9',
-        },
-      }}
-      signInUrl="/sign-in"
-      signUpUrl="/sign-up"
-      signInFallbackRedirectUrl="/sign-up"
-      // Explicitly set Clerk publishable key for production
-      publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
-    >
       <html lang="en" suppressHydrationWarning>
-        <head>
-          <meta name="viewport" content="width=device-width, initial-scale=1" />
-          <meta httpEquiv="Permissions-Policy" content="publickey-credentials-get=*" />
-          <link rel="icon" href="/logo.png" type="image/png" />
-          <GoogleTagManager />
-          <GoogleAnalytics />
-        </head>
-        <body className={`${geistSans.variable} ${geistMono.variable} antialiased`} suppressHydrationWarning>
-          <noscript>
-            <iframe
-              src={`https://www.googletagmanager.com/ns.html?id=${process.env.NEXT_PUBLIC_GTM_ID}`}
-              height="0"
-              width="0"
-              style={{ display: 'none', visibility: 'hidden' }}
-            />
-          </noscript>
-          <Providers>
-            <CartProvider>
-              <TestOrderProvider>
-                <ClientThemeWrapper>
-                  {children}
-                </ClientThemeWrapper>
-              </TestOrderProvider>
-            </CartProvider>
-          </Providers>
-          <ToasterProvider />
-          <Analytics />
-        </body>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta httpEquiv="Permissions-Policy" content="publickey-credentials-get=*" />
+        <link rel="icon" href="/logo.png" type="image/png" />
+        <GoogleTagManager />
+        <GoogleAnalytics />
+      </head>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`} suppressHydrationWarning>
+      <noscript>
+        <iframe
+            src={`https://www.googletagmanager.com/ns.html?id=${process.env.NEXT_PUBLIC_GTM_ID}`}
+            height="0"
+            width="0"
+            style={{ display: 'none', visibility: 'hidden' }}
+        />
+      </noscript>
+      <Providers>
+        <CartProvider>
+          <TestOrderProvider>
+            <ClientThemeWrapper>
+              {children}
+            </ClientThemeWrapper>
+          </TestOrderProvider>
+        </CartProvider>
+      </Providers>
+      <ToasterProvider />
+      <Analytics />
+      </body>
       </html>
-    </ClerkProvider>
   );
 }
