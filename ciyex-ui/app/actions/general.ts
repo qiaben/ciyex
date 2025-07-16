@@ -1,31 +1,30 @@
 "use server";
 
 import db from "@/lib/db";
-import { clerkClient } from "@clerk/nextjs/server";
 import { z } from "zod";
 import { RatingFormValues, ratingSchema } from "@/app/types/rating";
 
 export async function deleteDataById(
-  id: string,
-  deleteType: "doctor" | "patient" | "payment" | "bill"
+    id: string,
+    deleteType: "doctor" | "patient" | "payment" | "bill"
 ) {
   try {
     switch (deleteType) {
       case "doctor":
-        await db.doctor.delete({ where: { id: id } });
+        await db.doctor.delete({ where: { id } });
+        break;
       case "patient":
-        await db.patient.delete({ where: { id: id } });
+        await db.patient.delete({ where: { id } });
+        break;
       case "payment":
         await db.payment.delete({ where: { id: Number(id) } });
+        break;
+        // case "bill": // If you want to handle "bill", add logic here.
+        //   break;
     }
 
-    if (
-      deleteType === "patient" ||
-      deleteType === "doctor"
-    ) {
-      const client = await clerkClient();
-      await client.users.deleteUser(id);
-    }
+    // Clerk user deletion removed!
+    // If you want to delete users from your own users table, add it here.
 
     return {
       success: true,

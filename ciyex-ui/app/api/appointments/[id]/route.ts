@@ -1,16 +1,17 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { createAppointmentNotification } from "@/lib/notifications";
-import { auth } from "@clerk/nextjs/server";
+import { getCurrentUserFromToken } from "@/utils/auth";
 
+// Next.js expects dynamic route param to be passed in `params` (not Promise)
 export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
+    request: Request,
+    { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = await params;
-    const { userId } = await auth();
-    if (!userId) {
+    const { id } = params;
+    const user = await getCurrentUserFromToken();
+    if (!user?.userId) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
@@ -42,8 +43,11 @@ export async function GET(
       return new NextResponse('Appointment not found', { status: 404 });
     }
 
-    // Verify the user is either the doctor or patient of this appointment
-    if (appointment.doctor_id !== userId && appointment.patient_id !== userId) {
+    // Ensure IDs are compared as strings
+    if (
+        String(appointment.doctor_id) !== String(user.userId) &&
+        String(appointment.patient_id) !== String(user.userId)
+    ) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
@@ -55,13 +59,13 @@ export async function GET(
 }
 
 export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
+    request: Request,
+    { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = await params;
-    const { userId } = await auth();
-    if (!userId) {
+    const { id } = params;
+    const user = await getCurrentUserFromToken();
+    if (!user?.userId) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
@@ -92,33 +96,33 @@ export async function POST(
     // Create notification for the appropriate user based on status change
     if (status === "APPROVED") {
       await createAppointmentNotification(
-        appointment.patient_id,
-        "APPOINTMENT_APPROVED",
-        appointment.id.toString(),
-        `${appointment.patient.first_name} ${appointment.patient.last_name}`,
-        appointment.doctor.name,
-        appointment.type,
-        appointment.appointment_date
+          appointment.patient_id,
+          "APPOINTMENT_APPROVED",
+          appointment.id.toString(),
+          `${appointment.patient.first_name} ${appointment.patient.last_name}`,
+          appointment.doctor.name,
+          appointment.type,
+          appointment.appointment_date
       );
     } else if (status === "CANCELLED") {
       await createAppointmentNotification(
-        appointment.patient_id,
-        "APPOINTMENT_CANCELLED",
-        appointment.id.toString(),
-        `${appointment.patient.first_name} ${appointment.patient.last_name}`,
-        appointment.doctor.name,
-        appointment.type,
-        appointment.appointment_date
+          appointment.patient_id,
+          "APPOINTMENT_CANCELLED",
+          appointment.id.toString(),
+          `${appointment.patient.first_name} ${appointment.patient.last_name}`,
+          appointment.doctor.name,
+          appointment.type,
+          appointment.appointment_date
       );
     } else if (status === "PENDING") {
       await createAppointmentNotification(
-        appointment.doctor_id,
-        "APPOINTMENT_BOOKED",
-        appointment.id.toString(),
-        `${appointment.patient.first_name} ${appointment.patient.last_name}`,
-        appointment.doctor.name,
-        appointment.type,
-        appointment.appointment_date
+          appointment.doctor_id,
+          "APPOINTMENT_BOOKED",
+          appointment.id.toString(),
+          `${appointment.patient.first_name} ${appointment.patient.last_name}`,
+          appointment.doctor.name,
+          appointment.type,
+          appointment.appointment_date
       );
     }
 
@@ -127,4 +131,4 @@ export async function POST(
     console.error("Error updating appointment:", error);
     return new NextResponse("Internal Server Error", { status: 500 });
   }
-} 
+}

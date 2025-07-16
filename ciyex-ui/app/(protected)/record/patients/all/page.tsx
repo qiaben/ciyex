@@ -1,12 +1,18 @@
-import { auth } from "@clerk/nextjs/server";
+import { getCurrentUserFromToken } from "@/utils/auth"; // <-- Make sure this utility exists!
 import db from "@/lib/db";
 import AllPatientsClient from "./all-patients-client";
 
 export default async function AllPatientsPage() {
-  const { userId } = await auth();
+  // Replace Clerk with JWT util:
+  const user = await getCurrentUserFromToken();
+  if (!user?.id) {
+    // You can return a redirect, error component, or null
+    return <div>Unauthorized</div>;
+  }
+
   // Get all appointments for this doctor
   const appointments = await db.appointment.findMany({
-    where: { doctor_id: userId! },
+    where: { doctor_id: user.id },
     include: {
       patient: {
         select: {
@@ -21,6 +27,7 @@ export default async function AllPatientsPage() {
     },
     orderBy: { appointment_date: "desc" },
   });
+
   // Unique patients by id, and count visits
   const patientMap = new Map<string, { patient: any; visits: number }>();
   for (const a of appointments) {
@@ -34,4 +41,4 @@ export default async function AllPatientsPage() {
   const patients = Array.from(patientMap.values()).map(({ patient, visits }) => ({ ...patient, visits }));
 
   return <AllPatientsClient patients={patients} />;
-} 
+}

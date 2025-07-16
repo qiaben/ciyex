@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
-import { auth } from "@clerk/nextjs/server";
+import { getCurrentUserFromToken } from "@/utils/auth"; // Your JWT session util
 
 const MINIMUM_AMOUNT = 50; // 50 cents in USD
 
-// Validate Stripe key
 if (!process.env.STRIPE_SECRET_KEY) {
   console.error("STRIPE_SECRET_KEY is not defined in environment variables");
   throw new Error("STRIPE_SECRET_KEY is not defined in environment variables");
 }
 
-// Log Stripe key details (safely)
 const stripeKey = process.env.STRIPE_SECRET_KEY;
 console.log("Stripe key details:", {
   prefix: stripeKey.substring(0, 7),
@@ -20,7 +18,6 @@ console.log("Stripe key details:", {
   environment: process.env.NODE_ENV
 });
 
-// Initialize Stripe with error handling
 let stripe: Stripe;
 try {
   stripe = new Stripe(stripeKey, {
@@ -35,23 +32,34 @@ try {
 
 export async function POST(request: NextRequest) {
   try {
-    // Log request details
     console.log("Payment intent request received:", {
       headers: Object.fromEntries(request.headers.entries()),
       url: request.url,
       method: request.method
     });
 
-    // Verify authentication
-    const { userId } = await auth();
-    if (!userId) {
-      console.error("No user ID found in request");
+    // Authenticate user from JWT (you may use Authorization header or a cookie, adapt as needed)
+    let jwtToken: string | undefined = undefined;
+
+    // Example: look for token in Authorization header (Bearer ...)
+    const authHeader = request.headers.get('authorization');
+    if (authHeader?.startsWith('Bearer ')) {
+      jwtToken = authHeader.substring(7);
+    } else if (request.cookies.get('jwt')) {
+      jwtToken = request.cookies.get('jwt')?.value;
+    }
+
+    // Use your utility to decode user session from token
+    const user = await getCurrentUserFromToken(jwtToken);
+
+    if (!user || !user.userId) {
+      console.error("No user found in JWT token");
       return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
+          { error: "Unauthorized" },
+          { status: 401 }
       );
     }
-    console.log("User authenticated:", { userId });
+    console.log("User authenticated:", { userId: user.userId, email: user.email });
 
     // Parse request body
     let body;
@@ -61,16 +69,16 @@ export async function POST(request: NextRequest) {
     } catch (e) {
       console.error("Failed to parse request body:", e);
       return NextResponse.json(
-        { error: "Invalid request body" },
-        { status: 400 }
+          { error: "Invalid request body" },
+          { status: 400 }
       );
     }
 
     const { amount, currency = "usd" } = body;
-    console.log("Payment intent parameters:", { 
-      amount, 
-      currency, 
-      userId,
+    console.log("Payment intent parameters:", {
+      amount,
+      currency,
+      userId: user.userId,
       environment: process.env.NODE_ENV,
       stripeMode: stripeKey.startsWith('sk_live_') ? 'live' : 'test'
     });
@@ -79,32 +87,31 @@ export async function POST(request: NextRequest) {
     if (!amount || typeof amount !== 'number') {
       console.error("Invalid amount:", amount);
       return NextResponse.json(
-        { error: "Amount is required and must be a number" },
-        { status: 400 }
+          { error: "Amount is required and must be a number" },
+          { status: 400 }
       );
     }
 
     if (amount < MINIMUM_AMOUNT) {
       console.error("Amount too small:", amount);
       return NextResponse.json(
-        { error: `Amount must be at least ${MINIMUM_AMOUNT / 100} ${currency.toUpperCase()}` },
-        { status: 400 }
+          { error: `Amount must be at least ${MINIMUM_AMOUNT / 100} ${currency.toUpperCase()}` },
+          { status: 400 }
       );
     }
 
     try {
-      // Add metadata to track the user and environment
       const paymentIntent = await stripe.paymentIntents.create({
         amount,
         currency,
         automatic_payment_methods: { enabled: true },
         metadata: {
-          userId: userId,
+          userId: user.userId,
+          email: user.email,
           environment: process.env.NODE_ENV,
           mode: stripeKey.startsWith('sk_live_') ? 'live' : 'test'
         },
-        // Add receipt email if available
-        receipt_email: request.headers.get('x-user-email') || undefined,
+        receipt_email: user.email || undefined,
       });
 
       console.log("Payment intent created successfully:", {
@@ -127,31 +134,27 @@ export async function POST(request: NextRequest) {
         statusCode: stripeError.statusCode
       });
 
-      // Handle specific Stripe errors
       if (stripeError.type === 'StripeInvalidRequestError') {
         return NextResponse.json(
-          { error: stripeError.message },
-          { status: 400 }
+            { error: stripeError.message },
+            { status: 400 }
         );
       }
-
       if (stripeError.type === 'StripeAuthenticationError') {
         return NextResponse.json(
-          { error: "Payment service authentication failed" },
-          { status: 500 }
+            { error: "Payment service authentication failed" },
+            { status: 500 }
         );
       }
-
       if (stripeError.type === 'StripePermissionError') {
         return NextResponse.json(
-          { error: "Payment service permission denied" },
-          { status: 500 }
+            { error: "Payment service permission denied" },
+            { status: 500 }
         );
       }
-
       return NextResponse.json(
-        { error: "Payment service error" },
-        { status: 500 }
+          { error: "Payment service error" },
+          { status: 500 }
       );
     }
   } catch (error: any) {
@@ -163,18 +166,16 @@ export async function POST(request: NextRequest) {
       code: error.code
     });
 
-    // Handle authentication errors
     if (error.message?.includes('Unauthorized')) {
       return NextResponse.json(
-        { error: "Authentication required" },
-        { status: 401 }
+          { error: "Authentication required" },
+          { status: 401 }
       );
     }
 
-    // Handle other errors
     return NextResponse.json(
-      { error: "An unexpected error occurred" },
-      { status: 500 }
+        { error: "An unexpected error occurred" },
+        { status: 500 }
     );
   }
 }

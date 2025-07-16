@@ -1,4 +1,5 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+// middleware.ts
+
 import { NextResponse } from "next/server";
 import { routeAccess } from "./lib/routes";
 
@@ -8,11 +9,25 @@ type UserMetadata = {
   doctorId?: string;
 };
 
-// Define public routes that don't need authentication
+// === HARDCODED "AUTH" VALUES ===
+const fakeToken = "test-dev-token";
+const fakeRole = "doctor"; // change to "patient", "admin", etc. as needed
+const fakeStatus: 'pending' | 'approved' | 'rejected' = "approved";
+const fakeUserId = "user_12345";
+const fakeSessionClaims = {
+  metadata: {
+    role: fakeRole,
+    status: fakeStatus,
+    doctorId: "doctor_789",
+  },
+  token: fakeToken,
+  userId: fakeUserId,
+};
+
 const publicRoutes = [
-  "/", 
-  "/blog", 
-  "/about_us", 
+  "/",
+  "/blog",
+  "/about_us",
   "/partner-with-us",
   "/contact",
   "/sign-up/sso-callback",
@@ -22,20 +37,18 @@ const publicRoutes = [
   "/api/doctors/check",
   "/api/doctors/register"
 ];
-
-// Define auth routes that should redirect to dashboard if user is already signed in
 const authRoutes = ["/sign-in", "/sign-up"];
-
-// Define registration routes that should be accessible without role
 const registrationRoutes = ["/doctor-registration", "/patient/registration"];
 
 const matchers = Object.keys(routeAccess).map((route) => ({
-  matcher: createRouteMatcher([route]),
+  matcher: (req: Request) => req.url.includes(route),
   allowedRoles: routeAccess[route],
 }));
 
-export default clerkMiddleware(async (auth, req) => {
-  const { userId, sessionClaims } = await auth();
+export default async function middleware(req: any) {
+  // Use hardcoded user info for all requests
+  const userId = fakeUserId;
+  const sessionClaims = fakeSessionClaims;
   const url = new URL(req.url);
   const path = url.pathname;
 
@@ -46,8 +59,7 @@ export default clerkMiddleware(async (auth, req) => {
 
   // Allow access to registration routes if user is authenticated
   if (registrationRoutes.includes(path) && userId) {
-    // Check if user is trying to access the wrong registration route
-    const role = sessionClaims?.metadata?.role;
+    const role = sessionClaims?.metadata?.role || "";
     if (role === 'patient' && path === '/doctor-registration') {
       return NextResponse.redirect(new URL('/patient', url.origin));
     }
@@ -60,21 +72,14 @@ export default clerkMiddleware(async (auth, req) => {
   // Handle auth routes (sign-in, sign-up)
   if (authRoutes.includes(path)) {
     if (userId) {
-      // Check if user has a role parameter in the URL
       const urlParams = new URLSearchParams(url.search);
       const roleParam = urlParams.get('role');
-      
-      // If user is signing up as a doctor, redirect to doctor registration form
       if (path === '/sign-up' && roleParam === 'doctor') {
         return NextResponse.redirect(new URL('/doctor-registration', url.origin));
       }
-      
-      // If user has a role parameter (and not doctor signup), allow access to sign-up for registration
       if (path === '/sign-up' && roleParam) {
         return NextResponse.next();
       }
-      
-      // If user is signed in, redirect to their dashboard based on role
       const role = sessionClaims?.metadata?.role?.toLowerCase() || "patient";
       return NextResponse.redirect(new URL(`/${role}`, url.origin));
     }
@@ -82,15 +87,13 @@ export default clerkMiddleware(async (auth, req) => {
   }
 
   // Handle protected routes
-  const role = userId && sessionClaims?.metadata?.role
-    ? sessionClaims.metadata.role.toLowerCase()
-    : null;  // No role assigned
+  const role: string = userId && sessionClaims?.metadata?.role
+      ? sessionClaims.metadata.role.toLowerCase()
+      : "";
 
-  // If user has no role, redirect to sign-up with role parameter if available
   if (!role && userId) {
     const urlParams = new URLSearchParams(url.search);
     const roleParam = urlParams.get('role');
-    
     if (roleParam === 'doctor') {
       return NextResponse.redirect(new URL('/doctor-registration', url.origin));
     } else if (roleParam === 'patient') {
@@ -107,13 +110,12 @@ export default clerkMiddleware(async (auth, req) => {
   }
 
   const matchingRoute = matchers.find(({ matcher }) => matcher(req));
-
   if (matchingRoute && !matchingRoute.allowedRoles.includes(role)) {
-    return NextResponse.redirect(new URL(`/${role}`, url.origin));
+    return NextResponse.redirect(new URL(`/${role || "patient"}`, url.origin));
   }
 
   return NextResponse.next();
-});
+}
 
 export const config = {
   matcher: [

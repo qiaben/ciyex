@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@clerk/nextjs/server";
+import { getCurrentUserFromToken } from "@/utils/auth"; // Your JWT utility
 
 export async function GET() {
   try {
-    const { userId } = await auth();
-    if (!userId) {
+    const user = await getCurrentUserFromToken();
+    if (!user?.userId) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
@@ -24,4 +24,4 @@ export async function GET() {
     console.error("[PATIENT_INTAKES_GET]", error);
     return NextResponse.json({ intakes: [] });
   }
-} 
+}

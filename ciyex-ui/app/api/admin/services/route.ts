@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@clerk/nextjs/server";
+import { getCurrentUserFromToken } from "@/utils/auth";
 import { PatientIntake, Services, PaymentStatus, Doctor, Rating, Patient, Appointment } from "@prisma/client";
 
 interface Bill {
@@ -31,9 +31,9 @@ interface ServiceWithRelations extends Services {
 
 export async function GET() {
   try {
-    const { userId } = await auth();
+    const user = await getCurrentUserFromToken();
 
-    if (!userId) {
+    if (!user?.userId) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
@@ -112,44 +112,44 @@ export async function GET() {
     }
 
     // Transform services into interactions
-    const interactions = services.flatMap(service => 
-      (service as any).patientIntakes.map((intake: any) => ({
-        id: intake.id,
-        patientName: `${intake.patient.first_name} ${intake.patient.last_name}`,
-        patientEmail: intake.patient.email,
-        patientId: intake.patient.id,
-        doctorName: (service as any).doctor.name,
-        doctorId: (service as any).doctor.id,
-        specialty: (service as any).doctor.specialization,
-        serviceName: service.service_name,
-        serviceType: service.mode,
-        appointmentDate: intake.appointment?.appointment_date.toISOString().split('T')[0] || '',
-        appointmentTime: intake.appointment?.time || '',
-        duration: '30 min', // Default duration
-        status: intake.appointment?.status.toLowerCase() || 'scheduled',
-        insurance: 'Not specified', // Default value
-        amount: `$${service.price}`,
-      }))
+    const interactions = services.flatMap(service =>
+        (service as any).patientIntakes.map((intake: any) => ({
+          id: intake.id,
+          patientName: `${intake.patient.first_name} ${intake.patient.last_name}`,
+          patientEmail: intake.patient.email,
+          patientId: intake.patient.id,
+          doctorName: (service as any).doctor.name,
+          doctorId: (service as any).doctor.id,
+          specialty: (service as any).doctor.specialization,
+          serviceName: service.service_name,
+          serviceType: service.mode,
+          appointmentDate: intake.appointment?.appointment_date.toISOString().split('T')[0] || '',
+          appointmentTime: intake.appointment?.time || '',
+          duration: '30 min', // Default duration
+          status: intake.appointment?.status.toLowerCase() || 'scheduled',
+          insurance: 'Not specified', // Default value
+          amount: `$${service.price}`,
+        }))
     );
 
     // Group services by doctor and calculate stats
     const doctorMap = new Map();
-    
+
     services.forEach(service => {
       const doctor = (service as any).doctor;
       if (!doctorMap.has(doctor.id)) {
         // Get all services for this doctor
         const doctorServices = services
-          .filter(s => (s as any).doctor.id === doctor.id)
-          .map(s => ({
-            id: s.id,
-            name: s.service_name,
-            price: s.price,
-            mode: s.mode,
-            description: s.description || '',
-            totalAppointments: (s as any).patientIntakes.length,
-            revenue: s.price * (s as any).patientIntakes.length,
-          }));
+            .filter(s => (s as any).doctor.id === doctor.id)
+            .map(s => ({
+              id: s.id,
+              name: s.service_name,
+              price: s.price,
+              mode: s.mode,
+              description: s.description || '',
+              totalAppointments: (s as any).patientIntakes.length,
+              revenue: s.price * (s as any).patientIntakes.length,
+            }));
 
         // Calculate total revenue from all services for this doctor
         const totalRevenue = doctorServices.reduce((sum, s) => sum + s.revenue, 0);
@@ -161,9 +161,9 @@ export async function GET() {
           totalPatients: doctor._count.appointments,
           thisWeek: doctor.patientIntakes.length,
           revenue: `$${totalRevenue.toFixed(2)}`,
-          rating: doctor.Rating && doctor.Rating.length > 0 
-            ? (doctor.Rating.reduce((sum: number, r: any) => sum + r.rating, 0) / doctor.Rating.length).toFixed(1)
-            : 'N/A',
+          rating: doctor.Rating && doctor.Rating.length > 0
+              ? (doctor.Rating.reduce((sum: number, r: any) => sum + r.rating, 0) / doctor.Rating.length).toFixed(1)
+              : 'N/A',
           services: doctorServices,
         });
       }
@@ -183,4 +183,4 @@ export async function GET() {
       doctorStats: []
     });
   }
-} 
+}

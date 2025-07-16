@@ -2,8 +2,8 @@
 
 import db from "@/lib/db";
 import { PatientFormSchema } from "@/lib/schema";
-import { clerkClient } from "@clerk/nextjs/server";
 
+// Update patient info in database only
 export async function updatePatient(data: any, pid: string) {
   try {
     console.log("Starting patient update with data:", data);
@@ -59,43 +59,18 @@ export async function updatePatient(data: any, pid: string) {
 
     console.log("Database update successful:", updatedPatient);
 
-    // Update user data in Clerk
-    try {
-      const client = await clerkClient();
-      await client.users.updateUser(pid, {
-        firstName: patientData.first_name,
-        lastName: patientData.last_name,
-        publicMetadata: { 
-          role: "patient",
-          status: "active"
-        },
-      });
-      console.log("Clerk user update successful");
-    } catch (clerkError) {
-      console.error("Error updating Clerk user:", clerkError);
-      // Continue even if Clerk update fails, as the database update was successful
-    }
-
-    return { 
-      success: true, 
-      error: false, 
+    return {
+      success: true,
+      error: false,
       msg: "Patient updated successfully",
       data: updatedPatient
     };
   } catch (error: any) {
     console.error("Error updating patient:", error);
-    if (error?.errors) {
-      // Handle Clerk-specific errors
-      return { 
-        success: false, 
-        error: true, 
-        msg: error.errors.map((e: any) => e.message).join(", ") 
-      };
-    }
-    return { 
-      success: false, 
-      error: true, 
-      msg: error?.message || "Failed to update patient" 
+    return {
+      success: false,
+      error: true,
+      msg: error?.message || "Failed to update patient"
     };
   }
 }
@@ -105,7 +80,7 @@ export async function createNewPatient(data: any, userId: string) {
     console.log("=== CREATE NEW PATIENT DEBUG ===");
     console.log("Received data:", data);
     console.log("Received userId:", userId);
-    
+
     if (!userId) {
       console.log("No userId provided");
       return {
@@ -142,42 +117,6 @@ export async function createNewPatient(data: any, userId: string) {
         success: false,
         error: true,
         msg: "A patient profile already exists for this user",
-      };
-    }
-
-    console.log("No existing patient found, proceeding with creation...");
-    const client = await clerkClient();
-    
-    try {
-      // First check if user exists
-      console.log("Checking if user exists in Clerk...");
-      const existingUser = await client.users.getUser(userId);
-      if (!existingUser) {
-        console.log("User not found in Clerk");
-        return {
-          success: false,
-          error: true,
-          msg: "User not found. Please sign in again.",
-        };
-      }
-
-      console.log("User found in Clerk, updating metadata...");
-      // Update user metadata
-      await client.users.updateUser(userId, {
-        firstName: patientData.first_name,
-        lastName: patientData.last_name,
-        publicMetadata: { 
-          role: "patient",
-          status: "active"
-        },
-      });
-      console.log("Clerk user metadata updated successfully");
-    } catch (error) {
-      console.error("Error with Clerk user:", error);
-      return {
-        success: false,
-        error: true,
-        msg: "Error updating user information. Please try again.",
       };
     }
 
@@ -220,11 +159,11 @@ export async function createNewPatient(data: any, userId: string) {
 
       console.log("Patient created successfully:", newPatient);
 
-      return { 
-        success: true, 
-        error: false, 
+      return {
+        success: true,
+        error: false,
         msg: "Patient created successfully",
-        userId: userId 
+        userId: userId
       };
     } catch (error: any) {
       console.error("Error creating patient record:", error);
@@ -243,17 +182,10 @@ export async function createNewPatient(data: any, userId: string) {
     }
   } catch (error: any) {
     console.error("Error in createNewPatient:", error);
-    if (error?.errors) {
-      return { 
-        success: false, 
-        error: true, 
-        msg: error.errors.map((e: any) => e.message).join(", ") 
-      };
-    }
-    return { 
-      success: false, 
-      error: true, 
-      msg: error?.message || "Failed to create patient" 
+    return {
+      success: false,
+      error: true,
+      msg: error?.message || "Failed to create patient"
     };
   }
 }

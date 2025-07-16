@@ -1,22 +1,22 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
+import { getCurrentUserFromToken } from "@/utils/auth";
 
 export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
+    request: Request,
+    { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = await params;
-    const { userId } = await auth();
-    if (!userId) {
+    const { id } = params;
+    const user = await getCurrentUserFromToken();
+    if (!user?.userId) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
     const notification = await prisma.notification.findUnique({
       where: { id: parseInt(id) }
     });
-    if (!notification || notification.userId !== userId) {
+    if (!notification || String(notification.userId) !== String(user.userId)) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
@@ -34,4 +34,4 @@ export async function POST(
     console.error("Error marking notification as read:", error);
     return new NextResponse("Internal Server Error", { status: 500 });
   }
-} 
+}
