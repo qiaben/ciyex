@@ -1,4 +1,4 @@
-import { getCurrentUser } from "@/utils/auth";
+import { getCurrentUserFromToken } from "@/app/utils/auth";
 import { getPatientFullDataById } from "@/utils/services/patient";
 
 interface PatientRatingWrapperProps {
@@ -7,9 +7,9 @@ interface PatientRatingWrapperProps {
 
 export const PatientRatingWrapper = async ({ id }: PatientRatingWrapperProps) => {
   // Use your JWT-based user method
-  const user = await getCurrentUser();
+    const user = await getCurrentUserFromToken();
 
-  // You can use user?.id as the authenticated user id if needed
+    // You can use user?.id as the authenticated user id if needed
   // But for now, keeping the original logic (patient ID is passed as prop)
   const result = await getPatientFullDataById(id);
   if (!result.success) {

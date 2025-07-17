@@ -1,14 +1,11 @@
 // app/components/MedicalHistoryWrapper.tsx
 
-import { getCurrentUserFromToken } from "@/utils/auth";
+import { getCurrentUserFromToken } from "@/app/utils/auth";
 import { getPatientFullDataById } from "@/utils/services/patient";
 import { format } from "date-fns";
 import { Calendar, User, CheckCircle, AlertCircle } from "lucide-react";
 
-/*
-  Variant 1: Authenticated user's own history (SSR/server)
-  Usage: <MedicalHistoryWrapper />
-*/
+
 export const MedicalHistoryWrapper = async () => {
     // Get JWT from your own helper (fetch from cookie/header inside helper)
     const user = await getCurrentUserFromToken();
@@ -21,7 +18,8 @@ export const MedicalHistoryWrapper = async () => {
         );
     }
 
-    const result = await getPatientFullDataById(user.userId);
+    const result = await getPatientFullDataById(String(user.userId));
+
 
     if (!result.success) {
         return (
@@ -87,10 +85,6 @@ export const MedicalHistoryWrapper = async () => {
     );
 };
 
-/*
-  Variant 2: Pass patientId as prop
-  Usage: <MedicalHistoryWrapperWithId patientId="..." />
-*/
 
 export const MedicalHistoryWrapperWithId = async ({
                                                       patientId,

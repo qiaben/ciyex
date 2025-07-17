@@ -29,7 +29,7 @@ import { Textarea } from "../ui/textarea";
 import { toast } from "sonner";
 import { createRating } from "@/app/actions/general";
 import Confetti from "react-confetti";
-import { getCurrentUserFromToken } from "@/utils/auth"; // <-- use your JWT util
+import { getCurrentUserFromToken } from "@/app/utils/auth";
 
 export const ratingSchema = z.object({
   patient_id: z.string(),
