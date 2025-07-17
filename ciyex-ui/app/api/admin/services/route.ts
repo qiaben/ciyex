@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUserFromToken } from "@/utils/auth";
+import { getCurrentUserFromToken } from "../../../utils/auth";
 import { PatientIntake, Services, PaymentStatus, Doctor, Rating, Patient, Appointment } from "@prisma/client";
 
 interface Bill {

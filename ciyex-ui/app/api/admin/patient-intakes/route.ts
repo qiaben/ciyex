@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUserFromToken } from "@/utils/auth"; // Your JWT utility
+import { getCurrentUserFromToken } from "../../../utils/auth";
 
 export async function GET() {
   try {

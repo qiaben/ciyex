@@ -1,18 +1,18 @@
-import { getCurrentUserFromToken } from "@/utils/auth";
+import { getCurrentUserFromToken } from "../../utils/auth";
 import { getPatientAppointments } from "@/utils/services/appointment";
 import MessagesClient from "./MessagesClient";
 
 export default async function MessagesPage() {
   // Use JWT-based auth instead of Clerk
   const user = await getCurrentUserFromToken();
-  if (!user?.id) {
+    if (!user?.userId) {
     return <div>Please sign in to continue</div>;
   }
 
   const { data: appointments = [] } = await getPatientAppointments({
     page: 1,
     limit: 1000,
-    id: user.id,
+      id: String(user.userId),
   });
 
   const filtered = (appointments || []).filter(

@@ -8,7 +8,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Plus, List, Edit } from "lucide-react";
 // REMOVE Clerk import
 // import { useUser } from "@clerk/nextjs";
-import { getCurrentUserFromToken } from "@/utils/auth"; // <-- your helper
+import { getCurrentUserFromToken } from "../../utils/auth";
 
 const pageVariants = {
   initial: { opacity: 0 },
@@ -74,7 +74,7 @@ const DoctorServiceManagement = () => {
     async function fetchUser() {
       // You might read JWT from localStorage/cookie inside helper
       const user = await getCurrentUserFromToken();
-      setUserId(user?.userId || null);
+        setUserId(user?.userId?.toString() || null);
     }
     fetchUser();
   }, []);
