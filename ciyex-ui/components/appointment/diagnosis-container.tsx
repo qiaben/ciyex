@@ -32,7 +32,7 @@ export const DiagnosisContainer = async ({
     const diagnosis = data?.diagnosis || null;
 
     const roles = Array.isArray(user?.roles) ? user.roles : [];
-    const isPatient = checkRole("PATIENT", roles);
+    const isPatient = await checkRole("PATIENT"); // Check if the current user is a patient
 
 
     return (
