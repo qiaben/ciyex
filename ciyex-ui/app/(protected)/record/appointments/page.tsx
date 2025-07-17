@@ -5,7 +5,7 @@ import SearchInput from "@/components/search-input";
 import { Table } from "@/components/tables/table";
 import { ViewAppointment } from "@/components/view-appointment";
 import { getRole, checkRole } from "@/utils/roles";
-import { getCurrentUserFromToken } from "@/utils/auth";
+import { getCurrentUserFromToken } from "../../../utils/auth";
 import { DATA_LIMIT } from "@/utils/seeting";
 import { getPatientAppointments } from "@/utils/services/appointment";
 import { format } from "date-fns";
@@ -29,27 +29,29 @@ const Appointments = async (props: {
 }) => {
   const searchParams = await props.searchParams;
   const user = await getCurrentUserFromToken();
-  if (!user?.id) return <div>Unauthorized</div>;
+    if (!user?.userId) return <div>Unauthorized</div>;
 
-  const userRole = await getRole(user);         // getRole should accept user (if not, refactor as needed)
-  const isPatient = await checkRole("PATIENT", user); // checkRole should accept user
+    const userRole = await getRole();  // If getRole doesn't take any parameters
+    const isPatient = await checkRole("PATIENT");  // Adjust checkRole if needed
+
+// checkRole should accept user
 
   const page = (searchParams?.p || "1") as string;
   const searchQuery = searchParams?.q || "";
-  const id = searchParams?.id || undefined;
+    const id = searchParams?.id ? String(searchParams.id) : undefined;
 
   let queryId = undefined;
   if (userRole == "admin" || (userRole == "doctor" && id)) {
     queryId = id;
   } else if (userRole === "doctor" || userRole === "patient") {
-    queryId = user.id;
+      queryId = user.userId; // Correct usage
   }
 
   const { data, totalPages, totalRecord, currentPage } =
       await getPatientAppointments({
         page,
         search: searchQuery,
-        id: queryId!,
+          id: queryId?.toString() || undefined,
       });
 
   if (!data) return null;
@@ -95,7 +97,7 @@ const Appointments = async (props: {
             <div className="flex justify-center items-center gap-2">
               <ViewAppointment id={item?.id.toString()} buttonClassName="px-3 py-1 border border-primary text-primary bg-card text-xs font-semibold hover:bg-primary/10 transition rounded-none" />
               <AppointmentActionOptions
-                  userId={user.id}
+                  userId={String(user.userId)}
                   patientId={item?.patient_id}
                   doctorId={item?.doctor_id}
                   status={item?.status}

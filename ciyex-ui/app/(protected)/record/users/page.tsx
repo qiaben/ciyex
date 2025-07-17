@@ -1,4 +1,4 @@
-import { getCurrentUserFromToken } from "@/utils/auth";
+import { getCurrentUserFromToken } from "../../../utils/auth";
 import UserTableClient from "./UserTableClient";
 import { Users, Mail, Calendar } from "lucide-react";
 import React from "react";

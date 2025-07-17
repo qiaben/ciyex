@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { createAppointmentNotification } from "@/lib/notifications";
-import { getCurrentUserFromToken } from "@/utils/auth";
+import { getCurrentUserFromToken } from "../../../utils/auth";
 
 // Next.js expects dynamic route param to be passed in `params` (not Promise)
 export async function GET(

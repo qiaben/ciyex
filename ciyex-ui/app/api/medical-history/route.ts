@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { getCurrentUserFromToken } from "@/utils/auth";
+import { getCurrentUserFromToken } from "../../utils/auth";
 
 export async function GET(request: Request) {
   try {
@@ -16,7 +16,7 @@ export async function GET(request: Request) {
     }
 
     const data = await db.medicalRecords.findMany({
-      where: { patient_id: patientId ? patientId : String(user.userId) },
+        where: { patient_id: patientId || String(user?.userId) }, // Fallback to user.userId if patientId is not provided
       include: {
         diagnosis: { include: { doctor: true } },
         lab_test: true,

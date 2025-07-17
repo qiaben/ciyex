@@ -1,5 +1,5 @@
 import { getPatientFullDataById } from "@/utils/services/patient";
-import { auth } from "@/utils/auth";
+import { getCurrentUserFromToken } from "@/app/utils/auth";
 import PatientProfileClient from "./patient-profile-client";
 
 interface ParamsProps {
@@ -15,13 +15,15 @@ const PatientProfile = async (props: ParamsProps) => {
   // Determine the ID to fetch: either the explicit patientId, or the logged-in user if 'self'
   let id = params.patientId;
   let patientId = params.patientId;
+  let user = null;
 
-  if (patientId === "self") {
-    const { userId } = await auth();
+    if (patientId === "self") {
+      const user = await getCurrentUserFromToken();
+      const userId = user?.userId;
     if (!userId) {
       return <div>Unauthorized: Please sign in to view your profile.</div>;
     }
-    id = userId;
+      id = userId.toString();
   }
 
   // Fetch patient data from your backend/service
@@ -37,7 +39,7 @@ const PatientProfile = async (props: ParamsProps) => {
   const { data } = result as { success: true; data: any };
 
   // Render client component with fetched data
-  return <PatientProfileClient data={data} patientId={patientId} id={id} />;
+    return <PatientProfileClient data={data} id={id} patientId={patientId} user={user} />;
 };
 
 export default PatientProfile;

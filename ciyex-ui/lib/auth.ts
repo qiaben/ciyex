@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCurrentUserFromToken } from '@/utils/auth'; // Adjust this import if needed
+import { getCurrentUserFromToken } from "@/app/utils/auth";// Adjust this import if needed
 
 export async function getUserId(req: NextRequest): Promise<string | null> {
   const user = await extractUser(req);

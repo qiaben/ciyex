@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
-import { getCurrentUserFromToken } from "@/utils/auth"; // Your JWT session util
+import { getCurrentUserFromToken } from "../../utils/auth";
 
 const MINIMUM_AMOUNT = 50; // 50 cents in USD
 
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Use your utility to decode user session from token
-    const user = await getCurrentUserFromToken(jwtToken);
+      const user = await getCurrentUserFromToken(); // Call without passing jwtToken
 
     if (!user || !user.userId) {
       console.error("No user found in JWT token");

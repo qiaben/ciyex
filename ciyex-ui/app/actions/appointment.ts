@@ -4,7 +4,7 @@ import { VitalSignsFormData } from "@/components/dialogs/add-vital-signs";
 import db from "@/lib/db";
 import { AppointmentSchema, VitalSignsSchema } from "@/lib/schema";
 import { AppointmentStatus } from "@prisma/client";
-import { getCurrentUserFromToken } from "@/utils/auth"; // <-- JWT helper
+import { getCurrentUserFromToken } from "../utils/auth"; // <-- JWT helper
 
 export async function createNewAppointment(data: any) {
   try {

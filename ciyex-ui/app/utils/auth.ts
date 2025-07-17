@@ -24,7 +24,7 @@ export interface SessionUser {
     status?: string; // <-- Add this line
 }
 
-export async function getCurrentUserFromToken(): Promise<SessionUser | null> {
+export async function getCurrentUserFromToken(jwtToken: string): Promise<SessionUser | null> {
     const token = TOKEN;
     if (!token) return null;
 
