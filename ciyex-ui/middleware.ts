@@ -58,7 +58,7 @@ export default async function middleware(req: any) {
     }
 
     // Call getCurrentUserFromToken to retrieve the user data with the token
-    const user = await getCurrentUserFromToken(token);
+    const user = await getCurrentUserFromToken();
 
     // Log user data for debugging
     console.log("User:", user);

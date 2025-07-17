@@ -1,23 +1,32 @@
 import BillingClientWrapper from "./BillingClientWrapper";
 import { getBillsForAppointment, getPaymentForAppointment, getServicesData } from "@/lib/billing";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUserFromToken } from "@/app/utils/auth";
 
+// Updated: Ensure that the environment variable JWT_SECRET is set properly
 export default async function Billing({ appointmentId }: { appointmentId: string }) {
-  const user = await getCurrentUser();
-  const isAdmin = user?.role === "ADMIN";
-  const isDoctor = user?.role === "DOCTOR";
-  const bills = await getBillsForAppointment(appointmentId);
-  const payment = await getPaymentForAppointment(appointmentId);
-  const servicesData = await getServicesData();
+    // Fetch the current user using the stored TOKEN from process.env.JWT_SECRET
+    const user = await getCurrentUserFromToken();  // Since TOKEN is already in auth.ts, no need to pass it here
 
-  return (
-    <BillingClientWrapper
-      bills={bills}
-      payment={payment}
-      appointmentId={appointmentId}
-      isAdmin={isAdmin}
-      isDoctor={isDoctor}
-      servicesData={servicesData}
-    />
-  );
-} 
+    if (!user) {
+        throw new Error("User not found or authentication failed");
+    }
+
+    const isAdmin = user?.roles.includes("ADMIN");
+    const isDoctor = user?.roles.includes("DOCTOR");
+
+    // Fetch the appointment data
+    const bills = await getBillsForAppointment(appointmentId);
+    const payment = await getPaymentForAppointment(appointmentId);
+    const servicesData = await getServicesData();
+
+    return (
+        <BillingClientWrapper
+            bills={bills}
+            payment={payment}
+            appointmentId={appointmentId}
+            isAdmin={isAdmin}
+            isDoctor={isDoctor}
+            servicesData={servicesData}
+        />
+    );
+}
