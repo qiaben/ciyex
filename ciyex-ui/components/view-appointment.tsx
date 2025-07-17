@@ -1,36 +1,33 @@
 import { getAppointmentById } from "@/utils/services/appointment";
 import React from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "./ui/dialog";
-import { Button } from "./ui/button";
-import { calculateAge, formatDateTime } from "@/utils";
-import { ProfileImage } from "./profile-image";
-import { Calendar, Phone } from "lucide-react";
-import { format } from "date-fns";
-import { AppointmentStatusIndicator } from "./appointment-status-indicator";
+import { getCurrentUserFromToken } from "@/app/utils/auth";
 import { checkRole } from "@/utils/roles";
-import { getCurrentUserFromToken } from "@/utils/auth";
-import { AppointmentAction } from "./appointment-action";
 import { ViewAppointmentClient } from "./ViewAppointmentClient";
 
-export async function ViewAppointment({ id, buttonClassName }: { id: string | undefined, buttonClassName?: string }) {
-  const { data } = await getAppointmentById(Number(id!));
-  const user = await getCurrentUserFromToken();
-  const userId = user?.userId ? String(user.userId) : "";
-  const isAdmin = user?.roles ? checkRole("ADMIN", user.roles) : false;
+interface ViewAppointmentProps {
+    id: string | undefined;
+    buttonClassName?: string;
+}
 
-  return (
-      <ViewAppointmentClient
-          data={data}
-          userId={userId}
-          isAdmin={isAdmin}
-          buttonClassName={buttonClassName}
-      />
-  );
+export async function ViewAppointment({ id, buttonClassName }: ViewAppointmentProps) {
+    const { data } = await getAppointmentById(Number(id!));
+
+    const user = await getCurrentUserFromToken();
+
+    const userId = user?.userId ? String(user.userId) : "";
+
+    // Ensure roles is a string array
+    const roles: string[] = Array.isArray(user?.roles) ? user.roles : [];
+
+    // Ensure isAdmin is always boolean
+    const isAdmin = checkRole("ADMIN", roles);
+
+    return (
+        <ViewAppointmentClient
+            data={data}
+            userId={userId}
+            isAdmin={!!isAdmin} // ensure strict boolean
+            buttonClassName={buttonClassName}
+        />
+    );
 }

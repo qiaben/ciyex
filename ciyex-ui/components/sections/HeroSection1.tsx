@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
 import MovingBar from './MovingBar';
 import AnimatedPinDemo from '@/components/3d-pin-demo';
-import { getCurrentUserFromToken } from "@/utils/auth"; // <-- Custom JWT util
+import { getCurrentUserFromToken } from "@/app/utils/auth"; // <-- Custom JWT util
 
 // Create motion button component
 const MotionButton = motion(Button);
@@ -348,5 +348,10 @@ const HeroSection: React.FC = () => {
 
 export default HeroSection;
 
-// You can export HealthGame as before if needed, just import getCurrentUserFromToken for any user/session logic.
+// Example placeholder definition
+const HealthGame = () => {
+    return <div>Health Game Coming Soon...</div>;
+};
+
 export { HealthGame };
+

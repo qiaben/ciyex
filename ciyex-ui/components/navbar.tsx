@@ -24,7 +24,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { getCurrentUserFromToken } from "@/utils/auth"; // <-- your helper!
+import { getCurrentUserFromToken } from "@/app/utils/auth"; // <-- your helper!
 
 // Helper to read JWT and return { userId, email, fullName, roles, ... }
 const useCurrentUser = () => {

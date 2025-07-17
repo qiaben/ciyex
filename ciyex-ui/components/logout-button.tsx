@@ -10,7 +10,7 @@ export const LogoutButton = () => {
     if (typeof window !== "undefined") {
       localStorage.removeItem("cart");
     }
-    await signOut({ callbackUrl: "/login" }); // Redirect to login after sign out
+    await signOut({ callbackUrl: "/login" });
   };
 
   return (

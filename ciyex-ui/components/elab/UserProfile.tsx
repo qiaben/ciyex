@@ -15,7 +15,7 @@ import { useRouter } from 'next/navigation';
 import { useTestOrders } from '@/components/context/TestOrderContext';
 import { useToast } from "@/components/ui/use-toast";
 import { Badge } from "@/components/ui/badge";
-import { getCurrentUserFromToken } from "@/utils/auth"; // <- JWT user
+import { getCurrentUserFromToken } from "@/app/utils/auth";  // <- JWT user
 
 const UserProfile: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
