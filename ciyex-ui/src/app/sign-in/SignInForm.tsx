@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import { jwtDecode } from "jwt-decode"; // Correct named import
 
 interface Org {
     orgId: number;
@@ -45,9 +46,25 @@ export default function SignInForm() {
     const [error, setError] = useState<string>("");
     const [step, setStep] = useState<1 | 2>(1);
     const [loading, setLoading] = useState(false);
-    const [selecting, setSelecting] = useState(false); // NEW: for Continue btn loading
+    const [selecting, setSelecting] = useState(false);
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+
+    // ---- AUTO-REDIRECT IF ALREADY LOGGED IN ----
+    useEffect(() => {
+        const token = localStorage.getItem("token");
+        if (token) {
+            try {
+                const decoded: { exp: number } = jwtDecode(token);
+                if (decoded.exp * 1000 > Date.now()) {
+                    router.replace("/dashboard");
+                }
+            } catch {
+                // invalid token, show login
+            }
+        }
+    }, [router]);
+    // --------------------------------------------
 
     // Step 1: Submit login
     const handleSubmit = async (e: React.FormEvent) => {
@@ -81,7 +98,7 @@ export default function SignInForm() {
             setError("Please select all options.");
             return;
         }
-        setSelecting(true); // NEW: disable btn while routing
+        setSelecting(true);
 
         // Save data to localStorage
         localStorage.setItem("token", loginResponse?.data?.token || "");
@@ -91,7 +108,6 @@ export default function SignInForm() {
         localStorage.setItem("userEmail", loginResponse?.data?.email || "");
         localStorage.setItem("userFullName", loginResponse?.data?.fullName || "");
 
-        // Delay to ensure localStorage is written (sometimes useful)
         setTimeout(() => {
             router.replace("/dashboard");
         }, 100);
