@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { jwtDecode } from "jwt-decode"; // Correct named import
+import { jwtDecode } from "jwt-decode";
 
 interface Org {
     orgId: number;
@@ -34,15 +34,12 @@ export default function SignInForm() {
 
     const initialRole = searchParams.get("role") || "";
 
-    // Step 1: login form
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
-    // Step 2: selection
     const [loginResponse, setLoginResponse] = useState<LoginResponse | null>(null);
     const [selectedOrg, setSelectedOrg] = useState<string>("");
     const [selectedFacility, setSelectedFacility] = useState<string>("");
     const [selectedRole, setSelectedRole] = useState(initialRole);
-    // UI states
     const [error, setError] = useState<string>("");
     const [step, setStep] = useState<1 | 2>(1);
     const [loading, setLoading] = useState(false);
@@ -50,10 +47,13 @@ export default function SignInForm() {
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
-    // ---- AUTO-REDIRECT IF ALREADY LOGGED IN ----
+    // Auto-redirect if already logged in and context is present
     useEffect(() => {
         const token = localStorage.getItem("token");
-        if (token) {
+        const orgId = localStorage.getItem("orgId");
+        const facilityId = localStorage.getItem("facilityId");
+        const role = localStorage.getItem("role");
+        if (token && orgId && facilityId && role) {
             try {
                 const decoded: { exp: number } = jwtDecode(token);
                 if (decoded.exp * 1000 > Date.now()) {
@@ -64,7 +64,6 @@ export default function SignInForm() {
             }
         }
     }, [router]);
-    // --------------------------------------------
 
     // Step 1: Submit login
     const handleSubmit = async (e: React.FormEvent) => {
@@ -79,9 +78,23 @@ export default function SignInForm() {
             });
             const data: LoginResponse = await res.json();
             if (data.success && data.data) {
-                setLoginResponse(data);
-                setStep(2);
-                setError("");
+                // Always update JWT and user info
+                localStorage.setItem("token", data.data.token);
+                localStorage.setItem("userEmail", data.data.email || "");
+                localStorage.setItem("userFullName", data.data.fullName || "");
+
+                // Check if context is already present
+                const orgId = localStorage.getItem("orgId");
+                const facilityId = localStorage.getItem("facilityId");
+                const role = localStorage.getItem("role");
+
+                if (orgId && facilityId && role) {
+                    router.replace("/dashboard");
+                } else {
+                    setLoginResponse(data);
+                    setStep(2); // show selection step
+                    setError("");
+                }
             } else {
                 setError(data.message || "Invalid credentials");
             }
@@ -100,13 +113,10 @@ export default function SignInForm() {
         }
         setSelecting(true);
 
-        // Save data to localStorage
-        localStorage.setItem("token", loginResponse?.data?.token || "");
+        // Save context data to localStorage
         localStorage.setItem("orgId", selectedOrg);
         localStorage.setItem("facilityId", selectedFacility);
         localStorage.setItem("role", selectedRole);
-        localStorage.setItem("userEmail", loginResponse?.data?.email || "");
-        localStorage.setItem("userFullName", loginResponse?.data?.fullName || "");
 
         setTimeout(() => {
             router.replace("/dashboard");
@@ -121,9 +131,11 @@ export default function SignInForm() {
     }, [selectedOrg]);
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-gray-50">
-            <div className="w-full max-w-md space-y-6 bg-white p-8 rounded-xl shadow">
-                <h2 className="text-2xl font-bold text-center">Sign In</h2>
+        <div className="bg-gradient-to-tr from-blue-100 via-blue-200 to-blue-400 min-h-screen flex items-center justify-center">
+            <div className="w-full max-w-md space-y-6 bg-white p-8 rounded-2xl shadow-xl">
+                <h2 className="text-3xl font-extrabold text-center text-blue-700 mb-2 tracking-tight">
+                    Sign In
+                </h2>
 
                 {error && (
                     <div className="p-2 text-red-600 border border-red-300 bg-red-50 rounded mb-2 text-center">
@@ -134,7 +146,7 @@ export default function SignInForm() {
                 {step === 1 && (
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
-                            <label htmlFor="email" className="block text-sm font-medium">
+                            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                                 Email
                             </label>
                             <input
@@ -145,12 +157,12 @@ export default function SignInForm() {
                                 value={email}
                                 onChange={e => setEmail(e.target.value)}
                                 required
-                                className="mt-1 w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="mt-1 w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
                                 disabled={loading}
                             />
                         </div>
                         <div>
-                            <label htmlFor="password" className="block text-sm font-medium">
+                            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                                 Password
                             </label>
                             <input
@@ -161,7 +173,7 @@ export default function SignInForm() {
                                 value={password}
                                 onChange={e => setPassword(e.target.value)}
                                 required
-                                className="mt-1 w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="mt-1 w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
                                 disabled={loading}
                             />
                         </div>
@@ -178,13 +190,13 @@ export default function SignInForm() {
                 {step === 2 && loginResponse?.data && (
                     <div className="space-y-4">
                         <div>
-                            <label className="block text-sm font-medium">
+                            <label className="block text-sm font-medium text-gray-700">
                                 Select Practice/Organization
                             </label>
                             <select
                                 value={selectedOrg}
                                 onChange={e => setSelectedOrg(e.target.value)}
-                                className="mt-1 w-full px-3 py-2 border rounded-lg"
+                                className="mt-1 w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
                                 required
                                 disabled={selecting}
                             >
@@ -200,13 +212,13 @@ export default function SignInForm() {
                         {selectedOrg && (
                             <>
                                 <div>
-                                    <label className="block text-sm font-medium">
+                                    <label className="block text-sm font-medium text-gray-700">
                                         Select Location/Facility
                                     </label>
                                     <select
                                         value={selectedFacility}
                                         onChange={e => setSelectedFacility(e.target.value)}
-                                        className="mt-1 w-full px-3 py-2 border rounded-lg"
+                                        className="mt-1 w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
                                         required
                                         disabled={selecting}
                                     >
@@ -221,13 +233,13 @@ export default function SignInForm() {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium">
+                                    <label className="block text-sm font-medium text-gray-700">
                                         Select Role
                                     </label>
                                     <select
                                         value={selectedRole}
                                         onChange={e => setSelectedRole(e.target.value)}
-                                        className="mt-1 w-full px-3 py-2 border rounded-lg"
+                                        className="mt-1 w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
                                         required
                                         disabled={selecting}
                                     >

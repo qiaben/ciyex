@@ -5,6 +5,7 @@ export function useUserRole() {
 
     useEffect(() => {
         const storedRole = localStorage.getItem("role");
+        console.log("Read role from localStorage:", storedRole); // <-- Add this line
         setRole(storedRole);
         const onStorage = () => setRole(localStorage.getItem("role"));
         window.addEventListener("storage", onStorage);
