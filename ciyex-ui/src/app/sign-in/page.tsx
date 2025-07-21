@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import jwtDecode from "jwt-decode"; // npm install jwt-decode
 
 interface Org {
     orgId: number;
@@ -31,7 +32,6 @@ export default function SignInForm() {
     const searchParams = useSearchParams();
     const router = useRouter();
 
-    // Get role from URL param, if provided
     const initialRole = searchParams.get("role") || "";
 
     // Step 1: login form
@@ -46,9 +46,25 @@ export default function SignInForm() {
     const [error, setError] = useState<string>("");
     const [step, setStep] = useState<1 | 2>(1);
     const [loading, setLoading] = useState(false);
+    const [selecting, setSelecting] = useState(false);
 
-    // Use NEXT_PUBLIC_API_URL from environment
     const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+
+    // ---- AUTO-REDIRECT IF ALREADY LOGGED IN ----
+    useEffect(() => {
+        const token = localStorage.getItem("token");
+        if (token) {
+            try {
+                const decoded: { exp: number } = jwtDecode(token);
+                if (decoded.exp * 1000 > Date.now()) {
+                    router.replace("/dashboard");
+                }
+            } catch {
+                // invalid token, show login
+            }
+        }
+    }, [router]);
+    // --------------------------------------------
 
     // Step 1: Submit login
     const handleSubmit = async (e: React.FormEvent) => {
@@ -64,7 +80,8 @@ export default function SignInForm() {
             const data: LoginResponse = await res.json();
             if (data.success && data.data) {
                 setLoginResponse(data);
-                setStep(2); // Show org/facility/role picker
+                setStep(2);
+                setError("");
             } else {
                 setError(data.message || "Invalid credentials");
             }
@@ -76,11 +93,13 @@ export default function SignInForm() {
     };
 
     // Step 2: After selection, store data and redirect
-    const handleSelect = () => {
+    const handleSelect = async () => {
         if (!selectedOrg || !selectedFacility || !selectedRole) {
             setError("Please select all options.");
             return;
         }
+        setSelecting(true);
+
         // Save data to localStorage
         localStorage.setItem("token", loginResponse?.data?.token || "");
         localStorage.setItem("orgId", selectedOrg);
@@ -88,8 +107,10 @@ export default function SignInForm() {
         localStorage.setItem("role", selectedRole);
         localStorage.setItem("userEmail", loginResponse?.data?.email || "");
         localStorage.setItem("userFullName", loginResponse?.data?.fullName || "");
-        // Redirect to dashboard or wherever appropriate
-        router.replace("/dashboard");
+
+        setTimeout(() => {
+            router.replace("/dashboard");
+        }, 100);
     };
 
     // When org changes, clear facility/role
@@ -125,6 +146,7 @@ export default function SignInForm() {
                                 onChange={e => setEmail(e.target.value)}
                                 required
                                 className="mt-1 w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                disabled={loading}
                             />
                         </div>
                         <div>
@@ -140,6 +162,7 @@ export default function SignInForm() {
                                 onChange={e => setPassword(e.target.value)}
                                 required
                                 className="mt-1 w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                disabled={loading}
                             />
                         </div>
                         <button
@@ -163,6 +186,7 @@ export default function SignInForm() {
                                 onChange={e => setSelectedOrg(e.target.value)}
                                 className="mt-1 w-full px-3 py-2 border rounded-lg"
                                 required
+                                disabled={selecting}
                             >
                                 <option value="">-- Select Organization --</option>
                                 {loginResponse.data.orgs.map(org => (
@@ -184,6 +208,7 @@ export default function SignInForm() {
                                         onChange={e => setSelectedFacility(e.target.value)}
                                         className="mt-1 w-full px-3 py-2 border rounded-lg"
                                         required
+                                        disabled={selecting}
                                     >
                                         <option value="">-- Select Facility --</option>
                                         {loginResponse.data.orgs
@@ -204,6 +229,7 @@ export default function SignInForm() {
                                         onChange={e => setSelectedRole(e.target.value)}
                                         className="mt-1 w-full px-3 py-2 border rounded-lg"
                                         required
+                                        disabled={selecting}
                                     >
                                         <option value="">-- Select Role --</option>
                                         {loginResponse.data.orgs
@@ -222,8 +248,9 @@ export default function SignInForm() {
                         <button
                             onClick={handleSelect}
                             className="w-full py-2 px-4 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition"
+                            disabled={selecting}
                         >
-                            Continue
+                            {selecting ? "Redirecting..." : "Continue"}
                         </button>
                     </div>
                 )}
