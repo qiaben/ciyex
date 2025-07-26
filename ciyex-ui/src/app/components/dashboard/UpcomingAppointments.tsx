@@ -3,14 +3,27 @@
 import { CalendarDays } from "lucide-react";
 
 export default function UpcomingAppointments() {
-    // TODO: Replace with real data check
     const hasFutureAppointments = false;
 
     return (
-        <div className="bg-neutral-900 text-white rounded-xl p-6 min-h-[200px] flex flex-col justify-center items-center shadow">
-            <CalendarDays className="w-10 h-10 text-blue-500 mb-4" />
-            <p className="text-center text-gray-400 font-medium text-md">
-                {hasFutureAppointments ? "You have upcoming appointments." : "No appointments for 2025"}
+        <div
+            className="rounded-xl shadow transition-transform duration-500 hover:scale-[1.02]"
+            style={{
+                backgroundColor: "#e0f7ff",
+                padding: "24px",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                minHeight: "200px",
+                color: "#1e293b",
+            }}
+        >
+            <CalendarDays className="w-10 h-10 text-blue-600 mb-4" />
+            <p className="text-center font-medium text-md">
+                {hasFutureAppointments
+                    ? "You have upcoming appointments."
+                    : "No appointments for 2025"}
             </p>
         </div>
     );
