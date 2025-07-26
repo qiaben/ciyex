@@ -9,11 +9,9 @@ export default function DashboardPage() {
     const router = useRouter();
 
     useEffect(() => {
-        // Try to load role from localStorage
         const token = localStorage.getItem("token");
         const userRole = localStorage.getItem("role");
         if (!token || !userRole) {
-            // If not logged in, redirect to sign-in
             router.replace("/sign-in");
         } else {
             setRole(userRole);
@@ -21,7 +19,7 @@ export default function DashboardPage() {
     }, [router]);
 
     if (role === null) {
-        return <div>Loading...</div>;
+        return <div className="p-6 text-lg">Loading dashboard...</div>;
     }
 
     return <RoleDashboard role={role} />;

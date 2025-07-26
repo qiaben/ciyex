@@ -1,16 +1,16 @@
-// components/dashboard/SidebarMenu.tsx
 "use client";
+
 import React, { useState } from "react";
 import { Home, Users, User, ClipboardList, Settings } from "lucide-react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 
 const menu = [
-    { label: "Dashboard", icon: <Home />, href: "/dashboard" },
-    { label: "Users", icon: <Users />, href: "/dashboard/users", roles: ["SUPER_ADMIN", "ADMIN"] },
-    { label: "Patients", icon: <User />, href: "/dashboard/patients", roles: ["DOCTOR", "NURSE", "RECEPTIONIST"] },
-    { label: "Appointments", icon: <ClipboardList />, href: "/dashboard/appointments" },
-    { label: "Settings", icon: <Settings />, href: "/dashboard/settings" }
+    { label: "Dashboard", icon: <Home />, href: "/doctor" },
+    { label: "Users", icon: <Users />, href: "/doctor/users", roles: ["SUPER_ADMIN", "ADMIN"] },
+    { label: "Patients", icon: <User />, href: "/doctor/patients", roles: ["DOCTOR", "NURSE", "RECEPTIONIST"] },
+    { label: "Appointments", icon: <ClipboardList />, href: "/doctor/appointments" },
+    { label: "Settings", icon: <Settings />, href: "/doctor/settings" }
 ];
 
 export default function SidebarMenu() {
@@ -23,10 +23,11 @@ export default function SidebarMenu() {
         >
             <button
                 className="w-full flex justify-end p-2"
-                onClick={() => setOpen(o => !o)}
+                onClick={() => setOpen((o) => !o)}
             >
                 <span className="text-xs">{open ? "<" : ">"}</span>
             </button>
+
             <nav>
                 {menu.map((item) => (
                     <Link

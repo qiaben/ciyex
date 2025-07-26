@@ -2,9 +2,8 @@ import SidebarMenu from "@/components/dashboard/SidebarMenu";
 import TopBar from "@/components/dashboard/TopBar";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-
     return (
-        <div className="flex min-h-screen">
+        <div className="flex min-h-screen bg-gray-50 dark:bg-neutral-900">
             <SidebarMenu />
             <div className="flex-1 flex flex-col">
                 <TopBar />
