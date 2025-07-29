@@ -11,7 +11,23 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: ciyexdb
-
+  postgres:
+    image: postgres:16
+    container_name: ciyex-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ciyexdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
   app:
     build:
       context: .
@@ -28,3 +44,4 @@ services:
 
 volumes:
   databasevolume: {}
+  pgdata:
