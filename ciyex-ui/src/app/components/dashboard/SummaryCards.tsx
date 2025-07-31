@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Users, CalendarDays, Stethoscope, DollarSign } from "lucide-react";
 import { CSSProperties } from "react";
 import Link from "next/link";
@@ -40,12 +41,8 @@ function SummaryCard({
     const cardContent = (
         <div
             style={cardStyle}
-            onMouseEnter={(e) => {
-                e.currentTarget.style.transform = "rotateY(180deg)";
-            }}
-            onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "rotateY(0deg)";
-            }}
+            onMouseEnter={(e) => (e.currentTarget.style.transform = "rotateY(180deg)")}
+            onMouseLeave={(e) => (e.currentTarget.style.transform = "rotateY(0deg)")}
         >
             <div>
                 <div style={{ fontWeight: "bold", fontSize: "18px" }}>{title}</div>
@@ -60,6 +57,50 @@ function SummaryCard({
 }
 
 export default function SummaryCards() {
+    const [counts, setCounts] = useState({ patients: 0, appointments: 0 });
+
+    useEffect(() => {
+        async function fetchCounts() {
+            try {
+                const token = localStorage.getItem("token") || "";
+                const orgId = localStorage.getItem("orgId") || "1";
+                const facilityId = localStorage.getItem("facilityId") || "1";
+                const role = localStorage.getItem("role") || "provider";
+
+                const [patientRes, appointmentRes] = await Promise.all([
+                    fetch("http://localhost:8080/api/patient/count", {
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                            "X-Org-Id": orgId,
+                            "X-Facility-Id": facilityId,
+                            "X-Role": role,
+                        },
+                    }),
+                    fetch("http://localhost:8080/api/appointment/count", {
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                            "X-Org-Id": orgId,
+                            "X-Facility-Id": facilityId,
+                            "X-Role": role,
+                        },
+                    }),
+                ]);
+
+                const patientData = await patientRes.json();
+                const appointmentData = await appointmentRes.json();
+
+                setCounts({
+                    patients: patientData.data || 0,
+                    appointments: appointmentData.data || 0,
+                });
+            } catch (e) {
+                console.error("Error fetching dashboard counts:", e);
+            }
+        }
+
+        fetchCounts();
+    }, []);
+
     return (
         <div
             style={{
@@ -72,11 +113,11 @@ export default function SummaryCards() {
         >
             <SummaryCard
                 title="Patients"
-                value="2"
+                value={String(counts.patients)}
                 description="Total patients"
                 icon={<Users color="#3b82f6" />}
                 background="#e0efff"
-                href="/doctor/patients"
+                href="/dashboard/patients"
             />
             <SummaryCard
                 title="Appointments"
@@ -84,7 +125,7 @@ export default function SummaryCards() {
                 description="Successful appointments"
                 icon={<CalendarDays color="#facc15" />}
                 background="#fff9cc"
-                href="/doctor/appointments" // ✅ Updated to match your folder
+                href="/doctor/appointments"
             />
             <SummaryCard
                 title="Consultation"

@@ -8,7 +8,7 @@ import Link from "next/link";
 const menu = [
     { label: "Dashboard", icon: <Home />, href: "/doctor" },
     { label: "Users", icon: <Users />, href: "/doctor/users", roles: ["SUPER_ADMIN", "ADMIN"] },
-    { label: "Patients", icon: <User />, href: "/doctor/patients", roles: ["DOCTOR", "NURSE", "RECEPTIONIST"] },
+    { label: "Patients", icon: <User />, href: "/dashboard/patients", roles: ["DOCTOR", "NURSE", "RECEPTIONIST"] },
     { label: "Appointments", icon: <ClipboardList />, href: "/doctor/appointments" },
     { label: "Settings", icon: <Settings />, href: "/doctor/settings" }
 ];

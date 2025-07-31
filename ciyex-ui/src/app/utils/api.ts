@@ -9,6 +9,7 @@ export async function fetchPatientList() {
         },
     });
 
+
     if (!res.ok) throw new Error('Failed to fetch patient list');
     return res.json();
 }
