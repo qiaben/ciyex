@@ -3,11 +3,23 @@
 import React, { useState } from "react";
 import { Bell, UserCircle, LogOut, Repeat } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import {usePathname, useRouter} from "next/navigation";
 
 export default function TopBar() {
     const [menuOpen, setMenuOpen] = useState(false);
     const router = useRouter();
+
+    const pathname = usePathname();
+
+    const getTitleFromPath = (path: string) => {
+        if (path.includes("/users")) return "Users Dashboard";
+        if (path.includes("/patients")) return "Patients Dashboard";
+        if (path.includes("/appointments")) return "Appointments Dashboard";
+        if (path.includes("/settings")) return "Settings";
+        return "Ciyex Dashboard";
+    };
+
+    const title = getTitleFromPath(pathname);
 
     // Logout function
     const handleLogout = () => {
@@ -25,8 +37,9 @@ export default function TopBar() {
 
     return (
         <header className="h-16 bg-white dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between px-6 shadow-sm relative">
-            <div className="font-bold text-xl tracking-wide">Ciyex Dashboard</div>
-            <div className="flex items-center gap-4">
+            <div className="font-bold text-xl tracking-wide text-gray-900 dark:text-white">
+                {title}
+            </div>            <div className="flex items-center gap-4">
                 <button className="hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-full p-2">
                     <Bell className="w-5 h-5" />
                 </button>

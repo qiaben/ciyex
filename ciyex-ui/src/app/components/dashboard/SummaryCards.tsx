@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Users, CalendarDays, Stethoscope, DollarSign } from "lucide-react";
 import { CSSProperties } from "react";
 import Link from "next/link";
+import {fetchWithAuth} from "@/utils/fetchWithAuth";
 
 interface SummaryCardProps {
     title: string;
@@ -57,49 +58,39 @@ function SummaryCard({
 }
 
 export default function SummaryCards() {
-    const [counts, setCounts] = useState({ patients: 0, appointments: 0 });
+    const [appointmentCount, setAppointmentCount] = useState<number>(0);
+    const [patientCount, setPatientCount] = useState<number>(0); // ✅ Add this line
+
 
     useEffect(() => {
-        async function fetchCounts() {
-            try {
-                const token = localStorage.getItem("token") || "";
-                const orgId = localStorage.getItem("orgId") || "1";
-                const facilityId = localStorage.getItem("facilityId") || "1";
-                const role = localStorage.getItem("role") || "provider";
-
-                const [patientRes, appointmentRes] = await Promise.all([
-                    fetch("http://localhost:8080/api/patient/count", {
-                        headers: {
-                            Authorization: `Bearer ${token}`,
-                            "X-Org-Id": orgId,
-                            "X-Facility-Id": facilityId,
-                            "X-Role": role,
-                        },
-                    }),
-                    fetch("http://localhost:8080/api/appointment/count", {
-                        headers: {
-                            Authorization: `Bearer ${token}`,
-                            "X-Org-Id": orgId,
-                            "X-Facility-Id": facilityId,
-                            "X-Role": role,
-                        },
-                    }),
-                ]);
-
-                const patientData = await patientRes.json();
-                const appointmentData = await appointmentRes.json();
-
-                setCounts({
-                    patients: patientData.data || 0,
-                    appointments: appointmentData.data || 0,
-                });
-            } catch (e) {
-                console.error("Error fetching dashboard counts:", e);
-            }
-        }
-
-        fetchCounts();
+        fetchWithAuth("http://localhost:8080/api/appointment/count")
+            .then((res) => {
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.json();
+            })
+            .then((data) => {
+                console.log("✅ Authenticated appointment count:", data);
+                setAppointmentCount(data);
+            })
+            .catch((err) => {
+                console.error("❌ Fetch error with auth:", err);
+                setAppointmentCount(0);
+            });
+        fetchWithAuth("http://localhost:8080/api/patient/count")
+            .then((res) => {
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.json();
+            })
+            .then((data) => {
+                setPatientCount(data);
+            })
+            .catch((err) => {
+                console.error("❌ Error fetching patient count:", err);
+                setPatientCount(0);
+            });
     }, []);
+
+
 
     return (
         <div
@@ -113,7 +104,7 @@ export default function SummaryCards() {
         >
             <SummaryCard
                 title="Patients"
-                value={String(counts.patients)}
+                value={String(patientCount.toString())}
                 description="Total patients"
                 icon={<Users color="#3b82f6" />}
                 background="#e0efff"
@@ -121,11 +112,11 @@ export default function SummaryCards() {
             />
             <SummaryCard
                 title="Appointments"
-                value="0"
+                value={appointmentCount.toString()}
                 description="Successful appointments"
                 icon={<CalendarDays color="#facc15" />}
                 background="#fff9cc"
-                href="/doctor/appointments"
+                href="/dashboard/appointments"
             />
             <SummaryCard
                 title="Consultation"
