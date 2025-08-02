@@ -34,19 +34,19 @@ export default function PatientListPage() {
             });
 
             const json = await res.json();
-            const data = json.data || [];
+            const data = json.patients || []; // <-- updated
 
             const parsed: Patient[] = data.map((p: any) => ({
                 id: p.id,
-                fullName: p.name,
+                fullName: p.fullName,
                 homePhone: p.homePhone || "",
-                ssn: p.ssn || "",
-                dob: p.birthDate,
+                ssn: "", // since ssn is not returned, leave it blank or add support later
+                dob: p.dob,
                 externalId: p.externalId || "",
             }));
 
             setPatients(parsed);
-            setTotal(json.total || parsed.length);
+            setTotal(json.total || parsed.length); // fallback works fine
         } catch (error) {
             console.error("Failed to fetch patients:", error);
         }
@@ -55,8 +55,8 @@ export default function PatientListPage() {
     useEffect(() => {
         const endpoint =
             activeTab === "list"
-                ? `http://localhost:8080/api/patient/list?page=${page}&limit=${limit}`
-                : "http://localhost:8080/api/patient/recent";
+                ? `http://localhost:8080/api/patient/list`
+                : `http://localhost:8080/api/patient/recent`;
 
         fetchPatients(endpoint);
     }, [page, activeTab]);

@@ -82,7 +82,7 @@ export default function SummaryCards() {
                 return res.json();
             })
             .then((data) => {
-                setPatientCount(data);
+                setPatientCount(data.data || 0); // ✅ Correct: access `count` field
             })
             .catch((err) => {
                 console.error("❌ Error fetching patient count:", err);
@@ -104,7 +104,7 @@ export default function SummaryCards() {
         >
             <SummaryCard
                 title="Patients"
-                value={String(patientCount.toString())}
+                value={patientCount.toString()}
                 description="Total patients"
                 icon={<Users color="#3b82f6" />}
                 background="#e0efff"
