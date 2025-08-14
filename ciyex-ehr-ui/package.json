@@ -26,9 +26,9 @@
     "axios": "^1.11.0",
     "flatpickr": "^4.6.13",
     "lucide-react": "^0.536.0",
-    "next": "^13.4.0",  // Updated Next.js version
-    "react": "^18.2.0",  // Corrected react version
-    "react-dom": "^18.2.0",  // Corrected react-dom version
+    "next": "^13.4.0",  
+    "react": "^18.2.0",  
+    "react-dom": "^18.2.0",
     "react-apexcharts": "^1.7.0",
     "react-dnd": "^16.0.1",
     "react-dnd-html5-backend": "^16.0.1",
@@ -41,8 +41,8 @@
     "@eslint/eslintrc": "^3",
     "@svgr/webpack": "^8.1.0",
     "@types/node": "^20.19.9",
-    "@types/react": "^18.0.0",  // Updated to react 18 types
-    "@types/react-dom": "^18.0.0",  // Updated to react-dom 18 types
+    "@types/react": "^18.0.0",  
+    "@types/react-dom": "^18.0.0",  
     "@types/react-transition-group": "^4.4.12",
     "eslint": "^9",
     "eslint-config-next": "15.1.3",
