@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import Badge from "@/components/ui/badge/Badge";
-import { EyeIcon, PencilIcon } from "lucide-react";
+//import { EyeIcon, PencilIcon } from "lucide-react";
 import Link from "next/link";
 import { fetchWithAuth } from "@/utils/fetchWithAuth";
 import AdminLayout from "@/app/(admin)/layout";
@@ -177,14 +177,14 @@ export default function PatientListPage() {
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell className="px-4 py-4 text-gray-500 text-start text-theme-sm dark:text-gray-400">
-                                                    <div className="flex gap-4">
+{/*                                                     <*/div className="flex gap-4">
                                                         <Link href={`/patients/${patient.id}`}>
                                                             <EyeIcon className="w-4 h-4 text-blue-500 cursor-pointer" />
                                                         </Link>
                                                         <Link href={`/patients/${patient.id}/edit`}>
                                                             <PencilIcon className="w-4 h-4 text-green-500 cursor-pointer" />
                                                         </Link>
-                                                    </div>
+                                                    </div> */}
                                                 </TableCell>
                                             </TableRow>
                                         ))
