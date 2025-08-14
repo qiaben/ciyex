@@ -176,16 +176,20 @@ export default function PatientListPage() {
                                                         {patient.status}
                                                     </Badge>
                                                 </TableCell>
-                                                <TableCell className="px-4 py-4 text-gray-500 text-start text-theme-sm dark:text-gray-400">
-{/* {/*                                                     <div className="flex gap-4">
-                                                        <Link href={`/patients/${patient.id}`}>
-                                                            <EyeIcon className="w-4 h-4 text-blue-500 cursor-pointer" />
-                                                        </Link>
-                                                        <Link href={`/patients/${patient.id}/edit`}>
-                                                            <PencilIcon className="w-4 h-4 text-green-500 cursor-pointer" />
-                                                        </Link>
-                                                    </div> } */}
-                                                </TableCell>
+                                            <TableCell className="px-4 py-4 text-gray-500 text-start text-theme-sm dark:text-gray-400">
+                                        {/* Corrected comment, with the content you want to comment */}
+                                        {/* <div className="flex gap-4">
+                                            <Link href={`/patients/${patient.id}`}>
+                                                <EyeIcon className="w-4 h-4 text-blue-500 cursor-pointer" />
+                                            </Link>
+                                            <Link href={`/patients/${patient.id}/edit`}>
+                                                <PencilIcon className="w-4 h-4 text-green-500 cursor-pointer" />
+                                            </Link>
+                                        </div> */}
+                                    </TableCell>
+
+                                                
+
                                             </TableRow>
                                         ))
                                     )}
