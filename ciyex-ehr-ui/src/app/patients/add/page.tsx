@@ -398,26 +398,47 @@ export default function AddPatient() {
         value: string
     ) => {
         setFormData(prev => {
+            // Create a deep copy safely
+            const newState: PatientFormData = JSON.parse(JSON.stringify(prev));
             const pathParts = path.split('.');
-            const newState = { ...prev };
-            let current: any = newState;
+
+            // Start with the root object
+            let current: unknown = newState;
+
+            // Traverse the path except the last part
             for (let i = 0; i < pathParts.length - 1; i++) {
-                current = current[pathParts[i]] = { ...current[pathParts[i]] };
+                const key = pathParts[i];
+                if (typeof current === 'object' && current !== null && key in current) {
+                    current = (current as Record<string, unknown>)[key];
+                } else {
+                    console.error(`Invalid path ${path}`);
+                    return prev;
+                }
             }
-            const array = current[pathParts[pathParts.length - 1]];
-            if (!Array.isArray(array)) {
-                console.error(`Path ${path} does not lead to an array`);
-                return prev;
+
+            // Get the array property
+            const lastKey = pathParts[pathParts.length - 1];
+            if (typeof current === 'object' && current !== null && lastKey in current) {
+                const array = (current as Record<string, unknown>)[lastKey];
+                if (!Array.isArray(array)) {
+                    console.error(`Path ${path} does not lead to an array`);
+                    return prev;
+                }
+
+                // Update the array
+                const newArray = [...array];
+                newArray[index] = {
+                    ...newArray[index],
+                    [field]: value
+                };
+                (current as Record<string, unknown>)[lastKey] = newArray;
             }
-            const newArray = [...array];
-            newArray[index] = {
-                ...newArray[index],
-                [field]: value
-            };
-            current[pathParts[pathParts.length - 1]] = newArray;
+
             return newState;
         });
     };
+
+
 
     const addAdditionalContact = () => {
         setFormData(prev => ({
@@ -453,22 +474,22 @@ export default function AddPatient() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (isSubmitting) return; // Prevent multiple submissions
+        if (isSubmitting) return;
 
-        setIsSubmitting(true); // Start submission
+        setIsSubmitting(true);
         try {
             console.log('Submitting form data:', JSON.stringify(formData, null, 2));
             const response = await fetch('http://localhost:8080/api/patients', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': 'Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZUBleGFtcGxlLmNvbSIsImZpcnN0TmFtZSI6IkFsaWNlIiwibGFzdE5hbWUiOiJKb2huc29uIiwib3JnSWRzIjpbMSwzXSwib3JncyI6W3sib3JnSWQiOjEsIm9yZ05hbWUiOiJRaWFiZW4gSGVhbHRoIiwicm9sZXMiOlsiU1VQRVJfQURNSU4iXX0seyJvcmdJZCI6Mywib3JnTmFtZSI6IkNhcmVXZWxsIiwicm9sZXMiOlsiTlVSU0UiXX1dLCJleHAiOjE3ODY2NDAxMzYsInVzZXJJZCI6MSwiaWF0IjoxNzU1MDgyNTM2LCJlbWFpbCI6ImFsaWNlQGV4YW1wbGUuY29tIn0.96KNosbhKRfO-VwMbPGgDzRENeb4ayXGrdzWrzlS6eA', // Removed placeholders <> around the token
+                    'Authorization': 'Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZUBleGFtcGxlLmNvbSIsImZpcnN0TmFtZSI6IkFsaWNlIiwibGFzdE5hbWUiOiJKb2huc29uIiwib3JnSWRzIjpbMSwzXSwib3JncyI6W3sib3JnSWQiOjEsIm9yZ05hbWUiOiJRaWFiZW4gSGVhbHRoIiwicm9sZXMiOlsiU1VQRVJfQURNSU4iXX0seyJvcmdJZCI6Mywib3JnTmFtZSI6IkNhcmVXZWxsIiwicm9sZXMiOlsiTlVSU0UiXX1dLCJleHAiOjE3ODY2NDAxMzYsInVzZXJJZCI6MSwiaWF0IjoxNzU1MDgyNTM2LCJlbWFpbCI6ImFsaWNlQGV4YW1wbGUuY29tIn0.96KNosbhKRfO-VwMbPGgDzRENeb4ayXGrdzWrzlS6eA',
                 },
                 body: JSON.stringify(formData),
             });
 
             if (!response.ok) {
-                const text = await response.text(); // Get raw response
+                const text = await response.text();
                 throw new Error(`HTTP error! status: ${response.status}, message: ${text}`);
             }
 
@@ -483,14 +504,18 @@ export default function AddPatient() {
             setTimeout(() => {
                 router.push('/patients');
             }, 2000);
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error creating patient:', error);
-            toast.error(error.message || 'Failed to create patient. Please try again.', {
+            let message = 'Failed to create patient. Please try again.';
+            if (error instanceof Error) {
+                message = error.message;
+            }
+            toast.error(message, {
                 autoClose: 4000,
                 position: 'top-right',
             });
         } finally {
-            setIsSubmitting(false); // Reset submission state
+            setIsSubmitting(false);
         }
     };
 
