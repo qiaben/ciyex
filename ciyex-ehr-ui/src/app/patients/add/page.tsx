@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import AdminLayout from "@/app/(admin)/layout";
 import { toast } from "react-toastify";
 
-import "react-toastify/dist/ReactToastify.css";
+//import "react-toastify/dist/ReactToastify.css";
 
 // Define interfaces for your form data structure
 interface PersonalInfo {
