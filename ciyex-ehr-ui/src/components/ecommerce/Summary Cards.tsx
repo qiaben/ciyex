@@ -16,8 +16,15 @@ export const SummaryCards = () => {
                 const res = await fetchWithAuth(
                     `${process.env.NEXT_PUBLIC_API_URL}/api/patients/count`
                 );
+
+                // Check if response is ok
+                if (!res.ok) {
+                    throw new Error('Failed to fetch data');
+                }
+
                 const result = await res.json();
                 console.log("📊 Patient count response:", result);
+
                 if (result.success) {
                     setPatientCount(result.data);
                 } else {
@@ -36,11 +43,7 @@ export const SummaryCards = () => {
             <MetricCard
                 icon={<Users className="text-gray-800 size-6 dark:text-white/90" />}
                 label="Patients"
-                value={
-                    patientCount !== null
-                        ? String(patientCount)
-                        : "Loading..." // fallback text
-                }
+                value={patientCount !== null ? String(patientCount) : "Loading..."} // fallback text
                 badgeColor="success"
                 badgeText="11.01%" // You can update this dynamically later
                 badgeIcon={<ArrowUpIcon />}
@@ -48,9 +51,7 @@ export const SummaryCards = () => {
             />
 
             <MetricCard
-                icon={
-                    <CalendarDays className="text-gray-800 size-6 dark:text-white/90" />
-                }
+                icon={<CalendarDays className="text-gray-800 size-6 dark:text-white/90" />}
                 label="Appointments"
                 value="0"
                 badgeColor="error"
@@ -110,9 +111,9 @@ const MetricCard: React.FC<MetricCardProps> = ({
 
                 <div className="flex items-end justify-between mt-5">
                     <div>
-            <span className="text-sm text-gray-500 dark:text-gray-400">
-              {label}
-            </span>
+                        <span className="text-sm text-gray-500 dark:text-gray-400">
+                            {label}
+                        </span>
                         <h4 className="mt-2 font-bold text-gray-800 text-title-sm dark:text-white/90">
                             {value}
                         </h4>

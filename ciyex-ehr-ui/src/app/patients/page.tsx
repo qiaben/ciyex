@@ -1,5 +1,4 @@
 "use client";
-
 import { useEffect, useState } from "react";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import Badge from "@/components/ui/badge/Badge";
@@ -27,17 +26,19 @@ export default function PatientListPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    // Fetch patients when the component mounts
     useEffect(() => {
         setIsClient(true);
         const fetchPatients = async () => {
             setLoading(true);
             setError(null);
             try {
+                // Fetch patient data from the backend API
                 const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/patients`);
                 const result = await res.json();
 
                 if (result.success && Array.isArray(result.data)) {
-                    setData(result.data);
+                    setData(result.data); // Update state with the fetched data
                 } else {
                     setError("Failed to fetch patients. Please try again.");
                     console.error("❌ Failed to fetch patients:", result.message);
@@ -46,15 +47,16 @@ export default function PatientListPage() {
                 setError("An error occurred while fetching patients.");
                 console.error("❌ Error fetching patients:", err);
             } finally {
-                setLoading(false);
+                setLoading(false);  // Reset loading state
             }
         };
 
         if (isClient) {
-            fetchPatients();
+            fetchPatients();  // Trigger the fetch when the component is mounted
         }
     }, [isClient]);
 
+    // Filter the patients based on search and status filter
     const filtered = data.filter((patient) => {
         const fullName = `${patient.firstName} ${patient.lastName}`.toLowerCase();
         const matchesSearch = fullName.includes(search.toLowerCase());
@@ -62,18 +64,16 @@ export default function PatientListPage() {
         return matchesSearch && matchesStatus;
     });
 
+    // Handle loading and error states
     if (loading) return <div className="p-6">Loading...</div>;
     if (error) return <div className="p-6 text-red-500">{error}</div>;
 
     return (
         <AdminLayout>
-            {/* Main Content Area - Centered Container */}
             <div className="flex-1 p-6 bg-[#f9fafb] flex justify-center">
-                {/* Centered Content with max-width */}
                 <div className="w-full max-w-7xl">
-                    {/* Patient List Page Content */}
                     <div className="flex justify-between items-center mb-4">
-                        <h1 className="text-2xl font-bold">Patient List</h1>
+                        <h1 className="text-2xl font-bold">Patients</h1>
                         <Link href="/patients/add">
                             <button className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600">
                                 Add New Patient
@@ -90,7 +90,6 @@ export default function PatientListPage() {
                             onChange={(e) => setSearch(e.target.value)}
                             className="border rounded px-3 py-2 w-full sm:w-72 text-sm"
                         />
-
                         <select
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value)}
@@ -178,12 +177,14 @@ export default function PatientListPage() {
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell className="px-4 py-4 text-gray-500 text-start text-theme-sm dark:text-gray-400">
-                                                    <Link href={`/patients/${patient.id}`}>
-                                                        <EyeIcon className="w-4 h-4 text-blue-500" />
-                                                    </Link>
-                                                    <Link href={`/patients/${patient.id}/edit`}>
-                                                        <PencilIcon className="w-4 h-4 text-green-500" />
-                                                    </Link>
+                                                    <div className="flex gap-4">
+                                                        <Link href={`/patients/${patient.id}`}>
+                                                            <EyeIcon className="w-4 h-4 text-blue-500 cursor-pointer" />
+                                                        </Link>
+                                                        <Link href={`/patients/${patient.id}/edit`}>
+                                                            <PencilIcon className="w-4 h-4 text-green-500 cursor-pointer" />
+                                                        </Link>
+                                                    </div>
                                                 </TableCell>
                                             </TableRow>
                                         ))

@@ -2,11 +2,141 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import AdminLayout from "@/app/(admin)/layout";
+import { toast } from "react-toastify";
+
+import "react-toastify/dist/ReactToastify.css";
+
+// Define interfaces for your form data structure
+interface PersonalInfo {
+    firstName: string;
+    lastName: string;
+    mi: string;
+    suffix: string;
+    dob: string;
+    gender: string;
+    status: string;
+    maritalStatus: string;
+    siblings: string;
+    ethnicity: string;
+    additionalRace: string;
+    communicationPreference: string;
+    category: string;
+    referringPhysician: string;
+    primaryCarePhysician: string;
+    ptssn: string;
+    language: string;
+    publicityCode: string;
+    immunizationRegistryId: string;
+}
+interface Contact {
+    name: string;
+    address1: string;
+    address2: string;
+    city: string;
+    state: string;
+    country: string;
+    cellPhone: string;
+    email: string;
+    relation?: string;
+}
+interface ContactInfo {
+    address1: string;
+    address2: string;
+    city: string;
+    state: string;
+    zip: string;
+    country: string;
+    homePhone: string;
+    fax: string;
+    cellPhone: string;
+    email: string;
+    additionalContacts: Contact[];
+    emergencyContact: Contact & { relation: string };
+}
+interface Preferences {
+    pharmacy: string;
+    erxPharmacy: string;
+    labCenter: string;
+    radiologyCenter: string;
+    serviceLocation: string;
+}
+interface PatientNetwork {
+    enterpriseMasterPatientIndexId: string;
+    regionalPatientIdentifier: string;
+    nationalPatientIdentifier: string;
+    vfcEligibility: string;
+    patientClass: string;
+    shareNonPHIData: boolean;
+}
+interface EmployerInfo {
+    name: string;
+    address1: string;
+    address2: string;
+    status: string;
+    city: string;
+    state: string;
+    zip: string;
+    country: string;
+    workPhone: string;
+    cellPhone: string;
+    email: string;
+}
+interface Guarantor {
+    name: string;
+    address: string;
+    city: string;
+    state: string;
+    zip: string;
+    phone: string;
+    fax: string;
+    dob: string;
+    relation: string;
+    country: string;
+    cell: string;
+    email: string;
+    sex: string;
+}
+interface Insurance {
+    carrier: string;
+    category?: string;
+    receiver?: string;
+    emrInsuranceId?: string;
+    programPlanType?: string;
+    incentiveType?: string;
+    address: string;
+    city: string;
+    state: string;
+    zip: string;
+    phone: string;
+    plan: string;
+    idNo: string;
+    copay: string;
+    capitationAgreement?: boolean;
+    doNotBalanceBill?: boolean;
+    notes?: string;
+    effectiveDate: string;
+    policyNo: string;
+    subscriber: string;
+    guarantor: Guarantor;
+}
+interface InsuranceInfo {
+    primary: Insurance;
+    secondary: Insurance;
+    tertiary: Omit<Insurance, 'category' | 'receiver' | 'emrInsuranceId' | 'programPlanType' | 'incentiveType' | 'capitationAgreement' | 'doNotBalanceBill' | 'notes'>;
+}
+interface PatientFormData {
+    personalInfo: PersonalInfo;
+    contactInfo: ContactInfo;
+    preferences: Preferences;
+    patientNetwork: PatientNetwork;
+    employerInfo: EmployerInfo;
+    insurance: InsuranceInfo;
+}
 
 export default function AddPatient() {
     const router = useRouter();
     const [activeTab, setActiveTab] = useState(0);
-    const [formData, setFormData] = useState({
+    const [formData, setFormData] = useState<PatientFormData>({
         // Personal Information
         personalInfo: {
             firstName: "",
@@ -198,39 +328,62 @@ export default function AddPatient() {
             }
         }
     });
+    const [isSubmitting, setIsSubmitting] = useState(false); // Manage submission state
 
-    const handleChange = (section: string, field: string, value: string | boolean) => {
+    const handleChange = <K extends keyof PatientFormData>(
+        section: K,
+        field: keyof PatientFormData[K],
+        value: string | boolean
+    ) => {
         setFormData(prev => ({
             ...prev,
             [section]: {
-                ...prev[section as keyof typeof prev],
+                ...prev[section],
                 [field]: value
             }
         }));
     };
 
-    const handleNestedChange = (section: string, subSection: string, field: string, value: string | boolean) => {
+    const handleNestedChange = <
+        K1 extends keyof PatientFormData,
+        K2 extends keyof PatientFormData[K1]
+    >(
+        section: K1,
+        subSection: K2,
+        field: keyof PatientFormData[K1][K2],
+        value: string | boolean
+    ) => {
         setFormData(prev => ({
             ...prev,
             [section]: {
-                ...prev[section as keyof typeof prev],
+                ...prev[section],
                 [subSection]: {
-                    ...(prev[section as keyof typeof prev] as any)[subSection],
+                    ...(prev[section][subSection] as object),
                     [field]: value
                 }
             }
         }));
     };
 
-    const handleDeepNestedChange = (section: string, subSection: string, subSubSection: string, field: string, value: string | boolean) => {
+    const handleDeepNestedChange = <
+        K1 extends keyof PatientFormData,
+        K2 extends keyof PatientFormData[K1],
+        K3 extends keyof PatientFormData[K1][K2]
+    >(
+        section: K1,
+        subSection: K2,
+        subSubSection: K3,
+        field: keyof PatientFormData[K1][K2][K3],
+        value: string | boolean
+    ) => {
         setFormData(prev => ({
             ...prev,
             [section]: {
-                ...prev[section as keyof typeof prev],
+                ...prev[section],
                 [subSection]: {
-                    ...(prev[section as keyof typeof prev] as any)[subSection],
+                    ...prev[section][subSection],
                     [subSubSection]: {
-                        ...(prev[section as keyof typeof prev] as any)[subSection][subSubSection],
+                        ...(prev[section][subSection][subSubSection] as object),
                         [field]: value
                     }
                 }
@@ -239,30 +392,30 @@ export default function AddPatient() {
     };
 
     const handleArrayChange = (
-        section: string,
+        path: string,
         index: number,
         field: string,
         value: string
     ) => {
         setFormData(prev => {
-            const sectionData = prev[section as keyof typeof prev];
-
-            // Type guard to ensure we're working with an array
-            if (!Array.isArray(sectionData)) {
-                console.error(`Section ${section} is not an array`);
+            const pathParts = path.split('.');
+            const newState = { ...prev };
+            let current: any = newState;
+            for (let i = 0; i < pathParts.length - 1; i++) {
+                current = current[pathParts[i]] = { ...current[pathParts[i]] };
+            }
+            const array = current[pathParts[pathParts.length - 1]];
+            if (!Array.isArray(array)) {
+                console.error(`Path ${path} does not lead to an array`);
                 return prev;
             }
-
-            const newArray = [...sectionData];
+            const newArray = [...array];
             newArray[index] = {
                 ...newArray[index],
                 [field]: value
             };
-
-            return {
-                ...prev,
-                [section]: newArray
-            };
+            current[pathParts[pathParts.length - 1]] = newArray;
+            return newState;
         });
     };
 
@@ -300,8 +453,45 @@ export default function AddPatient() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        console.log("Form submitted:", formData);
-        router.push("/patients");
+        if (isSubmitting) return; // Prevent multiple submissions
+
+        setIsSubmitting(true); // Start submission
+        try {
+            console.log('Submitting form data:', JSON.stringify(formData, null, 2));
+            const response = await fetch('http://localhost:8080/api/patients', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZUBleGFtcGxlLmNvbSIsImZpcnN0TmFtZSI6IkFsaWNlIiwibGFzdE5hbWUiOiJKb2huc29uIiwib3JnSWRzIjpbMSwzXSwib3JncyI6W3sib3JnSWQiOjEsIm9yZ05hbWUiOiJRaWFiZW4gSGVhbHRoIiwicm9sZXMiOlsiU1VQRVJfQURNSU4iXX0seyJvcmdJZCI6Mywib3JnTmFtZSI6IkNhcmVXZWxsIiwicm9sZXMiOlsiTlVSU0UiXX1dLCJleHAiOjE3ODY2NDAxMzYsInVzZXJJZCI6MSwiaWF0IjoxNzU1MDgyNTM2LCJlbWFpbCI6ImFsaWNlQGV4YW1wbGUuY29tIn0.96KNosbhKRfO-VwMbPGgDzRENeb4ayXGrdzWrzlS6eA', // Removed placeholders <> around the token
+                },
+                body: JSON.stringify(formData),
+            });
+
+            if (!response.ok) {
+                const text = await response.text(); // Get raw response
+                throw new Error(`HTTP error! status: ${response.status}, message: ${text}`);
+            }
+
+            const data = await response.json();
+            console.log('Patient created:', data);
+
+            toast.success('Patient Created Successfully', {
+                autoClose: 4000,
+                position: 'top-right',
+            });
+
+            setTimeout(() => {
+                router.push('/patients');
+            }, 2000);
+        } catch (error: any) {
+            console.error('Error creating patient:', error);
+            toast.error(error.message || 'Failed to create patient. Please try again.', {
+                autoClose: 4000,
+                position: 'top-right',
+            });
+        } finally {
+            setIsSubmitting(false); // Reset submission state
+        }
     };
 
     const tabs = [
@@ -312,6 +502,10 @@ export default function AddPatient() {
         "Employer Information",
         "Insurance"
     ];
+
+
+
+
 
     return (
         <AdminLayout>
@@ -2110,9 +2304,10 @@ export default function AddPatient() {
                             ) : (
                                 <button
                                     type="submit"
-                                    className="px-4 py-2 text-white bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                    disabled={isSubmitting}
+                                    className={`px-4 py-2 text-white bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 >
-                                    Save Patient
+                                    {isSubmitting ? 'Saving...' : 'Save Patient'}
                                 </button>
                             )}
                         </div>
