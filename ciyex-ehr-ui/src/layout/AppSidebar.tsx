@@ -17,7 +17,7 @@ import {
   TableIcon,
   UserCircleIcon,
 } from "../icons/index";
-import SidebarWidget from "./SidebarWidget";
+// import SidebarWidget from "./SidebarWidget";
 
 type NavItem = {
   name: string;
@@ -303,40 +303,37 @@ const AppSidebar: React.FC = () => {
       onMouseEnter={() => !isExpanded && setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <div
-        className={`py-8 flex  ${
-          !isExpanded && !isHovered ? "lg:justify-center" : "justify-start"
-        }`}
-      >
-        <Link href="/">
-          {isExpanded || isHovered || isMobileOpen ? (
-            <>
-              <Image
-                className="dark:hidden"
-                src="/images/logo/logo.svg"
-                alt="Logo"
-                width={150}
-                height={40}
-              />
-              <Image
-                className="hidden dark:block"
-                src="/images/logo/logo-dark.svg"
-                alt="Logo"
-                width={150}
-                height={40}
-              />
-            </>
-          ) : (
-            <Image
-              src="/images/logo/logo-icon.svg"
-              alt="Logo"
-              width={32}
-              height={32}
-            />
-          )}
-        </Link>
-      </div>
-      <div className="flex flex-col overflow-y-auto duration-300 ease-linear no-scrollbar">
+        <div className={`py-8 flex ${!isExpanded && !isHovered ? "lg:justify-center" : "justify-start"}`}>
+            <Link href="/">
+                {isExpanded || isHovered || isMobileOpen ? (
+                    <>
+                        <Image
+                            className="dark:hidden"
+                            src="/images/ciyex-logo.svg" // Replace with "Ciyex" logo
+                            alt="Ciyex Dashboard"
+                            width={150}
+                            height={40}
+                        />
+                        <Image
+                            className="hidden dark:block"
+                            src="/images/ciyex-logo-dark.svg" // Replace with "Ciyex" dark logo
+                            alt="Ciyex Logo"
+                            width={150}
+                            height={40}
+                        />
+                    </>
+                ) : (
+                    <Image
+                        src="/images/ciyex-logo-icon.svg" // Replace with "Ciyex" icon
+                        alt="Ciyex Icon"
+                        width={32}
+                        height={32}
+                    />
+                )}
+            </Link>
+        </div>
+
+        <div className="flex flex-col overflow-y-auto duration-300 ease-linear no-scrollbar">
         <nav className="mb-6">
           <div className="flex flex-col gap-4">
             <div>
@@ -374,7 +371,7 @@ const AppSidebar: React.FC = () => {
             </div>
           </div>
         </nav>
-        {isExpanded || isHovered || isMobileOpen ? <SidebarWidget /> : null}
+        {/*{isExpanded || isHovered || isMobileOpen ? <SidebarWidget /> : null}*/}
       </div>
     </aside>
   );
