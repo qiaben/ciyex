@@ -5,7 +5,6 @@ import React, { useEffect, useState } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
 import {getInitials} from "@/utils/getInitials";
-import {router} from "next/client";
 import {useRouter} from "next/navigation";
 
 

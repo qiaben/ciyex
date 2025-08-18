@@ -1,7 +1,22 @@
 "use client";
 import React from "react";
 
-const ProfessionalInfo = ({ formData, handleChange, errors = {} }: any) => {
+interface ProfessionalInfoFormData {
+    providerType: string;
+    specialty: string;
+    licenseNumber: string;
+    npiNumber: string;
+    licenseExpiry: string;
+    licenseState: string;
+}
+interface ProfessionalInfoProps {
+    formData: ProfessionalInfoFormData;
+    handleChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
+    errors?: Partial<Record<keyof ProfessionalInfoFormData, string>>;
+}
+
+
+const ProfessionalInfo: React.FC<ProfessionalInfoProps> = ({ formData, handleChange, errors = {} }) => {
     return (
         <div className="bg-white p-6 rounded-lg shadow-md grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Provider Type Input */}

@@ -134,7 +134,7 @@ const ProviderRegistrationForm = () => {
                     message: result.message || "An error occurred.",
                 });
             }
-        } catch (err) {
+        } catch {
             setAlertData({
                 variant: "error",
                 title: "Error",

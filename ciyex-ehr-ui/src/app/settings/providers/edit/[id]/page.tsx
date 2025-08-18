@@ -41,7 +41,7 @@ const EditProvider = () => {
     const router = useRouter();
 
     const [provider, setProvider] = useState<Provider | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [, setLoading] = useState(true);
     const [alert, setAlert] = useState<{
         type: "success" | "error" | "warning";
         title: string;
