@@ -5,6 +5,8 @@ import React, { useEffect, useState } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
 import {getInitials} from "@/utils/getInitials";
+import {router} from "next/client";
+import {useRouter} from "next/navigation";
 
 
 export default function UserDropdown() {
@@ -15,6 +17,10 @@ export default function UserDropdown() {
         email?: string;
         profileImage?: string;
     } | null>(null);
+
+    const router = useRouter();
+
+
 
     useEffect(() => {
         const storedUser = localStorage.getItem("user");
@@ -41,6 +47,13 @@ export default function UserDropdown() {
     function closeDropdown() {
         setIsOpen(false);
     }
+
+    const handleSignOut = () => {
+        // Remove the user-related data from localStorage
+        localStorage.removeItem("orgId");
+        router.push("/");  // Adjust the redirection as needed
+
+    };
 
     return (
         <div className="relative">
@@ -168,9 +181,37 @@ export default function UserDropdown() {
               Support
             </DropdownItem>
           </li>
+
+            <li>
+                <DropdownItem
+                    onItemClick={closeDropdown} // Handle the click event to toggle the context switch dropdown
+                    href="/practice-switch"
+                    tag="a"
+                    className="flex items-center gap-3 px-3 py-2 font-medium text-gray-700 rounded-lg group text-theme-sm hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
+                >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="24"
+                        height="24"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="mr-2"
+                    >
+                        <path d="M3 12h18"></path>
+                        <path d="M3 6h18"></path>
+                        <path d="M3 18h18"></path>
+                    </svg>
+                    Switch Practice
+                </DropdownItem>
+            </li>
         </ul>
         <Link
-          href="/signin"
+          href="/"
+          onClick={handleSignOut} // Call handleSignOut function on click
           className="flex items-center gap-3 px-3 py-2 mt-3 font-medium text-gray-700 rounded-lg group text-theme-sm hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
         >
           <svg

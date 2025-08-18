@@ -107,11 +107,15 @@ export default function SignInForm() {
                     phone,
                     dateOfBirth,
                     orgs,
+                    orgIds, // <-- Ensure orgIds are included
                 } = data.data;
 
                 const fullName = `${firstName} ${LastName}`.trim();
                 const org = orgs[0];
                 const role = org.roles?.[0] || "UNKNOWN";
+
+                // Store orgIds in localStorage
+                localStorage.setItem("orgIds", JSON.stringify(orgIds));  // <-- Store orgIds here
 
                 localStorage.setItem("token", token);
                 localStorage.setItem("userEmail", email);
@@ -143,7 +147,12 @@ export default function SignInForm() {
                     securityAnswer: data.data.securityAnswer,
                 }));
 
-                router.push("/");
+                // Check if multiple orgs are available and redirect to PracticeSwitch page
+                if (orgIds.length > 1) {
+                    router.push("/practice-switch");  // Redirect to the Practice Switch page
+                } else {
+                    router.push("/dashboard");  // Redirect directly to the dashboard
+                }
             } else {
                 setError(data.message || "Invalid credentials");
             }
@@ -154,6 +163,7 @@ export default function SignInForm() {
             setLoading(false);
         }
     };
+
 
     return (
         <div className="flex flex-col flex-1 lg:w-1/2 w-full">
