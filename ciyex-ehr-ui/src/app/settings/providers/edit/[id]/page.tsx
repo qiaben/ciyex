@@ -83,9 +83,13 @@ const EditProvider = () => {
         try {
             const response = await fetchWithAuth(`${apiUrl}/api/providers/${provider.id}`, {
                 method: "PUT",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    Accept: "application/json",   // 👈 added
+                },
                 body: JSON.stringify(provider),
             });
+
             const data = await response.json();
 
             if (response.ok) {

@@ -4,7 +4,7 @@ import React from "react";
 import MonthlyTarget from "../../components/ecommerce/MonthlyTarget";
 import MonthlySalesChart from "../../components/ecommerce/MonthlySalesChart";
 import StatisticsChart from "../../components/ecommerce/StatisticsChart";
-import RecentOrders from "../../components/ecommerce/RecentOrders";
+// import RecentOrders from "../../components/ecommerce/RecentOrders";
 import DemographicCard from "../../components/ecommerce/DemographicCard";
 import AdminLayout from "@/app/(admin)/layout";
 
@@ -37,9 +37,9 @@ const Dashboard = () => {
                     <DemographicCard />
                 </div>
 
-                <div className="col-span-12 xl:col-span-7">
-                    <RecentOrders />
-                </div>
+                {/*<div className="col-span-12 xl:col-span-7">*/}
+                {/*    <RecentOrders />*/}
+                {/*</div>*/}
             </div>
         </div>
             </AdminLayout >

@@ -78,7 +78,10 @@ const ProviderList = () => {
                 const orgIds = JSON.parse(localStorage.getItem("orgIds") || "[]");
                 const response = await fetchWithAuth(
                     `${apiUrl}/api/providers?orgIds=${orgIds.join(",")}`,
-                    { method: "GET" }
+                    {
+                        method: "GET",
+                        headers: { Accept: "application/json" }   // 👈 added
+                    }
                 );
 
                 if (response.ok) {
@@ -98,6 +101,7 @@ const ProviderList = () => {
 
         fetchProviders();
     }, [apiUrl]);
+
 
     const toggleArchiveStatus = async (provider: Provider) => {
         try {
