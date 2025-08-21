@@ -5,17 +5,17 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useSidebar } from "../context/SidebarContext";
 import {
-  BoxCubeIcon,
-  CalenderIcon,
-  ChevronDownIcon,
-  GridIcon,
-  HorizontaLDots,
-  ListIcon,
-  PageIcon,
-  PieChartIcon,
-  PlugInIcon,
-  TableIcon,
-  UserCircleIcon,
+    BoxCubeIcon,
+    CalenderIcon,
+    ChevronDownIcon,
+    GridIcon,
+    HorizontaLDots,
+    ListIcon,
+    PageIcon,
+    PieChartIcon,
+    PlugInIcon, SettingsIcon,
+    TableIcon,
+    UserCircleIcon,
 } from "../icons/index";
 // import SidebarWidget from "./SidebarWidget";
 
@@ -30,7 +30,7 @@ const navItems: NavItem[] = [
   {
     icon: <GridIcon />,
     name: "Dashboard",
-    subItems: [{ name: "Ecommerce", path: "/", pro: false }],
+    subItems: [{ name: "Ecommerce", path: "/dashboard", pro: false }],
   },
   {
     icon: <CalenderIcon />,
@@ -42,11 +42,18 @@ const navItems: NavItem[] = [
     name: "User Profile",
     path: "/profile",
   },
+    {
+        icon: <SettingsIcon />, // Add this line for the Settings icon
+        name: "Settings", // Name for the Settings menu item
+        subItems: [
+            { name: "Providers", path: "/settings/providers" }, // New sub-item
+        ],
+    },
 
   {
     name: "Forms",
     icon: <ListIcon />,
-    subItems: [{ name: "Form Elements", path: "/form-elements", pro: false }],
+    subItems: [{ name: "Form Elements", path: "/form-elements", pro: false },],
   },
   {
     name: "Tables",
@@ -309,23 +316,23 @@ const AppSidebar: React.FC = () => {
                     <>
                         <Image
                             className="dark:hidden"
-                            src="/images/ciyex-logo.svg" // Replace with "Ciyex" logo
+                            src="/images/logo/Ciyex.png" // Path to your logo image
                             alt="Ciyex Dashboard"
-                            width={150}
-                            height={40}
+                            width={130}
+                            height={25}
                         />
                         <Image
                             className="hidden dark:block"
-                            src="/images/ciyex-logo-dark.svg" // Replace with "Ciyex" dark logo
-                            alt="Ciyex Logo"
-                            width={150}
-                            height={40}
+                            src="/images/logo/Ciyex.png" // Path to your logo image
+                            alt="Ciyex Dashboard"
+                            width={130}
+                            height={25}
                         />
                     </>
                 ) : (
                     <Image
-                        src="/images/ciyex-logo-icon.svg" // Replace with "Ciyex" icon
-                        alt="Ciyex Icon"
+                        src="/images/logo/Ciyex.png" // Path to your logo image
+                        alt="Ciyex Dashboard"
                         width={32}
                         height={32}
                     />

@@ -82,21 +82,19 @@ export default function SignInForm() {
             const res = await fetchWithAuth(`${apiUrl}/api/auth/login`, {
                 method: "POST",
                 headers: {
-                    "Content-Type": "application/json"
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",   // 👈 Force Spring to return JSON
                 },
                 body: JSON.stringify({ email, password }),
             });
 
-            const text = await res.text();
-            console.log("🪵 Raw login response text:", text);
-
-            let data: LoginResponse;
-            try {
-                data = JSON.parse(text);
-            } catch (parseError) {
-                console.error("❌ Failed to parse JSON from login:", parseError);
-                throw new Error("Invalid JSON response");
+            if (!res.ok) {
+                const errorText = await res.text();
+                console.error("❌ Login failed:", res.status, errorText);
+                throw new Error(`Login failed with status ${res.status}`);
             }
+
+            const data: LoginResponse = await res.json(); // safely JSON now ✅
 
             if (data.success && data.data) {
                 const {
@@ -107,12 +105,14 @@ export default function SignInForm() {
                     phone,
                     dateOfBirth,
                     orgs,
+                    orgIds,
                 } = data.data;
 
                 const fullName = `${firstName} ${LastName}`.trim();
                 const org = orgs[0];
                 const role = org.roles?.[0] || "UNKNOWN";
 
+                localStorage.setItem("orgIds", JSON.stringify(orgIds));
                 localStorage.setItem("token", token);
                 localStorage.setItem("userEmail", email);
                 localStorage.setItem("userFullName", fullName);
@@ -143,7 +143,11 @@ export default function SignInForm() {
                     securityAnswer: data.data.securityAnswer,
                 }));
 
-                router.push("/");
+                if (orgIds.length > 1) {
+                    router.push("/practice-switch");
+                } else {
+                    router.push("/dashboard");
+                }
             } else {
                 setError(data.message || "Invalid credentials");
             }
@@ -154,6 +158,7 @@ export default function SignInForm() {
             setLoading(false);
         }
     };
+
 
     return (
         <div className="flex flex-col flex-1 lg:w-1/2 w-full">
