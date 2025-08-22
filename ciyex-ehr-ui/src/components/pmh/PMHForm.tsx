@@ -21,7 +21,7 @@ export default function PMHForm({ patientId, encounterId, editing, onSaved, onCa
         setDescription(editing?.description || "");
     }, [editing]);
 
-    async function submit(e: React.FormEvent) {
+    async function submit(e: React.FormEvent<HTMLFormElement>): Promise<void> {
         e.preventDefault();
         setSaving(true);
         setErr(null);
@@ -63,11 +63,19 @@ export default function PMHForm({ patientId, encounterId, editing, onSaved, onCa
             />
             {err && <p className="text-sm text-red-600">{err}</p>}
             <div className="flex gap-2">
-                <button type="submit" disabled={saving} className="rounded-xl bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:opacity-60">
+                <button
+                    type="submit"
+                    disabled={saving}
+                    className="rounded-xl bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:opacity-60"
+                >
                     {saving ? "Saving..." : editing?.id ? "Update" : "Save"}
                 </button>
                 {onCancel && (
-                    <button type="button" onClick={onCancel} className="rounded-xl border px-4 py-2 hover:bg-gray-50">
+                    <button
+                        type="button"
+                        onClick={onCancel}
+                        className="rounded-xl border px-4 py-2 hover:bg-gray-50"
+                    >
                         Cancel
                     </button>
                 )}
