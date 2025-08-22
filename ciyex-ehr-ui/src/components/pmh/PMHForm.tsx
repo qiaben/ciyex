@@ -44,8 +44,8 @@ export default function PMHForm({ patientId, encounterId, editing, onSaved, onCa
             if (!res.ok || !json.success) throw new Error(json.message || "Save failed");
             onSaved(json.data!);
             setDescription("");
-        } catch (e: any) {
-            setErr(e.message || "Error");
+        } catch (e: unknown) {
+            setErr(e instanceof Error ? e.message : "Error");
         } finally {
             setSaving(false);
         }

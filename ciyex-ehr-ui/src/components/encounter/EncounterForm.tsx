@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {fetchWithOrg} from "@/utils/fetchWithOrg";
+import { fetchWithOrg } from "@/utils/fetchWithOrg";
 import type { ApiResponse, EncounterDto } from "@/utils/types";
 
 type Props = {
@@ -19,10 +19,12 @@ export default function EncounterForm({ patientId, editing, onSaved, onCancel }:
     const [err, setErr] = useState<string | null>(null);
 
     useEffect(() => {
-        if (editing?.id) {
-            setEncounterDate((editing as any).encounterDate?.slice(0, 10) || "");
+        if (editing && editing.id) {
+            const iso =
+                typeof editing.encounterDate === "string" ? editing.encounterDate.slice(0, 10) : "";
+            setEncounterDate(iso);
             setReason(editing.reason || "");
-            setStatus((editing.status as any) || "OPEN");
+            setStatus(editing.status === "OPEN" || editing.status === "CLOSED" ? editing.status : "OPEN");
         } else {
             setEncounterDate(new Date().toISOString().slice(0, 10));
             setReason("");
@@ -35,23 +37,24 @@ export default function EncounterForm({ patientId, editing, onSaved, onCancel }:
         setSubmitting(true);
         setErr(null);
         try {
-            const body: EncounterDto = { patientId, encounterDate, reason, status };
+            const base: Omit<EncounterDto, "id"> = { patientId, encounterDate, reason, status };
 
             let method: "POST" | "PUT" = "POST";
             let url = `/api/encounters`;
+            const payload: Partial<EncounterDto> =
+                editing && editing.id ? { ...base, id: editing.id } : base;
 
-            if (editing?.id) {
+            if (editing && editing.id) {
                 method = "PUT";
                 url = `/api/encounters/${editing.id}`;
-                (body as any).id = editing.id;
             }
 
-            const res = await fetchWithOrg(url, { method, body: JSON.stringify(body) });
+            const res = await fetchWithOrg(url, { method, body: JSON.stringify(payload) });
             const json = (await res.json()) as ApiResponse<EncounterDto>;
             if (!res.ok || !json.success) throw new Error(json.message || "Save failed");
             onSaved(json.data!);
-        } catch (e: any) {
-            setErr(e.message || "Error");
+        } catch (e: unknown) {
+            setErr(e instanceof Error ? e.message : "Error");
         } finally {
             setSubmitting(false);
         }

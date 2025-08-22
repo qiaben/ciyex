@@ -26,8 +26,8 @@ export default function PMHList({ patientId, encounterId }: Props) {
             const json = (await res.json()) as ApiResponse<PatientMedicalHistoryDto[]>;
             if (!res.ok || !json.success) throw new Error(json.message || "Load failed");
             setItems(json.data || []);
-        } catch (e: any) {
-            setError(e.message || "Error");
+        } catch (e: unknown) {
+            setError(e instanceof Error ? e.message : "Error");
         } finally {
             setLoading(false);
         }

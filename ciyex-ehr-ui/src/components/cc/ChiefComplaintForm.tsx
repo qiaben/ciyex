@@ -39,7 +39,7 @@ export default function ChiefComplaintForm({
                 encounterId,
                 complaint: complaint.trim(),
                 details: details.trim(),
-                ...(editing?.id ? { id: editing.id } : {}),
+                ...(editing?.id ? {id: editing.id} : {}),
             };
 
             const url = editing?.id
@@ -60,14 +60,16 @@ export default function ChiefComplaintForm({
                 setComplaint("");
                 setDetails("");
             }
-        } catch (e: any) {
-            setErr(e.message || "Something went wrong");
-        } finally {
-            setSaving(false);
+        } catch (e: unknown) {
+            if (e instanceof Error) {
+                setErr(e.message || "Something went wrong");
+            } else {
+                setErr("Something went wrong");
+            }
         }
     }
 
-    return (
+        return (
         <form onSubmit={handleSubmit} className="space-y-3 rounded-2xl border p-4 shadow-sm bg-white">
             <h3 className="text-lg font-semibold">
                 {editing?.id ? "Edit Chief Complaint" : "Add Chief Complaint"}

@@ -89,8 +89,8 @@ export default function HPIForm({ patientId, encounterId, editing, onSaved, onCa
                 setAssociatedSymptoms("");
                 setTiming("");
             }
-        } catch (e: any) {
-            setErr(e.message || "Something went wrong");
+        } catch (e: unknown) {
+            setErr(e instanceof Error ? e.message : "Something went wrong");
         } finally {
             setSaving(false);
         }

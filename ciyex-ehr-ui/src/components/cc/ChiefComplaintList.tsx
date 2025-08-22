@@ -38,9 +38,10 @@ export default function ChiefComplaintList({ patientId, encounterId }: Props) {
             const json = (await res.json()) as ApiResponse<ChiefComplaintDto[]>;
             if (!res.ok || !json.success) throw new Error(json.message || "Load failed");
             setItems(json.data || []);
-        } catch (e: any) {
-            setError(e.message || "Something went wrong");
-        } finally {
+        } catch (e: unknown) {
+            alert(e instanceof Error ? e.message : "Something went wrong");
+
+    } finally {
             setLoading(false);
         }
     }
@@ -74,8 +75,8 @@ export default function ChiefComplaintList({ patientId, encounterId }: Props) {
             const json = (await res.json()) as ApiResponse<void>;
             if (!res.ok || !json.success) throw new Error(json.message || "Delete failed");
             setItems((p) => p.filter((x) => x.id !== id));
-        } catch (e: any) {
-            alert(e.message || "Something went wrong");
+        }catch (e: unknown) {
+            alert(e instanceof Error ? e.message : "Something went wrong");
         }
     }
 

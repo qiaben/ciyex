@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -18,7 +17,7 @@ export default function EncounterClient() {
                 <p className="mb-2">No patient selected.</p>
                 <p className="text-sm text-gray-600">Set one in localStorage for dev:</p>
                 <code className="text-xs bg-gray-100 p-2 rounded block mt-2">
-                    localStorage.setItem("patientId","1")
+                    {`localStorage.setItem("patientId","1")`}
                 </code>
             </div>
         );
