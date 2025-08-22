@@ -12,10 +12,12 @@ type Props = {
     onCancel?: () => void;
 };
 
+const isDate = (v: unknown): v is Date => v instanceof Date;
+
 export default function PMHForm({ patientId, encounterId, editing, onSaved, onCancel }: Props) {
     const [condition, setCondition] = useState("");
     const [diagnosisDate, setDiagnosisDate] = useState("");
-    const [status, setStatus] = useState("Active");
+    const [status, setStatus] = useState<PastMedicalHistoryDto["status"] | "Active">("Active");
     const [notes, setNotes] = useState("");
 
     const [saving, setSaving] = useState(false);
@@ -23,12 +25,21 @@ export default function PMHForm({ patientId, encounterId, editing, onSaved, onCa
 
     useEffect(() => {
         setCondition(editing?.condition ?? "");
-        setDiagnosisDate((editing as any)?.diagnosisDate?.slice?.(0, 10) || editing?.diagnosisDate || "");
-        setStatus(editing?.status ?? "Active");
+
+        const raw: unknown = editing?.diagnosisDate as unknown;
+        setDiagnosisDate(
+            typeof raw === "string"
+                ? raw.slice(0, 10)
+                : isDate(raw)
+                    ? raw.toISOString().slice(0, 10)
+                    : ""
+        );
+
+        setStatus((editing?.status as PastMedicalHistoryDto["status"]) ?? "Active");
         setNotes(editing?.notes ?? "");
     }, [editing]);
 
-    async function handleSubmit(e: React.FormEvent) {
+    async function handleSubmit(e: React.FormEvent<HTMLFormElement>): Promise<void> {
         e.preventDefault();
         setSaving(true);
         setErr(null);
@@ -56,7 +67,10 @@ export default function PMHForm({ patientId, encounterId, editing, onSaved, onCa
 
             onSaved(json.data!);
             if (!editing?.id) {
-                setCondition(""); setDiagnosisDate(""); setStatus("Active"); setNotes("");
+                setCondition("");
+                setDiagnosisDate("");
+                setStatus("Active");
+                setNotes("");
             }
         } catch (e: unknown) {
             setErr(e instanceof Error ? e.message : "Something went wrong");
@@ -96,7 +110,7 @@ export default function PMHForm({ patientId, encounterId, editing, onSaved, onCa
                     <select
                         className="w-full rounded-lg border px-3 py-2 focus:ring"
                         value={status}
-                        onChange={(e) => setStatus(e.target.value)}
+                        onChange={(e) => setStatus(e.target.value as PastMedicalHistoryDto["status"])}
                     >
                         <option value="Active">Active</option>
                         <option value="Resolved">Resolved</option>

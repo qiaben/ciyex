@@ -1,15 +1,17 @@
-import PMHList from "@/components/pastmh/PMHList";
+import PEList from "@/components/physicalexam/PEList";
 
-type Props = { params: { patientId: string; encounterId: string } };
+type Props = { params: Promise<{ patientId: string; encounterId: string }> };
 
-export const metadata = { title: "Past Medical History (PMH)" };
+export const metadata = { title: "Physical Examination" };
 
-export default function PMHPage({ params }: Props) {
-    const patientId = Number(params.patientId);
-    const encounterId = Number(params.encounterId);
+export default async function PhysicalExamPage({ params }: Props) {
+    const { patientId: pidStr, encounterId: eidStr } = await params;
+    const patientId = Number(pidStr);
+    const encounterId = Number(eidStr);
+
     return (
         <div className="mx-auto max-w-3xl p-6">
-            <PMHList patientId={patientId} encounterId={encounterId} />
+            <PEList patientId={patientId} encounterId={encounterId} />
         </div>
     );
 }
