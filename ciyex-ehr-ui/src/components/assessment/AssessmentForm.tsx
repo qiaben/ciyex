@@ -88,7 +88,7 @@ export default function AssessmentForm({ patientId, encounterId, editing, onSave
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                    <label className="block text-sm font-medium mb-1">Diagnosis Code (ICD‑10)</label>
+                    <label className="block text-sm font-medium mb-1">Diagnosis Code (ICD-10)</label>
                     <input
                         className="w-full rounded-lg border px-3 py-2 focus:ring"
                         value={diagnosisCode}
@@ -111,7 +111,7 @@ export default function AssessmentForm({ patientId, encounterId, editing, onSave
                     <select
                         className="w-full rounded-lg border px-3 py-2 focus:ring"
                         value={status}
-                        onChange={(e) => setStatus(e.target.value as any)}
+                        onChange={(e) => setStatus(e.target.value as AssessmentDto["status"])}
                     >
                         <option value="Active">Active</option>
                         <option value="Resolved">Resolved</option>
@@ -126,7 +126,7 @@ export default function AssessmentForm({ patientId, encounterId, editing, onSave
                     <select
                         className="w-full rounded-lg border px-3 py-2 focus:ring"
                         value={priority}
-                        onChange={(e) => setPriority(e.target.value as any)}
+                        onChange={(e) => setPriority(e.target.value as AssessmentDto["priority"])}
                     >
                         <option value="Primary">Primary</option>
                         <option value="Secondary">Secondary</option>

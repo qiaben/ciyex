@@ -114,7 +114,7 @@ export default function ROSForm({ patientId, encounterId, editing, onSaved, onCa
                     <select
                         className="w-full rounded-lg border px-3 py-2 focus:ring"
                         value={status}
-                        onChange={(e) => setStatus(e.target.value as any)}
+                        onChange={(e) => setStatus(e.target.value as "Positive" | "Negative" | "NotAsked")}
                     >
                         <option value="Positive">Positive</option>
                         <option value="Negative">Negative</option>
