@@ -1,5 +1,5 @@
 "use client";
-import { PencilSquareIcon } from "@heroicons/react/24/outline";
+
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { fetchWithAuth } from "@/utils/fetchWithAuth";
@@ -1094,8 +1094,27 @@ function Card({ title, children, onEdit, onClick }: CardProps) {
             <div className="flex justify-between items-center mb-2">
                 <h4 className="text-sm font-semibold text-gray-800">{title}</h4>
                 {onEdit && (
-                    <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="text-blue-600 hover:text-blue-800">
-                        <PencilSquareIcon className="h-4 w-4" />
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onEdit();
+                        }}
+                        className="text-blue-600 hover:text-blue-800"
+                    >
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            strokeWidth={1.5}
+                            stroke="currentColor"
+                            className="h-4 w-4"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M16.862 4.487l1.687 1.687m-2.182-2.182a2.25 2.25 0 113.182 3.182L7.5 19.5H4.5v-3l12.182-12.182z"
+                            />
+                        </svg>
                     </button>
                 )}
             </div>
