@@ -10,6 +10,7 @@ export async function fetchWithAuth(
 
     const authHeaders: Record<string, string> = {
         "Content-Type": "application/json",
+        "Accept": "application/json",   // 👈 add here
         ...(token && { Authorization: `Bearer ${token}` }),
         ...(orgId && { "X-Org-Id": orgId }),
         ...(facilityId && { "X-Facility-Id": facilityId }),
