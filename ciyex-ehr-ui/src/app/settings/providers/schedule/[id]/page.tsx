@@ -15,7 +15,28 @@ type Provider = {
 
 type Freq = "DAILY" | "WEEKLY" | "MONTHLY";
 
+type PreviewOccurrence = {
+    start: Date;
+    end: Date;
+    isOneTime?: boolean; // optional, so recurrence entries don't need it
+};
+
+
+type Location = {
+    id: number;
+    name: string;
+    address?: string;
+};
+
+
+
 const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const WEEKDAY_CODES = ["SU","MO","TU","WE","TH","FR","SA"];
+
+function toByWeekday(weeklyFlags: boolean[]): string[] {
+    return WEEKDAY_CODES.filter((_, i) => weeklyFlags[i]);
+}
+
 
 function parseTimeToDate(base: Date, time: string) {
     const [hh, mm] = time.split(":").map((v) => parseInt(v || "0", 10));
@@ -36,49 +57,171 @@ function addMonths(d: Date, n: number) {
     return t;
 }
 
+// Format date/time in local timezone (browser default)
+function formatRange(s: Date, e: Date) {
+    if (isNaN(s.getTime()) || isNaN(e.getTime())) {
+        return "Invalid time range";
+    }
+
+    const datePart = new Intl.DateTimeFormat("en-US", {
+        month: "2-digit",
+        day: "2-digit",
+        year: "numeric",
+    }).format(s);
+
+    const startTime = new Intl.DateTimeFormat("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+    }).format(s);
+
+    const endTime = new Intl.DateTimeFormat("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+    }).format(e);
+
+    return `${datePart}, ${startTime} – ${endTime}`;
+}
+
+
+function formatInputToMMDDYYYY(value: string): string {
+    // Keep only digits
+    const digits = value.replace(/\D/g, "");
+    let result = "";
+
+    if (digits.length > 0) {
+        result += digits.substring(0, 2); // MM
+    }
+    if (digits.length >= 3) {
+        result += "/" + digits.substring(2, 4); // DD
+    }
+    if (digits.length >= 5) {
+        result += "/" + digits.substring(4, 8); // YYYY
+    }
+
+    return result;
+}
+
+function toISODateFromMMDDYYYY(val: string): string {
+    const parts = val.split("/");
+    if (parts.length === 3) {
+        const [mm, dd, yyyy] = parts;
+        if (mm && dd && yyyy && yyyy.length === 4) {
+            return `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
+        }
+    }
+    return "";
+}
+// ✅ Place it here (top-level, after imports/types, before Page component)
+type RecurrenceDto = {
+    frequency: Freq;
+    interval: number;
+    byWeekday?: string[];
+    startDate: string;
+    endDate?: string;
+    startTime: string;
+    endTime: string;
+    maxOccurrences: number;
+    locationId?: string;
+};
+
+type ScheduleDto = {
+    providerId: number;
+    actorReferences: string[];
+    timezone: string;
+    status: string;
+    comment?: string;
+    start?: string;
+    end?: string;
+    recurrence: RecurrenceDto | null;
+};
+
+async function createSchedule(dto: ScheduleDto) {
+    const res = await fetchWithAuth(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/schedules`,
+        {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(dto),
+        }
+    );
+
+    if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(text || "Failed to create schedule");
+    }
+
+    const json = await res.json();
+    if (!json?.success) {
+        throw new Error(json?.message || "Failed to create schedule");
+    }
+    return json.data;
+}
+
+
+
 const Page = () => {
     const { id } = useParams();
     const router = useRouter();
     const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
     const [provider, setProvider] = useState<Provider | null>(null);
-    const [otherProviders, setOtherProviders] = useState<Provider[]>([]);
     const [loading, setLoading] = useState(true);
 
     // recurrence state
     const [freq, setFreq] = useState<Freq>("WEEKLY");
     const [interval, setInterval] = useState<number>(1);
-    const todayISO = new Date().toISOString().split("T")[0];
-    const [startDate, setStartDate] = useState<string>(todayISO);
-    const [endDate, setEndDate] = useState<string>("");
     const [maxOccurrences, setMaxOccurrences] = useState<number>(10);
     const [weeklyDays, setWeeklyDays] = useState<boolean[]>([false, true, true, true, true, true, false]); // Mon–Fri
     const [startTime, setStartTime] = useState<string>("09:00");
     const [endTime, setEndTime] = useState<string>("");
-    const [location, setLocation] = useState<string>("");
-    const [useClientLocation, setUseClientLocation] = useState(false);
+    const [locations, setLocations] = useState<Location[]>([]);
+    const today = new Date();
+    const todayISO = today.toISOString().split("T")[0];
+    const todayInput = `${String(today.getMonth() + 1).padStart(2,"0")}/${String(today.getDate()).padStart(2,"0")}/${today.getFullYear()}`;
+
+    const [startDate, setStartDate] = useState<string>(todayISO);
+    const [startDateInput, setStartDateInput] = useState<string>(todayInput);
+
+    const [endDate, setEndDate] = useState<string>("");
+    const [endDateInput, setEndDateInput] = useState<string>("");
+    const [showRecurrence, setShowRecurrence] = useState(false);
+    const [locationId, setLocationId] = useState<number | "">(""); // <- instead of location: string
 
 
-    // substitute provider
-    const [substituteProviderId, setSubstituteProviderId] = useState<number | null>(null);
+    const [alertState, setAlertState] = useState<{ type: "success" | "warning" | "error"; message: string } | null>(null);
+
+
+    // one-time schedules
+    type OneTimeSchedule = {
+        dateInput: string;
+        date: string;        // ISO yyyy-mm-dd
+        startTime: string;
+        endTime: string;
+        locationId?: number; // <- was location?: string
+    };
+
+    const [oneTimeSchedules, setOneTimeSchedules] = useState<OneTimeSchedule[]>([]);
+
 
     // Fetch provider & other providers
     useEffect(() => {
         (async () => {
             try {
-                const [resProvider, resOthers] = await Promise.all([
+                const [resProvider,resLocations] = await Promise.all([
                     fetchWithAuth(`${apiUrl}/api/providers/${id}`, { method: "GET" }),
-                    fetchWithAuth(`${apiUrl}/api/providers?status=ACTIVE`, { method: "GET" }),
+                    fetchWithAuth(`${apiUrl}/api/locations`, { method: "GET" }), // ✅ new call
+
                 ]);
 
                 if (resProvider.ok) {
                     const data = await resProvider.json();
                     setProvider(data?.data ?? null);
                 }
-
-                if (resOthers.ok) {
-                    const data = await resOthers.json();
-                    setOtherProviders(data.data.filter((p: Provider) => p.id !== Number(id)));
+                if (resLocations.ok) {
+                    const data = await resLocations.json();
+                    setLocations(data?.data ?? []); // ✅ set state properly
                 }
             } finally {
                 setLoading(false);
@@ -86,88 +229,105 @@ const Page = () => {
         })();
     }, [apiUrl, id]);
 
-    // Preview calculation
-    const preview = useMemo(() => {
+// Preview calculation (recurrence + one-time)
+    const preview = useMemo<PreviewOccurrence[]>(() => {
         try {
-            const out: { start: Date; end: Date }[] = [];
-            if (!startDate) return out;
+            const recurrences: PreviewOccurrence[] = [];
 
-            const start = parseTimeToDate(new Date(startDate), startTime);
-            const endLimit = endDate ? new Date(endDate) : null;
+            // ✅ Generate recurrence preview only if recurrence fields are set
+            if (showRecurrence && startDate && startTime && endTime) {
+                const start = parseTimeToDate(new Date(startDate), startTime);
+                const endLimit = endDate ? new Date(endDate) : null;
+                let cursor = new Date(start);
 
-            let cursor = new Date(start);
-
-            if (freq === "DAILY") {
-                while (out.length < maxOccurrences) {
-                    if (!endLimit || cursor <= addDays(endLimit, 1)) {
-                        const s = new Date(cursor);
-                        const e = parseTimeToDate(s, endTime);   // ✅ use endTime instead of durationMin
-                        if (e > s) {
-                            out.push({ start: s, end: e });
-                        }
-                        cursor = addDays(cursor, interval);
-                    } else break;
-                }
-            } else if (freq === "WEEKLY") {
-                let guard = 0;
-                while (out.length < maxOccurrences && guard < 10000) {
-                    guard++;
-                    for (let dow = 0; dow < 7 && out.length < maxOccurrences; dow++) {
-                        const d = addDays(cursor, dow);
-                        if (weeklyDays[d.getDay()]) {
-                            const s = parseTimeToDate(d, startTime);
-                            const e = parseTimeToDate(d, endTime);  // ✅
-                            if ((!endLimit || s <= addDays(endLimit, 1)) && e > s) {
-                                out.push({ start: s, end: e });
+                if (freq === "DAILY") {
+                    while (recurrences.length < maxOccurrences) {
+                        if (!endLimit || cursor <= addDays(endLimit, 1)) {
+                            const s = new Date(cursor);
+                            const e = parseTimeToDate(s, endTime);
+                            if (!isNaN(e.getTime()) && e > s) {
+                                recurrences.push({ start: s, end: e });
+                            }
+                            cursor = addDays(cursor, interval);
+                        } else break;
+                    }
+                } else if (freq === "WEEKLY") {
+                    let guard = 0;
+                    while (recurrences.length < maxOccurrences && guard < 10000) {
+                        guard++;
+                        for (let dow = 0; dow < 7 && recurrences.length < maxOccurrences; dow++) {
+                            const d = addDays(cursor, dow);
+                            if (weeklyDays[d.getDay()]) {
+                                const s = parseTimeToDate(d, startTime);
+                                const e = parseTimeToDate(d, endTime);
+                                if ((!endLimit || s <= addDays(endLimit, 1)) && !isNaN(e.getTime()) && e > s) {
+                                    recurrences.push({ start: s, end: e });
+                                }
                             }
                         }
+                        cursor = addDays(cursor, 7 * interval);
+                        if (endLimit && cursor > addDays(endLimit, 1)) break;
                     }
-                    cursor = addDays(cursor, 7 * interval);
-                    if (endLimit && cursor > addDays(endLimit, 1)) break;
-                }
-            } else {
-                const targetDay = new Date(startDate).getDate();
-                let monthCursor = new Date(start);
-                let guard = 0;
-                while (out.length < maxOccurrences && guard < 1000) {
-                    guard++;
-                    if (!endLimit || monthCursor <= addDays(endLimit, 1)) {
-                        const s = parseTimeToDate(monthCursor, startTime);
-                        const e = parseTimeToDate(monthCursor, endTime); // ✅
-                        out.push({ start: s, end: e });
-                        monthCursor = addMonths(monthCursor, interval);
-                        const fix = new Date(monthCursor);
-                        fix.setDate(
-                            Math.min(targetDay, new Date(fix.getFullYear(), fix.getMonth() + 1, 0).getDate())
-                        );
-                        monthCursor = fix;
-                    } else break;
+                } else if (freq === "MONTHLY") {
+                    const targetDay = new Date(startDate).getDate();
+                    let monthCursor = new Date(start);
+                    let guard = 0;
+                    while (recurrences.length < maxOccurrences && guard < 1000) {
+                        guard++;
+                        if (!endLimit || monthCursor <= addDays(endLimit, 1)) {
+                            const s = parseTimeToDate(monthCursor, startTime);
+                            const e = parseTimeToDate(monthCursor, endTime);
+                            if (!isNaN(e.getTime()) && e > s) {
+                                recurrences.push({ start: s, end: e });
+                            }
+                            monthCursor = addMonths(monthCursor, interval);
+                            const fix = new Date(monthCursor);
+                            fix.setDate(
+                                Math.min(
+                                    targetDay,
+                                    new Date(fix.getFullYear(), fix.getMonth() + 1, 0).getDate()
+                                )
+                            );
+                            monthCursor = fix;
+                        } else break;
+                    }
                 }
             }
 
-            return out.slice(0, maxOccurrences);
+            // ✅ Always include one-time schedules
+            const oneTimes: PreviewOccurrence[] = oneTimeSchedules
+                .filter((s) => s.date && s.startTime && s.endTime)
+                .map((s) => {
+                    const base = new Date(s.date);
+                    return {
+                        start: parseTimeToDate(base, s.startTime),
+                        end: parseTimeToDate(base, s.endTime),
+                        isOneTime: true,
+                    };
+                });
+
+            return [...recurrences, ...oneTimes].sort(
+                (a, b) => a.start.getTime() - b.start.getTime()
+            );
         } catch {
             return [];
         }
-    }, [startDate, endDate, startTime, endTime, freq, interval, maxOccurrences, weeklyDays]);
+    }, [
+        startDate,
+        endDate,
+        startTime,
+        endTime,
+        freq,
+        interval,
+        maxOccurrences,
+        weeklyDays,
+        oneTimeSchedules,
+        showRecurrence,   // ✅ include toggle in dependencies
+    ]);
 
-    const formatRange = (s: Date, e: Date) => {
-        const fmt = new Intl.DateTimeFormat("en-US", {
-            weekday: "short",
-            month: "short",
-            day: "2-digit",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: false,   //  force 24-hour format
-        });
-        const tOnly = new Intl.DateTimeFormat("en-US", {
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: false,   //  force 24-hour clock
-        });
-        return `${fmt.format(s)} – ${tOnly.format(e)}`;
-    };
+
+
+
 
     const fullName = provider
         ? `${provider.identification?.firstName ?? ""} ${provider.identification?.lastName ?? ""}`.trim()
@@ -188,178 +348,321 @@ const Page = () => {
                                     : "—"}
                         </p>
                     </div>
-                    <Button variant="primary" onClick={() => router.back()}>
-                        Back
-                    </Button>
                 </div>
+
+                {alertState && (
+                    <div
+                        className={`mb-4 rounded-md border p-4 text-sm ${
+                            alertState.type === "success"
+                                ? "border-green-200 bg-green-50 text-green-700"
+                                : alertState.type === "warning"
+                                    ? "border-yellow-200 bg-yellow-50 text-yellow-700"
+                                    : "border-red-200 bg-red-50 text-red-700"
+                        }`}
+                    >
+                        {alertState.message}
+                    </div>
+                )}
+
 
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
                     {/* Left: Form */}
-                    <div className="lg:col-span-3 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-                        <h2 className="text-lg font-medium text-gray-900">Recurrence</h2>
+                    <div className="lg:col-span-3 space-y-6">
 
-                        {/* Frequency */}
-                        <div className="mt-4">
-                            <label className="block text-sm font-medium text-gray-700">Frequency</label>
-                            <div className="mt-2 flex gap-2">
-                                {(["DAILY", "WEEKLY", "MONTHLY"] as Freq[]).map((f) => (
-                                    <button
-                                        key={f}
-                                        onClick={() => setFreq(f)}
-                                        className={[
-                                            "rounded-full border px-3 py-1.5 text-sm",
-                                            freq === f
-                                                ? "border-indigo-600 bg-indigo-50 text-indigo-700"
-                                                : "border-gray-300 text-gray-700",
-                                        ].join(" ")}
-                                        aria-pressed={freq === f}
-                                    >
-                                        {f.charAt(0) + f.slice(1).toLowerCase()}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
 
-                        {/* Interval */}
-                        <div className="mt-4">
-                            <label className="block text-sm font-medium text-gray-700">Every</label>
-                            <div className="mt-2 flex items-center gap-2">
-                                <input
-                                    type="number"
-                                    min={1}
-                                    value={interval}
-                                    onChange={(e) => setInterval(Math.max(1, Number(e.target.value || 1)))}
-                                    className="h-10 w-20 rounded-lg border border-gray-300 px-3 text-sm"
-                                />
-                                <span className="text-sm text-gray-600">
-                  {freq === "DAILY" ? "day(s)" : freq === "WEEKLY" ? "week(s)" : "month(s)"}
-                </span>
-                            </div>
-                        </div>
-
-                        {/* Weekly day picker */}
-                        {freq === "WEEKLY" && (
-                            <div className="mt-4">
-                                <label className="block text-sm font-medium text-gray-700">Repeat On</label>
-                                <div className="mt-2 flex flex-wrap gap-2">
-                                    {dayNames.map((d, idx) => (
-                                        <button
-                                            key={d}
-                                            type="button"
-                                            onClick={() =>
-                                                setWeeklyDays((prev) => {
-                                                    const c = [...prev];
-                                                    c[idx] = !c[idx];
-                                                    return c;
-                                                })
-                                            }
-                                            className={[
-                                                "w-10 rounded-full border px-0 py-1.5 text-sm",
-                                                weeklyDays[idx]
-                                                    ? "border-indigo-600 bg-indigo-600 text-white"
-                                                    : "border-gray-300 text-gray-700",
-                                            ].join(" ")}
-                                            aria-pressed={weeklyDays[idx]}
-                                        >
-                                            {d[0]}
-                                        </button>
-                                    ))}
+                        {/* One-Time Schedules Card */}
+                        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h2 className="text-lg font-medium text-gray-900">One-Time Schedules</h2>
+                                    <p className="text-sm text-gray-500">
+                                        Add specific dates/times in addition to recurring schedule
+                                    </p>
                                 </div>
-                            </div>
-                        )}
 
-                        {/* Dates */}
-                        <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Start Date</label>
-                                <input
-                                    type="date"
-                                    value={startDate}
-                                    onChange={(e) => setStartDate(e.target.value)}
-                                    className="mt-2 h-10 w-full rounded-lg border border-gray-300 px-3 text-sm"
-                                />
+                                {/* ✅ Add Schedule button */}
+                                <Button
+                                    variant="primary"
+                                    onClick={() =>
+                                        setOneTimeSchedules((prev) => [
+                                            ...prev,
+                                            { dateInput: "", date: "", startTime: "09:00", endTime: "" },
+                                        ])
+                                    }
+                                >
+                                    Add Schedule
+                                </Button>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">End Date (optional)</label>
-                                <input
-                                    type="date"
-                                    value={endDate}
-                                    onChange={(e) => setEndDate(e.target.value)}
-                                    className="mt-2 h-10 w-full rounded-lg border border-gray-300 px-3 text-sm"
-                                />
-                            </div>
-                        </div>
 
-                        {/* Time + Duration + Location */}
-                        <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Start Time</label>
-                                <input
-                                    type="time"
-                                    value={startTime}
-                                    onChange={(e) => setStartTime(e.target.value)}
-                                    className="mt-2 h-10 w-full rounded-lg border border-gray-300 px-3 text-sm"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">End Time</label>
-                                <input
-                                    type="time"
-                                    value={endTime}
-                                    onChange={(e) => setEndTime(e.target.value)}
-                                    className="mt-2 h-10 w-full rounded-lg border border-gray-300 px-3 text-sm"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Location</label>
-                                <div className="mt-2 flex items-center gap-2">
+                            {/* Existing inputs stay here */}
+                            {oneTimeSchedules.map((s, idx) => (
+                                <div
+                                    key={idx}
+                                    className="grid grid-cols-5 gap-3 mt-4 p-4 border rounded-lg bg-gray-50 items-center"
+                                >
+                                    {/* Date */}
                                     <input
                                         type="text"
-                                        value={useClientLocation ? "Client" : location}
-                                        onChange={(e) => setLocation(e.target.value)}
-                                        disabled={useClientLocation}
-                                        className="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm"
-                                        placeholder="e.g., Clinic A, Room 12"
+                                        value={s.dateInput}
+                                        placeholder="MM/DD/YYYY"
+                                        onChange={(e) => {
+                                            const formatted = formatInputToMMDDYYYY(e.target.value);
+                                            const iso = toISODateFromMMDDYYYY(formatted);
+                                            const copy = [...oneTimeSchedules];
+                                            copy[idx].dateInput = formatted;
+                                            copy[idx].date = iso;
+                                            setOneTimeSchedules(copy);
+                                        }}
+                                        className="h-10 w-full rounded border px-2 text-sm"
                                     />
-                                    <label className="flex items-center gap-1 text-sm text-gray-600">
-                                        <input
-                                            type="checkbox"
-                                            checked={useClientLocation}
-                                            onChange={(e) => setUseClientLocation(e.target.checked)}
-                                        />
-                                        Use client
-                                    </label>
+
+                                    {/* Start Time */}
+                                    <input
+                                        type="time"
+                                        value={s.startTime}
+                                        onChange={(e) => {
+                                            const copy = [...oneTimeSchedules];
+                                            copy[idx].startTime = e.target.value;
+                                            setOneTimeSchedules(copy);
+                                        }}
+                                        className="h-10 w-full rounded border px-2 text-sm"
+                                    />
+
+                                    {/* End Time */}
+                                    <input
+                                        type="time"
+                                        value={s.endTime}
+                                        onChange={(e) => {
+                                            const copy = [...oneTimeSchedules];
+                                            copy[idx].endTime = e.target.value;
+                                            setOneTimeSchedules(copy);
+                                        }}
+                                        className="h-10 w-full rounded border px-2 text-sm"
+                                    />
+
+                                    {/* Location */}
+                                    <select
+                                        value={s.locationId ?? ""}
+                                        onChange={(e) => {
+                                            const copy = [...oneTimeSchedules];
+                                            copy[idx].locationId = e.target.value ? Number(e.target.value) : undefined;
+                                            setOneTimeSchedules(copy);
+                                        }}
+                                        className="h-10 w-35 rounded border px-2 text-sm"  // ✅ slightly bigger
+                                    >
+                                    <option value="">Select Location</option>
+                                        {locations.map((loc) => (
+                                            <option key={loc.id} value={loc.id}>
+                                                {loc.name} {loc.address ? `- ${loc.address}` : ""}
+                                            </option>
+                                        ))}
+                                    </select>
+
+
+
+
+                                    {/* Delete */}
+                                    <div className="flex justify-end">
+                                        <Button
+                                            variant="primary"
+                                            onClick={() =>
+                                                setOneTimeSchedules((prev) => prev.filter((_, i) => i !== idx))
+                                            }
+                                            className="h-10 px-4 text-sm"
+                                        >
+                                            Delete
+                                        </Button>
+                                    </div>
                                 </div>
+                            ))}
+                        </div>
+
+
+
+                        {/* Recurrence (mirrors One-Time Schedules) */}
+                        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h3 className="text-base font-medium text-gray-900">Recurrence</h3>
+                                    <p className="mt-1 text-sm text-gray-500">
+                                        Define repeating availability in addition to one-time schedules.
+                                    </p>
+                                </div>
+
+                                <Button
+                                    variant="primary"
+                                    onClick={() => setShowRecurrence((prev) => !prev)}
+                                    aria-expanded={showRecurrence}
+                                    aria-controls="recurrence-card"
+                                >
+                                    {showRecurrence ? "Hide Recurrence" : "Add Recurrence"}
+                                </Button>
                             </div>
-                        </div>
 
-                        {/* Substitute Provider */}
-                        <div className="mt-4">
-                            <label className="block text-sm font-medium text-gray-700">Substitute Provider (if on leave)</label>
-                            <select
-                                value={substituteProviderId ?? ""}
-                                onChange={(e) => setSubstituteProviderId(Number(e.target.value) || null)}
-                                className="mt-2 h-10 w-full rounded-lg border border-gray-300 px-3 text-sm"
-                            >
-                                <option value="">-- None --</option>
-                                {otherProviders.map((p) => (
-                                    <option key={p.id} value={p.id}>
-                                        {`${p.identification?.firstName ?? ""} ${p.identification?.lastName ?? ""}`}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
+                            {showRecurrence && (
+                                <div id="recurrence-card" className="mt-6 border-t border-gray-100 pt-6">
+                                    {/* Frequency */}
+                                    <div className="mt-0">
+                                        <label className="block text-sm font-medium text-gray-700">Frequency</label>
+                                        <div className="mt-2 flex gap-2">
+                                            {(["DAILY", "WEEKLY", "MONTHLY"] as Freq[]).map((f) => (
+                                                <button
+                                                    key={f}
+                                                    type="button"
+                                                    onClick={() => setFreq(f)}
+                                                    className={[
+                                                        "rounded-full border px-3 py-1.5 text-sm",
+                                                        freq === f
+                                                            ? "border-indigo-600 bg-indigo-50 text-indigo-700"
+                                                            : "border-gray-300 text-gray-700",
+                                                    ].join(" ")}
+                                                    aria-pressed={freq === f}
+                                                >
+                                                    {f.charAt(0) + f.slice(1).toLowerCase()}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
 
-                        {/* Occurrence cap */}
-                        <div className="mt-4">
-                            <label className="block text-sm font-medium text-gray-700">Max Occurrences (preview & save)</label>
-                            <input
-                                type="number"
-                                min={1}
-                                value={maxOccurrences}
-                                onChange={(e) => setMaxOccurrences(Math.max(1, Number(e.target.value || 1)))}
-                                className="mt-2 h-10 w-32 rounded-lg border border-gray-300 px-3 text-sm"
-                            />
+                                    {/* Interval */}
+                                    <div className="mt-4">
+                                        <label className="block text-sm font-medium text-gray-700">Every</label>
+                                        <div className="mt-2 flex items-center gap-2">
+                                            <input
+                                                type="number"
+                                                min={1}
+                                                value={interval}
+                                                onChange={(e) => setInterval(Math.max(1, Number(e.target.value || 1)))}
+                                                className="h-10 w-20 rounded-lg border border-gray-300 px-3 text-sm"
+                                            />
+                                            <span className="text-sm text-gray-600">
+            {freq === "DAILY" ? "day(s)" : freq === "WEEKLY" ? "week(s)" : "month(s)"}
+          </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Weekly day picker */}
+                                    {freq === "WEEKLY" && (
+                                        <div className="mt-4">
+                                            <label className="block text-sm font-medium text-gray-700">Repeat On</label>
+                                            <div className="mt-2 flex flex-wrap gap-2">
+                                                {dayNames.map((d, idx) => (
+                                                    <button
+                                                        key={d}
+                                                        type="button"
+                                                        onClick={() =>
+                                                            setWeeklyDays((prev) => {
+                                                                const c = [...prev];
+                                                                c[idx] = !c[idx];
+                                                                return c;
+                                                            })
+                                                        }
+                                                        className={[
+                                                            "w-10 rounded-full border px-0 py-1.5 text-sm",
+                                                            weeklyDays[idx]
+                                                                ? "border-indigo-600 bg-indigo-600 text-white"
+                                                                : "border-gray-300 text-gray-700",
+                                                        ].join(" ")}
+                                                        aria-pressed={weeklyDays[idx]}
+                                                    >
+                                                        {d[0]}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Dates */}
+                                    <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700">Start Date</label>
+                                            <input
+                                                type="text"
+                                                value={startDateInput}
+                                                placeholder="MM/DD/YYYY"
+                                                onChange={(e) => {
+                                                    const formatted = formatInputToMMDDYYYY(e.target.value);
+                                                    setStartDateInput(formatted);
+                                                    const iso = toISODateFromMMDDYYYY(formatted);
+                                                    if (iso) setStartDate(iso);
+                                                    else setStartDate("");
+                                                }}
+                                                className="mt-2 h-10 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700">End Date (optional)</label>
+                                            <input
+                                                type="text"
+                                                value={endDateInput}
+                                                placeholder="MM/DD/YYYY"
+                                                onChange={(e) => {
+                                                    const formatted = formatInputToMMDDYYYY(e.target.value);
+                                                    setEndDateInput(formatted);
+                                                    const iso = toISODateFromMMDDYYYY(formatted);
+                                                    if (iso) setEndDate(iso);
+                                                    else setEndDate("");
+                                                }}
+                                                className="mt-2 h-10 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Time + Duration + Location */}
+                                    <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700">Start Time</label>
+                                            <input
+                                                type="time"
+                                                value={startTime}
+                                                onChange={(e) => setStartTime(e.target.value)}
+                                                className="mt-2 h-10 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700">End Time</label>
+                                            <input
+                                                type="time"
+                                                value={endTime}
+                                                onChange={(e) => setEndTime(e.target.value)}
+                                                className="mt-2 h-10 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700">Location</label>
+                                            <div className="mt-2">
+                                                <select
+                                                    value={locationId}
+                                                    onChange={(e) => setLocationId(e.target.value ? Number(e.target.value) : "")}
+                                                    className="block w-full rounded-md border border-gray-300 bg-white py-2 px-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                                >
+                                                    <option value="">Select an option</option>
+                                                    {locations.map((loc) => (
+                                                        <option key={loc.id} value={loc.id}>
+                                                            {loc.name} {loc.address ? `- ${loc.address}` : ""}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Occurrence cap */}
+                                    <div className="mt-4">
+                                        <label className="block text-sm font-medium text-gray-700">
+                                            Max Occurrences (preview & save)
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min={1}
+                                            value={maxOccurrences}
+                                            onChange={(e) => setMaxOccurrences(Math.max(1, Number(e.target.value || 1)))}
+                                            className="mt-2 h-10 w-32 rounded-lg border border-gray-300 px-3 text-sm"
+                                        />
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Actions */}
@@ -368,22 +671,97 @@ const Page = () => {
                                 Cancel
                             </Button>
                             <Button
-                                onClick={() => {
-                                    const payload = {
-                                        providerId: Number(id),
-                                        substituteProviderId,
-                                        freq,
-                                        interval,
-                                        startDate,
-                                        endDate: endDate || null,
-                                        startTime,
-                                        endTime,  //   instead of durationMin
-                                        weeklyDays,
-                                        maxOccurrences,
-                                        location,
-                                    };
-                                    console.log("SAVE_SCHEDULE", payload);
-                                    alert("Schedule saved (mock). Check console for payload.");
+                                onClick={async () => {
+                                    try {
+                                        // basic validation
+                                        if (!provider?.id) throw new Error("Provider not loaded.");
+                                        if (showRecurrence && !endTime?.trim()) {
+                                            throw new Error("Please choose an end time for recurrence.");
+                                        }
+
+                                        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+
+                                        // shared actors: Practitioner + optional Location
+                                        const actorReferences: string[] = [`Practitioner/${provider.id}`];
+                                        if (locationId) actorReferences.push(`Location/${locationId}`);
+
+                                        // ===== (A) Recurrence schedule (single DTO) =====
+                                        const created: ScheduleDto[] = [];
+                                        if (showRecurrence && startDate && startTime && endTime) {
+                                            const recurrenceDto = {
+                                                // ScheduleDto (server computes id/orgId)
+                                                providerId: Number(id),
+                                                externalId: undefined, // not set here
+                                                actorReferences,
+                                                timezone: tz,
+                                                status: "active",
+
+                                                // one-time window not used for recurrence:
+                                                start: undefined,
+                                                end: undefined,
+
+                                                recurrence: {
+                                                    frequency: freq,                  // "DAILY" | "WEEKLY" | "MONTHLY"
+                                                    interval,                         // every n
+                                                    byWeekday: freq === "WEEKLY" ? toByWeekday(weeklyDays) : undefined,
+                                                    startDate,                        // yyyy-MM-dd
+                                                    endDate: endDate || undefined,    // yyyy-MM-dd (optional)
+                                                    startTime,                        // HH:mm
+                                                    endTime,                          // HH:mm
+                                                    maxOccurrences,                   // preview cap
+                                                    locationId: locationId ? String(locationId) : undefined, // ✅ pass ID, not name
+                                                },
+                                            };
+
+                                            const r = await createSchedule(recurrenceDto);
+                                            created.push(r);
+                                        }
+
+                                        // ===== (B) One-time schedules (one DTO per row) =====
+                                        const oneTimeRows = oneTimeSchedules.filter(
+                                            (s) => s.date && s.startTime && s.endTime
+                                        );
+
+                                        for (const row of oneTimeRows) {
+                                            const rowActors = [`Practitioner/${provider.id}`];
+                                            if (row.locationId) rowActors.push(`Location/${row.locationId}`);
+
+                                            // combine date + times into ISO-8601 instants in local TZ
+                                            const startISO = new Date(`${row.date}T${row.startTime}:00`).toISOString();
+                                            const endISO = new Date(`${row.date}T${row.endTime}:00`).toISOString();
+
+                                            const oneTimeDto = {
+                                                providerId: Number(id),
+                                                actorReferences: rowActors,
+                                                timezone: tz,
+                                                status: "active",
+
+                                                // One-time window
+                                                start: startISO, // ISO-8601
+                                                end: endISO,     // ISO-8601
+
+                                                // No recurrence
+                                                recurrence: null,
+                                            };
+
+                                            const r = await createSchedule(oneTimeDto);
+                                            created.push(r);
+                                        }
+
+                                        if (created.length === 0) {
+                                            alert("Nothing to save. Add a recurrence or one-time row.");
+                                            return;
+                                        }
+
+                                        setAlertState({ type: "success", message: `Created ${created.length} schedule(s) successfully.` });
+                                        router.push(`/settings/providers/schedule/${id}`);
+                                    } catch (e: unknown) {
+                                        console.error(e);
+                                        setAlertState({
+                                            type: "error",
+                                            message: e instanceof Error ? e.message : "Failed to create schedule(s).",
+                                        });
+                                    }
                                 }}
                             >
                                 Save Schedule
@@ -394,7 +772,9 @@ const Page = () => {
                     {/* Right: Preview */}
                     <div className="lg:col-span-2 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
                         <h2 className="text-lg font-medium text-gray-900">Preview</h2>
-                        <p className="text-sm text-gray-500 mt-1">Next {Math.min(preview.length, 10)} occurrence(s)</p>
+                        <p className="text-sm text-gray-500 mt-1">
+                            Next {Math.min(preview.length, 10)} occurrence(s)
+                        </p>
 
                         <div className="mt-4 space-y-2">
                             {preview.length === 0 ? (
@@ -403,19 +783,19 @@ const Page = () => {
                                 preview.slice(0, 10).map((o, i) => (
                                     <div
                                         key={i}
-                                        className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 flex items-center justify-between"
+                                        className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800"
                                     >
-                                        <span>{formatRange(o.start, o.end)}</span>
-                                        <span className="text-xs text-gray-500">
-  {`${startTime} – ${endTime}`}
-</span>
+                                        {formatRange(o.start, o.end)}
+                                        {o.isOneTime && (
+                                            <span className="ml-2 text-xs text-indigo-600 font-medium">(One-Time)</span>
+                                        )}
                                     </div>
                                 ))
                             )}
                         </div>
 
                         <div className="mt-6 rounded-lg bg-gray-50 p-3 text-xs text-gray-600">
-                            The preview uses your browser’s local time. Location is stored as text only.
+                            The preview uses your browser’s <strong>local timezone</strong>. Location is stored as text only.
                         </div>
                     </div>
                 </div>

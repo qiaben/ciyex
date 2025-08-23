@@ -15,7 +15,6 @@ import {
     PieChartIcon,
     PlugInIcon, SettingsIcon,
     TableIcon,
-    UserCircleIcon,
 } from "../icons/index";
 // import SidebarWidget from "./SidebarWidget";
 
@@ -36,11 +35,6 @@ const navItems: NavItem[] = [
     icon: <CalenderIcon />,
     name: "Calendar",
     path: "/calendar",
-  },
-  {
-    icon: <UserCircleIcon />,
-    name: "User Profile",
-    path: "/profile",
   },
     {
         icon: <SettingsIcon />, // Add this line for the Settings icon
