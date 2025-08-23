@@ -2,8 +2,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import AdminLayout from "@/app/(admin)/layout";
-//import { toast } from "react-toastify";
-//import "react-toastify/dist/ReactToastify.css";
+import { toast } from "react-toastify";
+
+import "react-toastify/dist/ReactToastify.css";
 
 // Define interfaces for your form data structure
 interface PersonalInfo {
@@ -495,15 +496,15 @@ export default function AddPatient() {
             const data = await response.json();
             console.log('Patient created:', data);
 
-{/*             toast.success('Patient Created Successfully', {
+            toast.success('Patient Created Successfully', {
                 autoClose: 4000,
                 position: 'top-right',
-            }); */}
+            });
 
             setTimeout(() => {
                 router.push('/patients');
             }, 2000);
-{/*         } catch (error: unknown) {
+        } catch (error: unknown) {
             console.error('Error creating patient:', error);
             let message = 'Failed to create patient. Please try again.';
             if (error instanceof Error) {
@@ -512,7 +513,7 @@ export default function AddPatient() {
             toast.error(message, {
                 autoClose: 4000,
                 position: 'top-right',
-            }); */}
+            });
         } finally {
             setIsSubmitting(false);
         }
