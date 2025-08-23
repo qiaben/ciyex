@@ -1,283 +1,1144 @@
-"use client";
-import React, { useState, useRef, useEffect } from "react";
-import FullCalendar from "@fullcalendar/react";
-import dayGridPlugin from "@fullcalendar/daygrid";
-import timeGridPlugin from "@fullcalendar/timegrid";
-import interactionPlugin from "@fullcalendar/interaction";
-import {
-  EventInput,
-  DateSelectArg,
-  EventClickArg,
-  EventContentArg,
-} from "@fullcalendar/core";
-import { useModal } from "@/hooks/useModal";
-import { Modal } from "@/components/ui/modal";
+'use client';
 
-interface CalendarEvent extends EventInput {
-  extendedProps: {
-    calendar: string;
-  };
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import FullCalendar from '@fullcalendar/react';
+import dayGridPlugin from '@fullcalendar/daygrid';
+import timeGridPlugin from '@fullcalendar/timegrid';
+import interactionPlugin from '@fullcalendar/interaction';
+import { useModal } from '@/hooks/useModal';
+import Select from '@/components/form/Select';
+import { ChevronDownIcon } from '@/icons';
+import { fetchWithAuth } from '@/utils/fetchWithAuth';
+import {
+    EventInput,
+    DateSelectArg,
+    EventClickArg,
+    EventContentArg,
+} from '@fullcalendar/core';
+
+/* =========================
+ * Types & Interfaces
+ * ======================= */
+interface Provider {
+    id: number;
+    identification?: { firstName?: string; lastName?: string } | null;
+    systemAccess?: { status?: string } | null;
 }
 
-const Calendar: React.FC = () => {
-  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(
-    null
-  );
-  const [eventTitle, setEventTitle] = useState("");
-  const [eventStartDate, setEventStartDate] = useState("");
-  const [eventEndDate, setEventEndDate] = useState("");
-  const [eventLevel, setEventLevel] = useState("");
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const calendarRef = useRef<FullCalendar>(null);
-  const { isOpen, openModal, closeModal } = useModal();
+interface Location {
+    id: number;
+    name: string;
+    address?: string;
+}
 
-  const calendarsEvents = {
-    Danger: "danger",
-    Success: "success",
-    Primary: "primary",
-    Warning: "warning",
-  };
+/** Support BOTH API shapes:
+ *  - flat: { firstName, lastName, dateOfBirth }
+ *  - nested: { identification: { firstName, lastName }, dateOfBirth }
+ */
+interface Patient {
+    id: number;
+    firstName?: string | null;
+    lastName?: string | null;
+    dateOfBirth?: string | null;
+    identification?: { firstName?: string | null; lastName?: string | null } | null;
+}
 
-  useEffect(() => {
-    // Initialize with some events
-    setEvents([
-      {
-        id: "1",
-        title: "Event Conf.",
-        start: new Date().toISOString().split("T")[0],
-        extendedProps: { calendar: "Danger" },
-      },
-      {
-        id: "2",
-        title: "Meeting",
-        start: new Date(Date.now() + 86400000).toISOString().split("T")[0],
-        extendedProps: { calendar: "Success" },
-      },
-      {
-        id: "3",
-        title: "Workshop",
-        start: new Date(Date.now() + 172800000).toISOString().split("T")[0],
-        end: new Date(Date.now() + 259200000).toISOString().split("T")[0],
-        extendedProps: { calendar: "Primary" },
-      },
-    ]);
-  }, []);
+type AppointmentStatus = 'Scheduled' | 'Confirmed' | 'Checked-in' | 'Completed';
+type Priority = 'Routine' | 'Urgent';
 
-  const handleDateSelect = (selectInfo: DateSelectArg) => {
-    resetModalFields();
-    setEventStartDate(selectInfo.startStr);
-    setEventEndDate(selectInfo.endStr || selectInfo.startStr);
-    openModal();
-  };
+interface CalendarEvent extends EventInput {
+    extendedProps: {
+        visitType?: string;
+        providerId?: string;
+        locationId?: string;
+        status?: AppointmentStatus;
+        notes?: string; // Reason / Chief Complaint
+        patientId?: string;
+        patientName?: string;
+        priority?: Priority;
+    };
+}
 
-  const handleEventClick = (clickInfo: EventClickArg) => {
-    const event = clickInfo.event;
-    setSelectedEvent(event as unknown as CalendarEvent);
-    setEventTitle(event.title);
-    setEventStartDate(event.start?.toISOString().split("T")[0] || "");
-    setEventEndDate(event.end?.toISOString().split("T")[0] || "");
-    setEventLevel(event.extendedProps.calendar);
-    openModal();
-  };
-
-  const handleAddOrUpdateEvent = () => {
-    if (selectedEvent) {
-      // Update existing event
-      setEvents((prevEvents) =>
-        prevEvents.map((event) =>
-          event.id === selectedEvent.id
-            ? {
-                ...event,
-                title: eventTitle,
-                start: eventStartDate,
-                end: eventEndDate,
-                extendedProps: { calendar: eventLevel },
-              }
-            : event
-        )
-      );
-    } else {
-      // Add new event
-      const newEvent: CalendarEvent = {
-        id: Date.now().toString(),
-        title: eventTitle,
-        start: eventStartDate,
-        end: eventEndDate,
-        allDay: true,
-        extendedProps: { calendar: eventLevel },
-      };
-      setEvents((prevEvents) => [...prevEvents, newEvent]);
-    }
-    closeModal();
-    resetModalFields();
-  };
-
-  const resetModalFields = () => {
-    setEventTitle("");
-    setEventStartDate("");
-    setEventEndDate("");
-    setEventLevel("");
-    setSelectedEvent(null);
-  };
-
-  return (
-    <div className="rounded-2xl border  border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-      <div className="custom-calendar">
-        <FullCalendar
-          ref={calendarRef}
-          plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-          initialView="dayGridMonth"
-          headerToolbar={{
-            left: "prev,next addEventButton",
-            center: "title",
-            right: "dayGridMonth,timeGridWeek,timeGridDay",
-          }}
-          events={events}
-          selectable={true}
-          select={handleDateSelect}
-          eventClick={handleEventClick}
-          eventContent={renderEventContent}
-          customButtons={{
-            addEventButton: {
-              text: "Add Event +",
-              click: openModal,
-            },
-          }}
-        />
-      </div>
-      <Modal
-        isOpen={isOpen}
-        onClose={closeModal}
-        className="max-w-[700px] p-6 lg:p-10"
-      >
-        <div className="flex flex-col px-2 overflow-y-auto custom-scrollbar">
-          <div>
-            <h5 className="mb-2 font-semibold text-gray-800 modal-title text-theme-xl dark:text-white/90 lg:text-2xl">
-              {selectedEvent ? "Edit Event" : "Add Event"}
-            </h5>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Plan your next big moment: schedule or edit an event to stay on
-              track
-            </p>
-          </div>
-          <div className="mt-8">
-            <div>
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-                  Event Title
-                </label>
-                <input
-                  id="event-title"
-                  type="text"
-                  value={eventTitle}
-                  onChange={(e) => setEventTitle(e.target.value)}
-                  className="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
-                />
-              </div>
-            </div>
-            <div className="mt-6">
-              <label className="block mb-4 text-sm font-medium text-gray-700 dark:text-gray-400">
-                Event Color
-              </label>
-              <div className="flex flex-wrap items-center gap-4 sm:gap-5">
-                {Object.entries(calendarsEvents).map(([key, value]) => (
-                  <div key={key} className="n-chk">
-                    <div
-                      className={`form-check form-check-${value} form-check-inline`}
-                    >
-                      <label
-                        className="flex items-center text-sm text-gray-700 form-check-label dark:text-gray-400"
-                        htmlFor={`modal${key}`}
-                      >
-                        <span className="relative">
-                          <input
-                            className="sr-only form-check-input"
-                            type="radio"
-                            name="event-level"
-                            value={key}
-                            id={`modal${key}`}
-                            checked={eventLevel === key}
-                            onChange={() => setEventLevel(key)}
-                          />
-                          <span className="flex items-center justify-center w-5 h-5 mr-2 border border-gray-300 rounded-full box dark:border-gray-700">
-                            <span
-                              className={`h-2 w-2 rounded-full bg-white ${
-                                eventLevel === key ? "block" : "hidden"
-                              }`}  
-                            ></span>
-                          </span>
-                        </span>
-                        {key}
-                      </label>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="mt-6">
-              <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-                Enter Start Date
-              </label>
-              <div className="relative">
-                <input
-                  id="event-start-date"
-                  type="date"
-                  value={eventStartDate}
-                  onChange={(e) => setEventStartDate(e.target.value)}
-                  className="dark:bg-dark-900 h-11 w-full appearance-none rounded-lg border border-gray-300 bg-transparent bg-none px-4 py-2.5 pl-4 pr-11 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
-                />
-              </div>
-            </div>
-
-            <div className="mt-6">
-              <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-                Enter End Date
-              </label>
-              <div className="relative">
-                <input
-                  id="event-end-date"
-                  type="date"
-                  value={eventEndDate}
-                  onChange={(e) => setEventEndDate(e.target.value)}
-                  className="dark:bg-dark-900 h-11 w-full appearance-none rounded-lg border border-gray-300 bg-transparent bg-none px-4 py-2.5 pl-4 pr-11 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
-                />
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 mt-6 modal-footer sm:justify-end">
-            <button
-              onClick={closeModal}
-              type="button"
-              className="flex w-full justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] sm:w-auto"
-            >
-              Close
-            </button>
-            <button
-              onClick={handleAddOrUpdateEvent}
-              type="button"
-              className="btn btn-success btn-update-event flex w-full justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 sm:w-auto"
-            >
-              {selectedEvent ? "Update Changes" : "Add Event"}
-            </button>
-          </div>
-        </div>
-      </Modal>
-    </div>
-  );
+/* Schedules from backend */
+type ScheduleRecurrence = {
+    frequency: 'DAILY' | 'WEEKLY' | 'MONTHLY';
+    interval: number;
+    byWeekday?: string[];
+    startDate: string; // yyyy-MM-dd
+    endDate?: string;
+    startTime: string; // HH:mm
+    endTime: string; // HH:mm
+    locationId?: string;
 };
 
-const renderEventContent = (eventInfo: EventContentArg) => {
-  const colorClass = `fc-bg-${eventInfo.event.extendedProps.calendar.toLowerCase()}`;
-  return (
-    <div
-      className={`event-fc-color flex fc-event-main ${colorClass} p-1 rounded-sm`}
-    >
-      <div className="fc-daygrid-event-dot"></div>
-      <div className="fc-event-time">{eventInfo.timeText}</div>
-      <div className="fc-event-title">{eventInfo.event.title}</div>
-    </div>
-  );
+type Schedule = {
+    id: number;
+    providerId: number;
+    status: string; // 'active' | ...
+    start?: string; // ISO (one-time)
+    end?: string; // ISO (one-time)
+    recurrence?: ScheduleRecurrence | null;
+    actorReferences?: string[];
+};
+
+/* =========================
+ * Helpers
+ * ======================= */
+const WEEKDAY_CODES = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+
+const getPatientFullName = (p: Patient | null | undefined): string => {
+    if (!p) return '';
+    const first = (p.firstName ?? p.identification?.firstName ?? '')?.trim();
+    const last = (p.lastName ?? p.identification?.lastName ?? '')?.trim();
+    return `${first} ${last}`.trim();
+};
+
+// Match Provider Schedule page: MM/DD/YYYY UI + ISO for logic
+const formatInputToMMDDYYYY = (value: string): string => {
+    const digits = value.replace(/\D/g, '');
+    let result = '';
+    if (digits.length > 0) result += digits.substring(0, 2); // MM
+    if (digits.length >= 3) result += '/' + digits.substring(2, 4); // DD
+    if (digits.length >= 5) result += '/' + digits.substring(4, 8); // YYYY
+    return result;
+};
+const toISODateFromMMDDYYYY = (val: string): string => {
+    const parts = val.split('/');
+    if (parts.length === 3) {
+        const [mm, dd, yyyy] = parts;
+        if (mm && dd && yyyy && yyyy.length === 4) {
+            return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
+        }
+    }
+    return '';
+};
+const dateToMMDDYYYY = (d: Date) => {
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    return `${mm}/${dd}/${yyyy}`;
+};
+
+// yyyy-mm-dd from Date
+const dateInput = (d: Date) => {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+// HH:mm from Date
+const timeInput = (d: Date) => {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+// join yyyy-mm-dd + HH:mm into local string
+const combineLocal = (ymd: string, hm: string) => (ymd && hm ? `${ymd}T${hm}` : '');
+
+// Days between YYYY-MM-DD strings
+const daysBetween = (aYmd: string, bYmd: string) => {
+    const a = new Date(`${aYmd}T00:00:00`);
+    const b = new Date(`${bYmd}T00:00:00`);
+    return Math.floor((b.getTime() - a.getTime()) / (24 * 60 * 60 * 1000));
+};
+const monthsBetween = (startYmd: string, targetYmd: string) => {
+    const s = new Date(`${startYmd}T00:00:00`);
+    const t = new Date(`${targetYmd}T00:00:00`);
+    return (t.getFullYear() - s.getFullYear()) * 12 + (t.getMonth() - s.getMonth());
+};
+const hmToMinutes = (hm: string) => {
+    const [h, m] = hm.split(':').map((n) => parseInt(n || '0', 10));
+    return (h || 0) * 60 + (m || 0);
+};
+const toDateOnly = (isoOrYmd: string) => (isoOrYmd.includes('T') ? isoOrYmd.slice(0, 10) : isoOrYmd);
+
+const hasOccurrenceOnDate = (sched: Schedule, dateYmd: string) => {
+    if (!sched.recurrence && sched.start) {
+        return toDateOnly(sched.start) === dateYmd;
+    }
+    const r = sched.recurrence;
+    if (!r) return false;
+    if (dateYmd < r.startDate) return false;
+    if (r.endDate && dateYmd > r.endDate) return false;
+    const diffDays = daysBetween(r.startDate, dateYmd);
+    if (diffDays < 0) return false;
+
+    switch (r.frequency) {
+        case 'DAILY':
+            return diffDays % Math.max(1, r.interval) === 0;
+        case 'WEEKLY': {
+            const weeks = Math.floor(diffDays / 7);
+            const dayCode = WEEKDAY_CODES[new Date(`${dateYmd}T00:00:00`).getDay()];
+            const inBy = !r.byWeekday || r.byWeekday.includes(dayCode);
+            return inBy && weeks % Math.max(1, r.interval) === 0;
+        }
+        case 'MONTHLY': {
+            const months = monthsBetween(r.startDate, dateYmd);
+            const startDay = new Date(`${r.startDate}T00:00:00`).getDate();
+            const targetDay = new Date(`${dateYmd}T00:00:00`).getDate();
+            const sameDay = startDay === targetDay;
+            return months >= 0 && sameDay && months % Math.max(1, r.interval) === 0;
+        }
+    }
+};
+
+const hasOccurrenceCoveringSlot = (
+    sched: Schedule,
+    startYmdTHM: string,
+    endYmdTHM: string
+) => {
+    if (!startYmdTHM || !endYmdTHM) return false;
+    const start = new Date(startYmdTHM);
+    const end = new Date(endYmdTHM);
+    const dateYmd = startYmdTHM.slice(0, 10);
+
+    // One-time
+    if (!sched.recurrence && sched.start && sched.end) {
+        const s = new Date(sched.start);
+        const e = new Date(sched.end);
+        return s <= start && e >= end;
+    }
+
+    const r = sched.recurrence;
+    if (!r) return false;
+    if (!hasOccurrenceOnDate(sched, dateYmd)) return false;
+
+    const apptStartHM = startYmdTHM.slice(11, 16);
+    const apptEndHM = endYmdTHM.slice(11, 16);
+    return (
+        hmToMinutes(apptStartHM) >= hmToMinutes(r.startTime) &&
+        hmToMinutes(apptEndHM) <= hmToMinutes(r.endTime)
+    );
+};
+
+const scheduleHasLocation = (sched: Schedule, locId: string | 'all') => {
+    if (!locId || locId === 'all') return true;
+    const idStr = String(locId);
+    if (sched.recurrence?.locationId && String(sched.recurrence.locationId) === idStr) return true;
+    const refs = sched.actorReferences;
+    if (Array.isArray(refs) && refs.includes(`Location/${idStr}`)) return true;
+    return false;
+};
+
+// Extract Location/{id} preference from a schedule
+const getLocationIdFromSchedule = (sched: Schedule): string | null => {
+    const rid = sched?.recurrence?.locationId;
+    if (rid) return String(rid);
+    const refs = Array.isArray(sched?.actorReferences) ? sched.actorReferences : [];
+    const locRef = refs.find((r) => String(r).startsWith('Location/'));
+    if (!locRef) return null;
+    const parts = String(locRef).split('/');
+    return parts[1] || null;
+};
+
+/* =========================
+ * Static Options
+ * ======================= */
+type Option<T extends string = string> = { value: T; label: string };
+
+const visitTypeOptions: Option[] = [
+    { value: 'Consultation', label: 'Consultation' },
+    { value: 'Follow-up', label: 'Follow-up' },
+    { value: 'Routine Check', label: 'Routine Check' },
+    { value: 'Procedure', label: 'Procedure' },
+    { value: 'Telehealth', label: 'Telehealth' },
+];
+
+const statusOptions: Option<AppointmentStatus>[] = [
+    { value: 'Scheduled', label: 'Scheduled' },
+    { value: 'Confirmed', label: 'Confirmed' },
+    { value: 'Checked-in', label: 'Checked-in' },
+    { value: 'Completed', label: 'Completed' },
+];
+
+const priorityOptions: Option<Priority>[] = [
+    { value: 'Routine', label: 'Routine' },
+    { value: 'Urgent', label: 'Urgent' },
+];
+
+type ViewType = 'dayGridMonth' | 'timeGridWeek' | 'timeGridDay';
+
+const Calendar: React.FC = () => {
+    const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+
+    // Removed Title — auto-generate from Visit Type + Patient
+    const [visitType, setVisitType] = useState<string>('Consultation');
+
+    // Patient search & selection
+    const [patientQuery, setPatientQuery] = useState<string>('');
+    const [patientResults, setPatientResults] = useState<Patient[]>([]);
+    const [selectedPatientId, setSelectedPatientId] = useState<string>('');
+    const [selectedPatientName, setSelectedPatientName] = useState<string>('');
+    const [patientSearching, setPatientSearching] = useState<boolean>(false);
+    const [showPatientDropdown, setShowPatientDropdown] = useState<boolean>(false);
+
+    // Priority / Provider / Location / Status
+    const [appointmentPriority, setAppointmentPriority] = useState<Priority>('Routine');
+    const [appointmentProviderId, setAppointmentProviderId] = useState<string>('');
+    const [appointmentLocationId, setAppointmentLocationId] = useState<string>('');
+    const [appointmentStatus, setAppointmentStatus] = useState<AppointmentStatus>('Scheduled');
+
+    // Date & Time — input (MM/DD/YYYY) + ISO (YYYY-MM-DD)
+    const [startDateInput, setStartDateInput] = useState<string>('');
+    const [endDateInput, setEndDateInput] = useState<string>('');
+    const [startDate, setStartDate] = useState<string>(''); // ISO yyyy-mm-dd
+    const [endDate, setEndDate] = useState<string>(''); // ISO yyyy-mm-dd
+    const [startTime, setStartTime] = useState<string>('');
+    const [endTime, setEndTime] = useState<string>('');
+
+    // Reason / Chief Complaint
+    const [appointmentNotes, setAppointmentNotes] = useState<string>('');
+
+    const [events, setEvents] = useState<CalendarEvent[]>([]);
+    const calendarRef = useRef<FullCalendar>(null);
+    const { isOpen, openModal, closeModal } = useModal();
+
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL as string;
+
+    // Header filters (existing)
+    const [providers, setProviders] = useState<{ value: string; label: string }[]>([]);
+    const [, setProvider] = useState('all');
+    const [locations, setLocations] = useState<{ value: string; label: string }[]>([]);
+    const [location, setLocation] = useState('all');
+
+    // Modal provider list (based on chosen slot & location)
+    const [providersForDate, setProvidersForDate] = useState<{ value: string; label: string }[]>([]);
+    const [loadingProvidersForDate, setLoadingProvidersForDate] = useState(false);
+
+    // Filtered locations for the selected provider (modal dropdown)
+    const [providerLocationOptions, setProviderLocationOptions] = useState<
+        { value: string; label: string }[]
+    >([]);
+
+    const combinedStart = useMemo(() => combineLocal(startDate, startTime), [startDate, startTime]);
+    const combinedEnd = useMemo(() => combineLocal(endDate, endTime), [endDate, endTime]);
+
+    // NEW: calendar title + active view
+    const [calendarTitle, setCalendarTitle] = useState<string>('');
+    const [activeView, setActiveView] = useState<ViewType>('dayGridMonth');
+
+    // FullCalendar controls
+    const api = () => calendarRef.current?.getApi();
+    const goPrev = () => api()?.prev();
+    const goNext = () => api()?.next();
+    const changeView = (v: ViewType) => {
+        if (api()) {
+            api()!.changeView(v);
+            setActiveView(v);
+        }
+    };
+
+    // Fetch ACTIVE providers (header)
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await fetchWithAuth(`${apiUrl}/api/providers?status=ACTIVE`);
+                const json = await res.json();
+                if (json?.success && Array.isArray(json.data)) {
+                    const active = json.data
+                        .filter((p: Provider) => p?.systemAccess?.status === 'ACTIVE')
+                        .map((p: Provider) => ({
+                            value: String(p.id),
+                            label: `${p.identification?.firstName || ''} ${p.identification?.lastName || ''}`.trim(),
+                        }));
+                    setProviders(active);
+                }
+            } catch (e) {
+                console.error('Failed to fetch providers', e);
+            }
+        })();
+    }, [apiUrl]);
+
+    // Fetch locations (header & modal base)
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await fetchWithAuth(`${apiUrl}/api/locations`);
+                const json = await res.json();
+                const list: Location[] = Array.isArray(json?.data) ? json.data : [];
+                const opts = list.map((l) => ({
+                    value: String(l.id),
+                    label: `${l.name}${l.address ? ` - ${l.address}` : ''}`,
+                }));
+                setLocations(opts);
+            } catch (e) {
+                console.error('Failed to fetch locations', e);
+            }
+        })();
+    }, [apiUrl]);
+
+    // Build provider list for chosen date/time (& location)
+    useEffect(() => {
+        if (!isOpen || !combinedStart || !combinedEnd) {
+            setProvidersForDate([]);
+            return;
+        }
+        (async () => {
+            setLoadingProvidersForDate(true);
+            try {
+                const res = await fetchWithAuth(`${apiUrl}/api/schedules?status=active`);
+                const json = await res.json();
+                const schedules: Schedule[] = Array.isArray(json?.data) ? json.data : [];
+                const effectiveLocation = appointmentLocationId || (location !== 'all' ? location : 'all');
+
+                const providerIds = new Set<number>();
+                for (const s of schedules) {
+                    if (
+                        String(s.status).toLowerCase() === 'active' &&
+                        hasOccurrenceCoveringSlot(s, combinedStart, combinedEnd) &&
+                        scheduleHasLocation(s, effectiveLocation)
+                    ) {
+                        providerIds.add(Number(s.providerId));
+                    }
+                }
+                const allowed = providers.filter((p) => providerIds.has(Number(p.value)));
+                setProvidersForDate(allowed);
+                if (appointmentProviderId && !allowed.some((a) => a.value === appointmentProviderId)) {
+                    setAppointmentProviderId('');
+                }
+            } catch (e) {
+                console.error('Failed to load schedules', e);
+                setProvidersForDate([]);
+            } finally {
+                setLoadingProvidersForDate(false);
+            }
+        })();
+    }, [
+        isOpen,
+        combinedStart,
+        combinedEnd,
+        providers,
+        appointmentProviderId,
+        location,
+        appointmentLocationId,
+        apiUrl,
+    ]);
+
+    // Slot-aware locations: ONLY the selected provider's locations.
+    // If a time is chosen, further restrict to schedules covering that slot.
+    useEffect(() => {
+        let cancelled = false;
+
+        (async () => {
+            // No provider selected → nothing to show
+            if (!appointmentProviderId) {
+                setProviderLocationOptions([]);
+                setAppointmentLocationId('');
+                return;
+            }
+
+            try {
+                // Ask server for this provider's schedules (but also strictly filter client-side)
+                const res = await fetchWithAuth(
+                    `${apiUrl}/api/schedules?status=active&providerId=${appointmentProviderId}`
+                );
+                const json = await res.json();
+                const schedules: Schedule[] = Array.isArray(json?.data) ? json.data : [];
+
+                // STRICT provider filter on the client
+                const providerSchedules = schedules.filter(
+                    (s) => Number(s.providerId) === Number(appointmentProviderId)
+                );
+
+                const locIds = new Set<string>();
+                providerSchedules.forEach((s) => {
+                    const coversSlot =
+                        combinedStart && combinedEnd
+                            ? hasOccurrenceCoveringSlot(s, combinedStart, combinedEnd)
+                            : true; // if no slot yet, show all provider locations
+
+                    if (coversSlot) {
+                        const lid = getLocationIdFromSchedule(s);
+                        if (lid) locIds.add(String(lid));
+                    }
+                });
+
+                // Map ids → labels using the global locations list
+                const byId: Record<string, { value: string; label: string }> = {};
+                locations.forEach((l) => (byId[l.value] = l));
+
+                const filtered = Array.from(locIds).map((id) => byId[id]).filter(Boolean);
+
+                if (!cancelled) {
+                    setProviderLocationOptions(filtered);
+
+                    // Auto-select if exactly one
+                    if (filtered.length === 1) {
+                        setAppointmentLocationId(filtered[0].value);
+                    } else if (
+                        appointmentLocationId &&
+                        !filtered.some((l) => l.value === appointmentLocationId)
+                    ) {
+                        // Clear if previously selected location no longer valid
+                        setAppointmentLocationId('');
+                    } else if (
+                        // Optional: if header location filter is valid for this provider, prefill it
+                        filtered.length > 1 &&
+                        location !== 'all' &&
+                        filtered.some((l) => l.value === location)
+                    ) {
+                        setAppointmentLocationId(location);
+                    }
+                }
+            } catch (e) {
+                if (!cancelled) {
+                    console.error('Failed to load provider locations', e);
+                    setProviderLocationOptions([]);
+                    setAppointmentLocationId('');
+                }
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [appointmentProviderId, combinedStart, combinedEnd, locations, apiUrl, appointmentLocationId, location]);
+
+    // Clear modal location whenever provider changes
+    useEffect(() => {
+        setAppointmentLocationId('');
+    }, [appointmentProviderId]);
+
+    // Patient search (debounced)
+    useEffect(() => {
+        if (!isOpen) return;
+        const q = patientQuery.trim();
+        if (q.length < 2) {
+            setPatientResults([]);
+            return;
+        }
+        let cancelled = false;
+        setPatientSearching(true);
+        const t = setTimeout(async () => {
+            try {
+                const res = await fetchWithAuth(
+                    `${apiUrl}/api/patients?search=${encodeURIComponent(q)}`
+                );
+                const json = await res.json();
+                if (cancelled) return;
+                const list: Patient[] = Array.isArray(json?.data) ? json.data : [];
+                setPatientResults(list);
+                setShowPatientDropdown(true);
+            } catch (e) {
+                if (!cancelled) {
+                    console.error('Patient search failed', e);
+                    setPatientResults([]);
+                }
+            } finally {
+                if (!cancelled) setPatientSearching(false);
+            }
+        }, 250);
+
+        return () => {
+            cancelled = true;
+            clearTimeout(t);
+        };
+    }, [patientQuery, apiUrl, isOpen]);
+
+    // Default 15-minute end when selecting on grid
+    const handleDateSelect = (selectInfo: DateSelectArg) => {
+        resetModalFields();
+
+        const start = selectInfo.start;
+        const end = new Date(start.getTime() + 15 * 60 * 1000);
+
+        // UI inputs (MM/DD/YYYY)
+        setStartDateInput(dateToMMDDYYYY(start));
+        setEndDateInput(dateToMMDDYYYY(end));
+        // ISO for logic
+        setStartDate(dateInput(start));
+        setEndDate(dateInput(end));
+
+        setStartTime(timeInput(start));
+        setEndTime(timeInput(end));
+
+        setAppointmentLocationId(location === 'all' ? '' : location);
+        openModal();
+    };
+
+    // Click existing event → load into modal
+    const handleEventClick = (clickInfo: EventClickArg) => {
+        const apiEvent = clickInfo.event; // EventApi
+
+        const s = apiEvent.start;
+        const e = apiEvent.end;
+
+        // UI inputs (MM/DD/YYYY) + ISO
+        setStartDateInput(s ? dateToMMDDYYYY(s) : '');
+        setStartDate(s ? dateInput(s) : '');
+        setStartTime(s ? timeInput(s) : '');
+
+        setEndDateInput(e ? dateToMMDDYYYY(e) : '');
+        setEndDate(e ? dateInput(e) : '');
+        setEndTime(e ? timeInput(e) : '');
+
+        // Extended props from EventApi
+        const xp = apiEvent.extendedProps as CalendarEvent['extendedProps'];
+
+        setVisitType(xp?.visitType ?? 'Consultation');
+        setAppointmentProviderId(xp?.providerId ?? '');
+        setAppointmentLocationId(xp?.locationId ?? '');
+        setAppointmentStatus((xp?.status as AppointmentStatus) ?? 'Scheduled');
+        setAppointmentNotes(xp?.notes ?? '');
+        setAppointmentPriority((xp?.priority as Priority) ?? 'Routine');
+
+        setSelectedPatientId(xp?.patientId ?? '');
+        setSelectedPatientName(xp?.patientName ?? ''); // already stored when created
+        setPatientQuery(''); // keep input showing the selected full name
+
+        setSelectedEvent({
+            id: apiEvent.id,
+            extendedProps: xp,
+        } as unknown as CalendarEvent);
+
+        openModal();
+    };
+
+    const choosePatient = (p: Patient) => {
+        const name = getPatientFullName(p);
+        setSelectedPatientId(String(p.id));
+        setSelectedPatientName(name);
+        setPatientQuery('');
+        setPatientResults([]);
+        setShowPatientDropdown(false);
+    };
+
+    const handleAddOrUpdateAppointment = () => {
+        // requireds
+        if (!appointmentProviderId) {
+            alert('Please select a provider.');
+            return;
+        }
+        const combinedStart = startDate && startTime ? `${startDate}T${startTime}` : '';
+        const combinedEnd = endDate && endTime ? `${endDate}T${endTime}` : '';
+        if (!combinedStart || !combinedEnd) {
+            alert('Please choose start & end date/time.');
+            return;
+        }
+        if (new Date(combinedEnd).getTime() <= new Date(combinedStart).getTime()) {
+            alert('End must be after start.');
+            return;
+        }
+
+        const autoTitle = selectedPatientName?.trim()
+            ? `${visitType} — ${selectedPatientName.trim()}`
+            : visitType;
+
+        const extended = {
+            visitType,
+            providerId: appointmentProviderId,
+            locationId: appointmentLocationId || undefined,
+            status: appointmentStatus,
+            notes: appointmentNotes || undefined, // reason / chief complaint
+            patientId: selectedPatientId || undefined,
+            patientName: selectedPatientName || undefined,
+            priority: appointmentPriority,
+        } as CalendarEvent['extendedProps'];
+
+        if (selectedEvent) {
+            setEvents((prev) =>
+                prev.map((event) =>
+                    event.id === selectedEvent.id
+                        ? {
+                            ...event,
+                            title: autoTitle,
+                            start: combinedStart,
+                            end: combinedEnd,
+                            extendedProps: { ...event.extendedProps, ...extended },
+                        }
+                        : event
+                )
+            );
+        } else {
+            const newEvent: CalendarEvent = {
+                id: Date.now().toString(),
+                title: autoTitle,
+                start: combinedStart,
+                end: combinedEnd,
+                allDay: false,
+                extendedProps: extended,
+            };
+            setEvents((prev) => [...prev, newEvent]);
+        }
+
+        closeModal();
+        resetModalFields();
+    };
+
+    const resetModalFields = () => {
+        setVisitType('Consultation');
+        setPatientQuery('');
+        setPatientResults([]);
+        setSelectedPatientId('');
+        setSelectedPatientName('');
+        setAppointmentPriority('Routine');
+        setAppointmentProviderId('');
+        setAppointmentLocationId('');
+        setAppointmentStatus('Scheduled');
+        setStartDateInput('');
+        setEndDateInput('');
+        setStartDate('');
+        setStartTime('');
+        setEndDate('');
+        setEndTime('');
+        setAppointmentNotes('');
+        setShowPatientDropdown(false);
+        setSelectedEvent(null);
+    };
+
+    // === Event renderer (inside component so we can read location labels) ===
+    const renderEventContent = useCallback(
+        (eventInfo: EventContentArg) => {
+            const xp = eventInfo.event.extendedProps as {
+                visitType?: string;
+                status?: AppointmentStatus;
+                locationId?: string;
+            };
+            const vType = xp?.visitType;
+            const status = xp?.status;
+            const locId = xp?.locationId;
+            const locLabel =
+                locId && locations.find((l) => l.value === String(locId))?.label;
+
+            return (
+                <div className="event-fc-color flex fc-event-main items-center gap-1 rounded-sm p-1">
+                    <div className="fc-daygrid-event-dot"></div>
+                    <div className="fc-event-time">{eventInfo.timeText}</div>
+                    <div className="fc-event-title">{eventInfo.event.title}</div>
+                    {vType ? <span className="ml-2 text-xs opacity-70">• {vType}</span> : null}
+                    {status ? (
+                        <span className="ml-2 rounded px-1.5 text-[10px] opacity-80 border border-gray-300">
+              {status}
+            </span>
+                    ) : null}
+                    {locLabel ? (
+                        <span className="ml-2 text-[10px] opacity-80 border border-gray-300 rounded px-1.5">
+              @{locLabel}
+            </span>
+                    ) : null}
+                </div>
+            );
+        },
+        [locations]
+    );
+
+    /* =========================
+     * Render
+     * ======================= */
+    return (
+        <div className="relative rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+            {/* Custom header */}
+            <div className="flex flex-wrap items-center gap-3 px-6 pt-4">
+                {/* Prev / Next first */}
+                <div className="flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={goPrev}
+                        aria-label="Previous"
+                        className="h-9 w-9 rounded-lg border border-gray-300 bg-white text-sm font-semibold hover:bg-gray-50 dark:border-gray-700 dark:bg-dark-900"
+                    >
+                        &lt;
+                    </button>
+                    <button
+                        type="button"
+                        onClick={goNext}
+                        aria-label="Next"
+                        className="h-9 w-9 rounded-lg border border-gray-300 bg-white text-sm font-semibold hover:bg-gray-50 dark:border-gray-700 dark:bg-dark-900"
+                    >
+                        &gt;
+                    </button>
+                </div>
+
+                {/* Create Appointment */}
+                <button
+                    onClick={() => {
+                        resetModalFields();
+                        setAppointmentLocationId(location === 'all' ? '' : location);
+                        openModal();
+                    }}
+                    type="button"
+                    className="rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600"
+                >
+                    Create Appointment
+                </button>
+
+                {/* Providers */}
+                <div className="relative w-48">
+                    <Select
+                        options={providers}
+                        onChange={setProvider}
+                        placeholder="All Providers"
+                        className="dark:bg-dark-900"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500 dark:text-gray-400">
+            <ChevronDownIcon />
+          </span>
+                </div>
+
+                {/* Locations */}
+                <div className="relative w-56">
+                    <Select
+                        options={locations}
+                        onChange={setLocation}
+                        placeholder="All Locations"
+                        className="dark:bg-dark-900"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500 dark:text-gray-400">
+            <ChevronDownIcon />
+          </span>
+                </div>
+
+                {/* Title + View switcher (together, in this order) */}
+                <div className="flex items-center gap-3">
+                    <div className="mx-1 min-w-[160px] text-base font-semibold text-gray-900 dark:text-white/90">
+                        {calendarTitle || ' '}
+                    </div>
+                    <div className="inline-flex overflow-hidden rounded-xl border border-gray-200 bg-gray-50 p-[2px] dark:border-gray-700 dark:bg-white/10">
+                        {([
+                            { key: 'dayGridMonth', label: 'month' },
+                            { key: 'timeGridWeek', label: 'week' },
+                            { key: 'timeGridDay', label: 'day' },
+                        ] as { key: ViewType; label: string }[]).map((v) => {
+                            const active = activeView === v.key;
+                            return (
+                                <button
+                                    key={v.key}
+                                    type="button"
+                                    onClick={() => changeView(v.key)}
+                                    aria-pressed={active}
+                                    className={[
+                                        'px-3 py-1.5 text-sm font-medium rounded-lg',
+                                        active
+                                            ? 'bg-white text-gray-900 shadow-sm dark:bg-dark-900 dark:text-white'
+                                            : 'text-gray-600 hover:bg-white/80 dark:text-gray-300',
+                                    ].join(' ')}
+                                >
+                                    {v.label}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            </div>
+
+            {/* Calendar */}
+            <div className="custom-calendar">
+                <FullCalendar
+                    ref={calendarRef}
+                    plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+                    initialView="dayGridMonth"
+                    headerToolbar={false} // using our custom header
+                    datesSet={(arg) => {
+                        setCalendarTitle(arg.view.title);
+                        setActiveView(arg.view.type as ViewType);
+                    }}
+                    events={events}
+                    selectable
+                    select={handleDateSelect}
+                    eventClick={handleEventClick}
+                    eventContent={renderEventContent}
+                />
+            </div>
+
+            {/* Inline "modal" panel — no blur, rendered inside this card */}
+            {isOpen && (
+                <div className="absolute inset-0 z-50">
+                    {/* Transparent backdrop only to catch outside clicks (no blur, no dimming) */}
+                    <button
+                        aria-label="Close appointment panel"
+                        onClick={closeModal}
+                        className="absolute inset-0 bg-transparent"
+                    />
+                    {/* Panel */}
+                    <div className="pointer-events-auto absolute left-1/2 top-6 w-[95%] max-w-[760px] -translate-x-1/2 rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-dark-900">
+                        {/* Header */}
+                        <div className="flex items-start justify-between px-6 py-5">
+                            <div>
+                                <h5 className="mb-1 font-semibold text-gray-800 text-theme-xl dark:text-white/90 lg:text-2xl">
+                                    {selectedEvent ? 'Edit Appointment' : 'Add Appointment'}
+                                </h5>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">
+                                    Schedule or edit an appointment to stay on track
+                                </p>
+                            </div>
+                            <button
+                                onClick={closeModal}
+                                aria-label="Close"
+                                className="rounded-full border border-gray-200 p-2 text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300"
+                            >
+                                ×
+                            </button>
+                        </div>
+
+                        {/* Body */}
+                        <div className="custom-scrollbar max-h-[70vh] overflow-y-auto px-6 pb-6 lg:px-10">
+                            <div className="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                {/* Row 1: Visit Type / Patient */}
+                                <div>
+                                    <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                                        Visit Type
+                                    </label>
+                                    <select
+                                        className="h-9 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:border-gray-700 dark:bg-dark-900 dark:text-gray-100"
+                                        value={visitType}
+                                        onChange={(e) => setVisitType(e.target.value)}
+                                    >
+                                        {visitTypeOptions.map((o) => (
+                                            <option key={o.value} value={o.value}>
+                                                {o.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                                        Patient
+                                    </label>
+                                    <div className="relative">
+                                        <input
+                                            type="text"
+                                            value={selectedPatientName || patientQuery}
+                                            onChange={(e) => {
+                                                setSelectedPatientId('');
+                                                setSelectedPatientName('');
+                                                setPatientQuery(e.target.value);
+                                                setShowPatientDropdown(true);
+                                            }}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' && patientResults.length > 0) {
+                                                    e.preventDefault();
+                                                    choosePatient(patientResults[0]);
+                                                }
+                                            }}
+                                            onFocus={() => patientResults.length > 0 && setShowPatientDropdown(true)}
+                                            className="h-9 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:border-gray-700 dark:bg-dark-900 dark:text-gray-100"
+                                            placeholder="Search patient by name..."
+                                        />
+                                        {showPatientDropdown && (patientSearching || patientResults.length > 0) && (
+                                            <div className="absolute z-20 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-dark-900">
+                                                {patientSearching ? (
+                                                    <div className="px-3 py-2 text-xs text-gray-500">Searching…</div>
+                                                ) : (
+                                                    <ul className="max-h-56 overflow-auto py-1">
+                                                        {patientResults.map((p) => {
+                                                            const name = getPatientFullName(p);
+                                                            return (
+                                                                <li
+                                                                    key={p.id}
+                                                                    onMouseDown={(e) => e.preventDefault()}
+                                                                    onClick={() => choosePatient(p)}
+                                                                    className="cursor-pointer px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-white/10"
+                                                                >
+                                                                    <div className="font-medium text-gray-800 dark:text-gray-100">
+                                                                        {name || `Patient #${p.id}`}
+                                                                    </div>
+                                                                    {p.dateOfBirth ? (
+                                                                        <div className="text-xs text-gray-500">DOB: {p.dateOfBirth}</div>
+                                                                    ) : null}
+                                                                </li>
+                                                            );
+                                                        })}
+                                                        {patientResults.length === 0 && (
+                                                            <li className="px-3 py-2 text-sm text-gray-500">No matches</li>
+                                                        )}
+                                                    </ul>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Row 2: Start / End Dates (MM/DD/YYYY UI) */}
+                                <div>
+                                    <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                                        Appointment Start date
+                                    </label>
+                                    <input
+                                        type="text"
+                                        placeholder="MM/DD/YYYY"
+                                        maxLength={10}
+                                        value={startDateInput}
+                                        onChange={(e) => {
+                                            const formatted = formatInputToMMDDYYYY(e.target.value);
+                                            setStartDateInput(formatted);
+                                            setStartDate(toISODateFromMMDDYYYY(formatted)); // ISO for logic
+                                        }}
+                                        className="h-9 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:border-gray-700 dark:bg-dark-900 dark:text-gray-100"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                                        Appointment End date
+                                    </label>
+                                    <input
+                                        type="text"
+                                        placeholder="MM/DD/YYYY"
+                                        maxLength={10}
+                                        value={endDateInput}
+                                        onChange={(e) => {
+                                            const formatted = formatInputToMMDDYYYY(e.target.value);
+                                            setEndDateInput(formatted);
+                                            setEndDate(toISODateFromMMDDYYYY(formatted)); // ISO for logic
+                                        }}
+                                        className="h-9 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:border-gray-700 dark:bg-dark-900 dark:text-gray-100"
+                                    />
+                                </div>
+
+                                {/* Row 3: Start / End Times */}
+                                <div>
+                                    <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                                        Appointment start time
+                                    </label>
+                                    <input
+                                        type="time"
+                                        value={startTime}
+                                        onChange={(e) => setStartTime(e.target.value)}
+                                        className="h-9 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:border-gray-700 dark:bg-dark-900 dark:text-gray-100"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                                        Appointment end time
+                                    </label>
+                                    <input
+                                        type="time"
+                                        value={endTime}
+                                        onChange={(e) => setEndTime(e.target.value)}
+                                        className="h-9 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:border-gray-700 dark:bg-dark-900 dark:text-gray-100"
+                                    />
+                                </div>
+
+                                {/* Row 4: Priority / Provider */}
+                                <div>
+                                    <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                                        Priority
+                                    </label>
+                                    <select
+                                        className="h-9 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:border-gray-700 dark:bg-dark-900 dark:text-gray-100"
+                                        value={appointmentPriority}
+                                        onChange={(e) => setAppointmentPriority(e.target.value as Priority)}
+                                    >
+                                        {priorityOptions.map((o) => (
+                                            <option key={o.value} value={o.value}>
+                                                {o.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                                        Provider{' '}
+                                        <span className="ml-2 rounded-md bg-red-100 px-2 py-[2px] text-xs font-medium text-red-700">
+                      required
+                    </span>
+                                    </label>
+                                    <select
+                                        required
+                                        className="h-9 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:border-gray-700 dark:bg-dark-900 dark:text-gray-100"
+                                        value={appointmentProviderId}
+                                        onChange={(e) => setAppointmentProviderId(e.target.value)}
+                                        disabled={!combinedStart || !combinedEnd || loadingProvidersForDate || providersForDate.length === 0}
+                                    >
+                                        <option value="">
+                                            {!combinedStart || !combinedEnd
+                                                ? 'Pick date & time first'
+                                                : loadingProvidersForDate
+                                                    ? 'Loading available providers…'
+                                                    : providersForDate.length === 0
+                                                        ? 'No providers scheduled for this slot'
+                                                        : 'Select a provider...'}
+                                        </option>
+                                        {providersForDate.map((p) => (
+                                            <option key={p.value} value={p.value}>
+                                                {p.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* Row 5: Location / Status */}
+                                <div>
+                                    <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                                        Location
+                                    </label>
+                                    <select
+                                        className="h-9 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:border-gray-700 dark:bg-dark-900 dark:text-gray-100"
+                                        value={appointmentLocationId}
+                                        onChange={(e) => setAppointmentLocationId(e.target.value)}
+                                        disabled={!appointmentProviderId || providerLocationOptions.length === 0}
+                                    >
+                                        <option value="">
+                                            {!appointmentProviderId
+                                                ? 'Select provider first'
+                                                : providerLocationOptions.length === 0
+                                                    ? 'No locations for this provider'
+                                                    : 'Select a location'}
+                                        </option>
+                                        {providerLocationOptions.map((l) => (
+                                            <option key={l.value} value={l.value}>
+                                                {l.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                                        Status
+                                    </label>
+                                    <select
+                                        className="h-9 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:border-gray-700 dark:bg-dark-900 dark:text-gray-100"
+                                        value={appointmentStatus}
+                                        onChange={(e) => setAppointmentStatus(e.target.value as AppointmentStatus)}
+                                    >
+                                        {statusOptions.map((s) => (
+                                            <option key={s.value} value={s.value}>
+                                                {s.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* Row 6: Reason / Chief Complaint */}
+                                <div className="sm:col-span-2">
+                                    <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                                        Reason / Chief Complaint
+                                    </label>
+                                    <textarea
+                                        rows={4}
+                                        value={appointmentNotes}
+                                        onChange={(e) => setAppointmentNotes(e.target.value)}
+                                        placeholder="e.g., chest discomfort for 2 days"
+                                        className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:border-gray-700 dark:bg-dark-900 dark:text-gray-100"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Footer */}
+                            <div className="mt-6 flex items-center gap-3 sm:justify-end">
+                                <button
+                                    onClick={closeModal}
+                                    type="button"
+                                    className="flex w-full justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 sm:w-auto"
+                                >
+                                    Close
+                                </button>
+                                <button
+                                    onClick={handleAddOrUpdateAppointment}
+                                    type="button"
+                                    className="flex w-full justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-60 sm:w-auto"
+                                    disabled={!appointmentProviderId || !startDate || !startTime || !endDate || !endTime}
+                                >
+                                    {selectedEvent ? 'Update Appointment' : 'Save Appointment'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
 };
 
 export default Calendar;
