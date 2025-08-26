@@ -1,11 +1,8 @@
 "use client";
-import React, { useEffect, useState } from "react"; 
-import Link from "next/link"; 
-import Badge from "../ui/badge/Badge"; 
-// Commented out lucide-react imports
-// import { ArrowDownIcon, ArrowUpIcon } from "@/icons"; 
-// import { Users, CalendarDays, Stethoscope, DollarSign } from "lucide-react"; 
-import { fetchWithAuth } from "@/utils/fetchWithAuth"; 
+import React, { useEffect, useState } from "react";
+import Link from "next/link";
+import Badge from "../ui/badge/Badge";
+import { fetchWithAuth } from "@/utils/fetchWithAuth";
 
 export const SummaryCards = () => {
     const [patientCount, setPatientCount] = useState<number | null>(null);
@@ -17,9 +14,8 @@ export const SummaryCards = () => {
                     `${process.env.NEXT_PUBLIC_API_URL}/api/patients/count`
                 );
 
-                // Check if response is ok
                 if (!res.ok) {
-                    throw new Error('Failed to fetch data');
+                    throw new Error("Failed to fetch data");
                 }
 
                 const result = await res.json();
@@ -40,44 +36,107 @@ export const SummaryCards = () => {
 
     return (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            {/* Commented out MetricCard with icons */}
+            {/* Patients */}
             <MetricCard
-                icon={<div className="w-6 h-6 bg-gray-200 rounded-full" />} // Placeholder icon
+                icon={
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="w-6 h-6 text-blue-500"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                    >
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M5.121 17.804A9 9 0 1118.364 4.56M15 11a3 3 0 11-6 0 3 3 0 016 0zM12 14c-4.418 0-8 2.239-8 5v1h16v-1c0-2.761-3.582-5-8-5z"
+                        />
+                    </svg>
+                }
                 label="Patients"
-                value={patientCount !== null ? String(patientCount) : "Loading..."} // fallback text
+                value={patientCount !== null ? String(patientCount) : "Loading..."}
                 badgeColor="success"
-                badgeText="11.01%" // You can update this dynamically later
-                badgeIcon={<div className="w-3 h-3 bg-green-400 rounded-full" />} // Placeholder badge icon
+                badgeText="11.01%"
+                badgeIcon={<div className="w-3 h-3 bg-green-400 rounded-full" />}
                 href="/patients"
             />
 
+            {/* Appointments */}
             <MetricCard
-                icon={<div className="w-6 h-6 bg-gray-200 rounded-full" />} // Placeholder icon
+                icon={
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="w-6 h-6 text-purple-500"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                    >
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M8 7V3m8 4V3m-9 8h10m-11 6h12a2 2 0 002-2V7a2 2 0 00-2-2h-1V3h-2v2H9V3H7v2H6a2 2 0 00-2 2v10a2 2 0 002 2z"
+                        />
+                    </svg>
+                }
                 label="Appointments"
                 value="0"
                 badgeColor="error"
                 badgeText="9.05%"
-                badgeIcon={<div className="w-3 h-3 bg-red-400 rounded-full" />} // Placeholder badge icon
+                badgeIcon={<div className="w-3 h-3 bg-red-400 rounded-full" />}
                 href="/appointments"
             />
 
+            {/* Consultations */}
             <MetricCard
-                icon={<div className="w-6 h-6 bg-gray-200 rounded-full" />} // Placeholder icon
+                icon={
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="w-6 h-6 text-green-500"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                    >
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M12 20h9m-9 0a9 9 0 110-18 9 9 0 010 18zm0 0v-6m0 0h6m-6 0H6"
+                        />
+                    </svg>
+                }
                 label="Consultations"
                 value="0"
                 badgeColor="success"
                 badgeText="2.3%"
-                badgeIcon={<div className="w-3 h-3 bg-green-400 rounded-full" />} // Placeholder badge icon
+                badgeIcon={<div className="w-3 h-3 bg-green-400 rounded-full" />}
                 href="/consultations"
             />
 
+            {/* Revenue */}
             <MetricCard
-                icon={<div className="w-6 h-6 bg-gray-200 rounded-full" />} // Placeholder icon
+                icon={
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="w-6 h-6 text-yellow-500"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                    >
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M12 8c-1.657 0-3 1.343-3 3h3m0-3c1.657 0 3 1.343 3 3h-3m0 0v4m0 4h.01"
+                        />
+                    </svg>
+                }
                 label="Revenue"
                 value="0"
                 badgeColor="success"
                 badgeText="6.75%"
-                badgeIcon={<div className="w-3 h-3 bg-green-400 rounded-full" />} // Placeholder badge icon
+                badgeIcon={<div className="w-3 h-3 bg-green-400 rounded-full" />}
                 href="/revenue"
             />
         </div>
@@ -95,14 +154,14 @@ interface MetricCardProps {
 }
 
 const MetricCard: React.FC<MetricCardProps> = ({
-    icon,
-    label,
-    value,
-    badgeColor,
-    badgeText,
-    badgeIcon,
-    href,
-}) => {
+                                                   icon,
+                                                   label,
+                                                   value,
+                                                   badgeColor,
+                                                   badgeText,
+                                                   badgeIcon,
+                                                   href,
+                                               }) => {
     return (
         <Link href={href}>
             <div className="rounded-2xl border border-gray-200 bg-white p-5 transition hover:shadow-md dark:border-gray-800 dark:bg-white/[0.03] md:p-6 cursor-pointer">

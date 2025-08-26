@@ -184,7 +184,7 @@ const ProviderList = () => {
 
     return (
         <AdminLayout>
-            <div className="container mx-auto p-6">
+            <div className="container mx-auto p-6 overflow-x-hidden">
                 {/* Heading */}
                 <div className="flex items-center justify-between mb-4">
                     <h1 className="text-3xl font-semibold text-gray-800">Providers</h1>
@@ -241,7 +241,10 @@ const ProviderList = () => {
 
                 {/* Table */}
                 <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-md">
-                    <table className="min-w-full">
+                    <table className="w-full table-fixed">
+                        <colgroup>
+                            <col style={{width:"22%"}}/><col style={{width:"10%"}}/><col style={{width:"12%"}}/><col style={{width:"12%"}}/><col style={{width:"18%"}}/><col style={{width:"12%"}}/><col style={{width:"9%"}}/><col style={{width:"160px"}}/>
+                        </colgroup>
                         <thead className="bg-gray-100">
                         <tr>
                             <th className="py-3 px-6 text-left text-sm font-medium text-gray-600">Full Name</th>
@@ -315,19 +318,21 @@ const ProviderList = () => {
                                         </td>
                                         <td className="py-3 px-6 text-sm">
                         <span
-                            className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                            className={[
+                                "inline-flex items-center rounded-full text-[11px] font-semibold",
+                                "px-2 py-0.5 whitespace-nowrap", // ⬅ keeps badge compact
                                 provider.systemAccess?.status === "ACTIVE"
                                     ? "bg-green-100 text-green-800"
                                     : provider.systemAccess?.status === "ARCHIVED"
                                         ? "bg-gray-200 text-gray-800"
-                                        : "bg-yellow-100 text-yellow-800"
-                            }`}
+                                        : "bg-yellow-100 text-yellow-800",
+                            ].join(" ")}
                         >
                           {provider.systemAccess?.status || "N/A"}
                         </span>
                                         </td>
-                                        <td className="py-3 px-6 text-sm flex items-center gap-2">
-                                            {/* Edit */}
+                                        <td className="py-3 px-4 text-sm">
+                                            <div className="flex items-center gap-2 justify-end flex-nowrap">                                            {/* Edit */}
                                             <button
                                                 onClick={() => router.push(`/settings/providers/edit/${provider.id}`)}
                                                 className="group flex items-center justify-center w-9 h-9 rounded-full border border-blue-500 text-blue-500 shadow hover:bg-blue-50"
@@ -367,6 +372,7 @@ const ProviderList = () => {
                                                     )}
                                                 </svg>
                                             </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 );
