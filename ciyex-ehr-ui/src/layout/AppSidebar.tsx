@@ -16,7 +16,6 @@ import {
     PlugInIcon,
     SettingsIcon, // ensure this exists in ../icons/index
     TableIcon,
-    UserCircleIcon,
 } from "../icons/index";
 
 // ===== Types (nested) =====
@@ -43,7 +42,6 @@ const navItems: NavItem[] = [
         subItems: [{ name: "Ecommerce", path: "/dashboard", pro: false }],
     },
     { icon: <CalenderIcon />, name: "Calendar", path: "/calendar" },
-    { icon: <UserCircleIcon />, name: "User Profile", path: "/profile" },
 
     // Settings with nested Forms -> Lists
     {
