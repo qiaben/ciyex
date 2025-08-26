@@ -1,223 +1,427 @@
 "use client";
-import { useEffect, useState } from "react";
-import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
-import Badge from "@/components/ui/badge/Badge";
-import Link from "next/link";
-//import { EyeIcon, PencilIcon } from "lucide-react";
+
+import React, { useEffect, useState,useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { fetchWithAuth } from "@/utils/fetchWithAuth";
 import AdminLayout from "@/app/(admin)/layout";
+import Link from "next/link";
 
 interface Patient {
-    id: string;
+    id: number;
     firstName: string;
     lastName: string;
     email: string;
     phoneNumber: string;
-    ssn?: string;
-    dateOfBirth?: string;
-    status: "Active" | "Pending" | "Inactive";
+    dateOfBirth: string;
+    gender: string;
+    status?: string;
 }
 
+interface PageResponse<T> {
+    content: T[];
+    totalElements: number;
+    totalPages: number;
+    number: number; // current page index (0-based)
+    size: number;
+    // optionally other Spring fields
+}
+
+interface ApiResponse<T> {
+    success: boolean;
+    message?: string;
+    data?: T;
+}
+
+const badgeColors = [
+    "bg-blue-500",
+    "bg-green-500",
+    "bg-red-500",
+    "bg-purple-500",
+    "bg-pink-500",
+    "bg-yellow-500",
+    "bg-indigo-500",
+    "bg-teal-500",
+];
+
 export default function PatientListPage() {
-    const [data, setData] = useState<Patient[]>([]);
-    const [search, setSearch] = useState("");
-    const [statusFilter, setStatusFilter] = useState("");
-    const [isClient, setIsClient] = useState(false);
+    const router = useRouter();
+
+    const [patients, setPatients] = useState<Patient[]>([]);
+    const [recentPatients, setRecentPatients] = useState<Patient[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    // Fetch patients when the component mounts
+    // Server-driven pagination state
+    const [currentPage, setCurrentPage] = useState<number>(1); // UI 1-based
+    const [patientsPerPage, setPatientsPerPage] = useState<number>(10);
+    const [totalPages, setTotalPages] = useState<number>(1);
+    const [totalItems, setTotalItems] = useState<number>(0);
+
+    // Search (server-side)
+    const [searchTerm, setSearchTerm] = useState<string>("");
+    const [debouncedSearch, setDebouncedSearch] = useState<string>("");
+
+    // debounce input to avoid a request per keystroke
     useEffect(() => {
-        setIsClient(true);
-        const fetchPatients = async () => {
+        const t = setTimeout(() => setDebouncedSearch(searchTerm.trim()), 400);
+        return () => clearTimeout(t);
+    }, [searchTerm]);
+
+    // reset page to 1 when debounced search changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [debouncedSearch]);
+
+    useEffect(() => {
+        const recent = JSON.parse(localStorage.getItem("recentPatients") || "[]");
+        setRecentPatients(recent);
+    }, []);
+
+    const formatDate = (dateString: string) => {
+        if (!dateString) return "N/A";
+        try {
+            return new Date(dateString).toLocaleDateString();
+        } catch {
+            return dateString;
+        }
+    };
+
+    const getInitials = (firstName: string, lastName: string) =>
+        `${firstName?.charAt(0) || ""}${lastName?.charAt(0) || ""}`.toUpperCase();
+
+    const getBadgeColor = (id: number) => badgeColors[id % badgeColors.length];
+
+    const handlePatientClick = (patient: Patient) => {
+        const updatedRecent = [patient, ...recentPatients.filter((p) => p.id !== patient.id)].slice(
+            0,
+            5
+        );
+        setRecentPatients(updatedRecent);
+        localStorage.setItem("recentPatients", JSON.stringify(updatedRecent));
+    };
+
+    const goToPatient = (patient: Patient) => {
+        handlePatientClick(patient);
+        router.push(`/patients/${patient.id}/`);
+    };
+
+    const fetchPatients = useCallback(
+        async (page: number, size: number, search: string, signal?: AbortSignal) => {
             setLoading(true);
             setError(null);
             try {
-                // Fetch patient data from the backend API
-                const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/patients`);
-                const result = await res.json();
+                const base = `${process.env.NEXT_PUBLIC_API_URL}/api/patients`;
+                const params = new URLSearchParams();
+                // backend expects 0-based page index
+                params.set("page", String(Math.max(0, page - 1)));
+                params.set("size", String(size));
+                params.set("sort", "id,asc");
+                if (search) params.set("search", search);
 
-                if (result.success && Array.isArray(result.data)) {
-                    setData(result.data); // Update state with the fetched data
-                } else {
-                    setError("Failed to fetch patients. Please try again.");
-                    console.error("❌ Failed to fetch patients:", result.message);
+                const url = `${base}?${params.toString()}`;
+                const res = await fetchWithAuth(url, { signal });
+                const contentType = res.headers.get("content-type") || "";
+
+                if (!contentType.includes("application/json")) {
+                    // We expect JSON from the server (ApiResponse<Page<PatientDto>>)
+                    throw new Error("Expected JSON response from server but got: " + contentType);
                 }
-            } catch (err) {
-                setError("An error occurred while fetching patients.");
-                console.error("❌ Error fetching patients:", err);
+
+                const body = (await res.json()) as ApiResponse<PageResponse<Patient>>;
+
+                if (!body) throw new Error("Empty response from server");
+                if (!body.success) {
+                    throw new Error(body.message || "Failed to fetch patients");
+                }
+                if (!body.data) {
+                    // No data payload
+                    setPatients([]);
+                    setTotalPages(1);
+                    setTotalItems(0);
+                    return;
+                }
+
+                const pageData = body.data;
+                setPatients(pageData.content || []);
+                setTotalPages(Math.max(1, pageData.totalPages ?? 1));
+                setTotalItems(pageData.totalElements ?? (pageData.content?.length ?? 0));
+                // sync UI's 1-based page with server number (server returns 0-based)
+                setCurrentPage((prev) => {
+                    const serverPage1 = (pageData.number ?? (page - 1)) + 1;
+                    return prev === serverPage1 ? prev : serverPage1;
+                });
+            } catch (err: unknown) {
+                if (err instanceof DOMException && err.name === "AbortError") return;
+                console.error("Fetch patients error:", err);
+                setError("An error occurred while fetching patients: " + (err as Error).message);
+                setPatients([]);
+                setTotalPages(1);
+                setTotalItems(0);
             } finally {
-                setLoading(false);  // Reset loading state
+                setLoading(false);
             }
-        };
+        },
+        []
+    );
 
-        if (isClient) {
-            fetchPatients();  // Trigger the fetch when the component is mounted
-        }
-    }, [isClient]);
+    // Trigger fetch when page, size or debounced search changes
+    useEffect(() => {
+        const controller = new AbortController();
+        fetchPatients(currentPage, patientsPerPage, debouncedSearch, controller.signal);
+        return () => controller.abort();
+    }, [currentPage, patientsPerPage, debouncedSearch, fetchPatients]);
 
-    // Filter the patients based on search and status filter
-    const filtered = data.filter((patient) => {
-        const fullName = `${patient.firstName} ${patient.lastName}`.toLowerCase();
-        const matchesSearch = fullName.includes(search.toLowerCase());
-        const matchesStatus = statusFilter ? patient.status === statusFilter : true;
-        return matchesSearch && matchesStatus;
-    });
+    if (loading)
+        return (
+            <AdminLayout>
+                <div className="w-full p-1 text-sm">Loading patients...</div>
+            </AdminLayout>
+        );
 
-    // Handle loading and error states
-    if (loading) return <div className="p-6">Loading...</div>;
-    if (error) return <div className="p-6 text-red-500">{error}</div>;
+    if (error)
+        return (
+            <AdminLayout>
+                <div className="w-full p-1 text-sm text-red-500">{error}</div>
+            </AdminLayout>
+        );
+
+    const handlePrevious = () => setCurrentPage((p) => Math.max(1, p - 1));
+    const handleNext = () => setCurrentPage((p) => Math.min(totalPages, p + 1));
 
     return (
         <AdminLayout>
-            <div className="flex-1 p-6 bg-[#f9fafb] flex justify-center">
-                <div className="w-full max-w-7xl">
-                    <div className="flex justify-between items-center mb-4">
-                        <h1 className="text-2xl font-bold">Patients</h1>
-                        <Link href="/patients/add">
-                            <button className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600">
-                                Add New Patient
-                            </button>
-                        </Link>
+            <div className="w-full min-h-[calc(100vh-56px)] bg-[#f8fafb] m-0 p-0">
+                {/* Top row: Recent patients (left) • Search • Create button (right) */}
+                <div className="flex flex-wrap items-center justify-between gap-2 px-2">
+                    {/* Left: Recent patients */}
+                    <div className="min-w-0">
+                        {recentPatients.length > 0 ? (
+                            <>
+                                <div className="text-xs text-gray-700 mb-1">Recent patients</div>
+                                <div className="flex flex-wrap gap-1">
+                                    {recentPatients.slice(0, 5).map((patient) => (
+                                        <Link
+                                            key={patient.id}
+                                            href={`/patients/${patient.id}/`}
+                                            onClick={() => handlePatientClick(patient)}
+                                            className="inline-flex items-center gap-2 px-2 py-0.5 rounded-md border border-gray-200 bg-white text-xs text-gray-700 hover:bg-gray-50"
+                                        >
+                                            <div
+                                                className={`flex items-center justify-center h-5 w-5 rounded-full text-[11px] font-semibold text-white ${getBadgeColor(
+                                                    patient.id
+                                                )}`}
+                                            >
+                                                {getInitials(patient.firstName, patient.lastName)}
+                                            </div>
+                                            <span className="text-xs font-medium leading-4">
+                                                {patient.firstName} {patient.lastName}
+                                            </span>
+                                            <span className="ml-1 px-1 py-0.5 bg-gray-100 text-gray-700 text-[10px] rounded">
+                                                MRN {patient.id}
+                                            </span>
+                                        </Link>
+                                    ))}
+                                </div>
+                            </>
+                        ) : (
+                            <div className="text-xs text-gray-600">No recent patients</div>
+                        )}
                     </div>
 
-                    {/* Filter controls */}
-                    <div className="flex flex-wrap gap-4 items-center justify-between mb-4">
+                    {/* Right: Search + Create */}
+                    <div className="flex items-center gap-2">
                         <input
                             type="text"
-                            placeholder="Search patients..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            className="border rounded px-3 py-2 w-full sm:w-72 text-sm"
+                            placeholder="Search patients"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-40 px-2 py-1 border border-gray-200 rounded-md text-sm bg-white focus:outline-none focus:ring-0"
+                            aria-label="Search patients"
                         />
-                        <select
-                            value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value)}
-                            className="border rounded px-3 py-2 text-sm"
+
+
+                        <Link
+                            href="/patients/new"
+                            className="shrink-0 inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium"
+                            aria-label="Create patient"
                         >
-                            <option value="">All Status</option>
-                            <option value="Active">Active</option>
-                            <option value="Pending">Pending</option>
-                            <option value="Inactive">Inactive</option>
-                        </select>
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                className="h-4 w-4"
+                                aria-hidden="true"
+                            >
+                                <path d="M12 5v14M5 12h14" />
+                            </svg>
+                            <span>Create patient</span>
+                        </Link>
                     </div>
+                </div>
 
-                    {/* Patient Table */}
-                    <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-lg dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400">
-                        <div className="min-w-full">
-                            <Table>
-                                {/* Table Header */}
-                                <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
-                                    <TableRow>
-                                        <TableCell isHeader className="px-4 py-3 font-medium text-gray-500 text-start text-sm">
-                                            Full Name
-                                        </TableCell>
-                                        <TableCell isHeader className="px-4 py-3 font-medium text-gray-500 text-start text-sm">
-                                            Home Phone
-                                        </TableCell>
-                                        <TableCell isHeader className="px-4 py-3 font-medium text-gray-500 text-start text-sm">
-                                            SSN
-                                        </TableCell>
-                                        <TableCell isHeader className="px-4 py-3 font-medium text-gray-500 text-start text-sm">
-                                            Date of Birth
-                                        </TableCell>
-                                        <TableCell isHeader className="px-4 py-3 font-medium text-gray-500 text-start text-sm">
-                                            Status
-                                        </TableCell>
-                                        <TableCell isHeader className="px-4 py-3 font-medium text-gray-500 text-start text-sm">
-                                            Actions
-                                        </TableCell>
-                                    </TableRow>
-                                </TableHeader>
+                {/* Table */}
+                <div className="w-full">
+                    <div className="bg-white border-t border-gray-100 overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full table-fixed text-sm">
+                                <colgroup>
+                                    <col className="w-[20%]" />
+                                    <col className="w-[8%]" />
+                                    <col className="w-[22%]" />
+                                    <col className="w-[15%]" />
+                                    <col className="w-[12%]" />
+                                    <col className="w-[10%]" />
+                                    <col className="w-[13%]" />
+                                </colgroup>
 
-                                {/* Table Body */}
-                                <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
-                                    {filtered.length === 0 ? (
-                                        <TableRow>
-                                            <td colSpan={6} className="text-center text-gray-400 py-6">
-                                                No patients found.
-                                            </td>
-                                        </TableRow>
-                                    ) : (
-                                        filtered.map((patient) => (
-                                            <TableRow key={patient.id}>
-                                                <TableCell className="px-4 py-4 sm:px-5 text-start">
-                                                    <div className="flex items-center gap-3">
-                                                        <div
-                                                            className="w-10 h-10 overflow-hidden rounded-full flex items-center justify-center text-sm font-bold uppercase text-white"
-                                                            style={{ backgroundColor: getColorFromName(`${patient.firstName} ${patient.lastName}`) }}
-                                                        >
-                                                            {getInitials(`${patient.firstName} ${patient.lastName}`)}
-                                                        </div>
-                                                        <div>
-                                                            <span className="block font-medium text-gray-800 text-theme-sm dark:text-white/90">
-                                                                {patient.firstName} {patient.lastName}
-                                                            </span>
-                                                            <span className="block text-gray-500 text-theme-xs dark:text-gray-400">
-                                                                {patient.email}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="px-4 py-4 text-gray-500 text-start text-theme-sm dark:text-gray-400">
-                                                    {patient.phoneNumber || "N/A"}
-                                                </TableCell>
-                                                <TableCell className="px-4 py-4 text-gray-500 text-start text-theme-sm dark:text-gray-400">
-                                                    {patient.ssn || "N/A"}
-                                                </TableCell>
-                                                <TableCell className="px-4 py-4 text-gray-500 text-start text-theme-sm dark:text-gray-400">
-                                                    {patient.dateOfBirth || "N/A"}
-                                                </TableCell>
-                                                <TableCell className="px-4 py-4 text-gray-500 text-start text-theme-sm dark:text-gray-400">
-                                                    <Badge
-                                                        size="sm"
-                                                        color={patient.status === "Active" ? "success" : patient.status === "Pending" ? "warning" : "error"}
+                                <thead className="bg-gray-50">
+                                <tr>
+                                    <th className="px-2 py-2 text-left text-xs font-semibold text-gray-400 uppercase">
+                                        Name
+                                    </th>
+                                    <th className="px-2 py-2 text-left text-xs font-semibold text-gray-400 uppercase">
+                                        MRN
+                                    </th>
+                                    <th className="px-2 py-2 text-left text-xs font-semibold text-gray-400 uppercase">
+                                        Email
+                                    </th>
+                                    <th className="px-2 py-2 text-left text-xs font-semibold text-gray-400 uppercase">
+                                        Phone
+                                    </th>
+                                    <th className="px-2 py-2 text-left text-xs font-semibold text-gray-400 uppercase">
+                                        DOB
+                                    </th>
+                                    <th className="px-2 py-2 text-left text-xs font-semibold text-gray-400 uppercase">
+                                        Gender
+                                    </th>
+                                    <th className="px-2 py-2 text-left text-xs font-semibold text-gray-400 uppercase">
+                                        Status
+                                    </th>
+                                </tr>
+                                </thead>
+
+                                <tbody className="bg-white divide-y divide-gray-100">
+                                {patients.length > 0 ? (
+                                    patients.map((patient) => (
+                                        <tr
+                                            key={patient.id}
+                                            className="hover:bg-gray-50 cursor-pointer"
+                                            onClick={() => goToPatient(patient)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === "Enter" || e.key === " ") {
+                                                    e.preventDefault();
+                                                    goToPatient(patient);
+                                                }
+                                            }}
+                                            tabIndex={0}
+                                            role="button"
+                                            aria-label={`Open patient ${patient.firstName} ${patient.lastName} dashboard`}
+                                        >
+                                            <td className="px-2 py-2 align-top">
+                                                <div className="flex items-start gap-2">
+                                                    <div
+                                                        className={`flex items-center justify-center h-8 w-8 rounded-full text-sm font-semibold text-white ${getBadgeColor(
+                                                            patient.id
+                                                        )}`}
                                                     >
-                                                        {patient.status}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell className="px-4 py-4 text-gray-500 text-start text-theme-sm dark:text-gray-400">
-                                                    <div className="flex gap-4">
-                                                        {/* View Button (Currently Placeholder) */}
-                                                        <Link href={`/patients/${patient.id}`}>
-                                                            {/* <EyeIcon className="w-4 h-4 text-blue-500 cursor-pointer" /> */}
-                                                            <button className="text-blue-500">View</button>
-                                                        </Link>
-                                                        {/* Edit Button (Currently Placeholder) */}
-                                                        <Link href={`/patients/${patient.id}/edit`}>
-                                                            {/* <PencilIcon className="w-4 h-4 text-green-500 cursor-pointer" /> */}
-                                                            <button className="text-green-500">Edit</button>
-                                                        </Link>
+                                                        {getInitials(patient.firstName, patient.lastName)}
                                                     </div>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))
-                                    )}
-                                </TableBody>
-                            </Table>
+                                                    <div className="leading-tight">
+                                                        <div className="text-sm font-semibold text-gray-700">
+                                                            {patient.firstName} {patient.lastName}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </td>
+
+                                            <td className="px-2 py-2 align-top text-sm text-gray-500">
+                                                {patient.id}
+                                            </td>
+
+                                            <td className="px-2 py-2 align-top text-sm text-gray-500 break-words">
+                                                {patient.email || "N/A"}
+                                            </td>
+
+                                            <td className="px-2 py-2 align-top text-sm text-gray-500">
+                                                {patient.phoneNumber || "N/A"}
+                                            </td>
+
+                                            <td className="px-2 py-2 align-top text-sm text-gray-500">
+                                                {formatDate(patient.dateOfBirth)}
+                                            </td>
+
+                                            <td className="px-2 py-2 align-top text-sm text-gray-500">
+                                                {patient.gender || "N/A"}
+                                            </td>
+
+                                            <td className="px-2 py-2 align-top">
+                                                    <span className="inline-block bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-semibold">
+                                                        {patient.status || "Active"}
+                                                    </span>
+                                            </td>
+                                        </tr>
+                                    ))
+                                ) : (
+                                    <tr>
+                                        <td colSpan={7} className="px-2 py-5 text-center text-gray-500">
+                                            No patients found
+                                        </td>
+                                    </tr>
+                                )}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Pagination */}
+                        <div className="flex items-center justify-between px-2 py-2 border-t bg-white">
+                            <div className="flex items-center gap-2">
+                                <button
+                                    disabled={currentPage === 1}
+                                    onClick={handlePrevious}
+                                    className="px-2 py-1 text-sm border rounded disabled:opacity-50"
+                                >
+                                    Previous
+                                </button>
+
+                                <div className="text-sm text-gray-600">
+                                    Page {currentPage} of {totalPages}
+                                </div>
+
+                                <button
+                                    disabled={currentPage === totalPages}
+                                    onClick={handleNext}
+                                    className="px-2 py-1 text-sm border rounded disabled:opacity-50"
+                                >
+                                    Next
+                                </button>
+                            </div>
+
+                            <div className="flex items-center gap-4">
+                                <div className="text-sm text-gray-600">
+                                    Showing {patients.length} of {totalItems} patients
+                                </div>
+
+                                <select
+                                    value={patientsPerPage}
+                                    onChange={(e) => {
+                                        setPatientsPerPage(Number(e.target.value));
+                                        setCurrentPage(1); // reset page when page size changes
+                                    }}
+                                    className="text-sm border rounded px-2 py-1 bg-white"
+                                    aria-label="Patients per page"
+                                >
+                                    <option value={5}>5</option>
+                                    <option value={10}>10</option>
+                                    <option value={25}>25</option>
+                                    <option value={50}>50</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </AdminLayout>
     );
-}
-
-// Helper function to get initials from the full name
-function getInitials(name: string) {
-    const words = name.trim().split(" ");
-    return words.slice(0, 2).map((w) => w[0]).join("");
-}
-
-// Helper function to generate color based on name
-function getColorFromName(name: string): string {
-    const colors = [
-        "#10B981", "#6366F1", "#F59E0B", "#EF4444", "#3B82F6",
-        "#8B5CF6", "#EC4899", "#22C55E", "#F97316", "#0EA5E9"
-    ];
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) {
-        hash = name.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    return colors[Math.abs(hash % colors.length)];
 }
