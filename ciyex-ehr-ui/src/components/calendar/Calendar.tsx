@@ -6,8 +6,6 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { useModal } from '@/hooks/useModal';
-import Select from '@/components/form/Select';
-import { ChevronDownIcon } from '@/icons';
 import { fetchWithAuth } from '@/utils/fetchWithAuth';
 import {
     EventInput,
@@ -15,6 +13,10 @@ import {
     EventClickArg,
     EventContentArg,
 } from '@fullcalendar/core';
+import Alert from "@/components/ui/alert/Alert";
+
+
+
 
 /* =========================
  * Types & Interfaces
@@ -81,9 +83,34 @@ type Schedule = {
     actorReferences?: string[];
 };
 
+interface AppointmentDTO {
+    id: number;
+    visitType: string;
+    patientName?: string | null;
+    appointmentStartDate: string;
+    appointmentEndDate: string;
+    appointmentStartTime: string;
+    appointmentEndTime: string;
+    providerId: number;
+    locationId?: number | null;
+    status: AppointmentStatus;
+    reason?: string | null;
+    patientId: number;
+    priority: Priority;
+    start?: string;
+    end?: string;
+    notes?: string;
+}
+
 /* =========================
  * Helpers
  * ======================= */
+
+const getProviderColor = (providerId: number | string) => {
+    const idNum = Number(providerId);
+    return providerPalette[idNum % providerPalette.length];
+};
+
 const WEEKDAY_CODES = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
 
 const getPatientFullName = (p: Patient | null | undefined): string => {
@@ -118,6 +145,23 @@ const dateToMMDDYYYY = (d: Date) => {
     const yyyy = d.getFullYear();
     return `${mm}/${dd}/${yyyy}`;
 };
+
+const providerPalette = [
+    "#1E90FF", // Blue
+    "#28A745", // Green
+    "#FF5733", // Orange Red
+    "#6F42C1", // Purple
+    "#20C997", // Teal
+    "#FD7E14", // Orange
+    "#DC3545", // Red
+    "#17A2B8", // Cyan
+    "#FFC107", // Yellow
+    "#343A40", // Dark Gray
+];
+
+
+
+
 
 // yyyy-mm-dd from Date
 const dateInput = (d: Date) => {
@@ -253,10 +297,18 @@ const priorityOptions: Option<Priority>[] = [
     { value: 'Urgent', label: 'Urgent' },
 ];
 
+
+
 type ViewType = 'dayGridMonth' | 'timeGridWeek' | 'timeGridDay';
 
 const Calendar: React.FC = () => {
     const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+
+    const [alertData, setAlertData] = useState<{
+        variant: "success" | "error" | "warning" | "info";
+        title: string;
+        message: string;
+    } | null>(null);
 
     // Removed Title — auto-generate from Visit Type + Patient
     const [visitType, setVisitType] = useState<string>('Consultation');
@@ -274,6 +326,8 @@ const Calendar: React.FC = () => {
     const [appointmentProviderId, setAppointmentProviderId] = useState<string>('');
     const [appointmentLocationId, setAppointmentLocationId] = useState<string>('');
     const [appointmentStatus, setAppointmentStatus] = useState<AppointmentStatus>('Scheduled');
+    const [currentViewDate, setCurrentViewDate] = useState<Date>(new Date());
+
 
     // Date & Time — input (MM/DD/YYYY) + ISO (YYYY-MM-DD)
     const [startDateInput, setStartDateInput] = useState<string>('');
@@ -294,7 +348,7 @@ const Calendar: React.FC = () => {
 
     // Header filters (existing)
     const [providers, setProviders] = useState<{ value: string; label: string }[]>([]);
-    const [, setProvider] = useState('all');
+    const [provider, setProvider] = useState('all');
     const [locations, setLocations] = useState<{ value: string; label: string }[]>([]);
     const [location, setLocation] = useState('all');
 
@@ -312,18 +366,43 @@ const Calendar: React.FC = () => {
 
     // NEW: calendar title + active view
     const [calendarTitle, setCalendarTitle] = useState<string>('');
-    const [activeView, setActiveView] = useState<ViewType>('dayGridMonth');
+    const [activeView, setActiveView] = useState<ViewType>('timeGridDay');
+    const calendarRefs = useRef<Record<string, FullCalendar | null>>({});
+
+
 
     // FullCalendar controls
-    const api = () => calendarRef.current?.getApi();
-    const goPrev = () => api()?.prev();
-    const goNext = () => api()?.next();
-    const changeView = (v: ViewType) => {
-        if (api()) {
-            api()!.changeView(v);
-            setActiveView(v);
+    const goPrev = () => {
+        if (provider === 'all') {
+            Object.values(calendarRefs.current).forEach(cal => cal?.getApi().prev());
+        } else {
+            calendarRef.current?.getApi().prev();
         }
     };
+
+    const goNext = () => {
+        if (provider === 'all') {
+            Object.values(calendarRefs.current).forEach(cal => cal?.getApi().next());
+        } else {
+            calendarRef.current?.getApi().next();
+        }
+    };
+
+    const changeView = (v: ViewType) => {
+        setActiveView(v);
+
+        if (provider === 'all') {
+            // update ALL provider calendars
+            Object.values(calendarRefs.current).forEach(cal => {
+                if (cal) cal.getApi().changeView(v);
+            });
+        } else {
+            if (calendarRef.current) {
+                calendarRef.current.getApi().changeView(v);
+            }
+        }
+    };
+
 
     // Fetch ACTIVE providers (header)
     useEffect(() => {
@@ -338,7 +417,7 @@ const Calendar: React.FC = () => {
                             value: String(p.id),
                             label: `${p.identification?.firstName || ''} ${p.identification?.lastName || ''}`.trim(),
                         }));
-                    setProviders(active);
+                    setProviders([{ value: 'all', label: 'All Providers' }, ...active]);
                 }
             } catch (e) {
                 console.error('Failed to fetch providers', e);
@@ -357,44 +436,109 @@ const Calendar: React.FC = () => {
                     value: String(l.id),
                     label: `${l.name}${l.address ? ` - ${l.address}` : ''}`,
                 }));
-                setLocations(opts);
+                setLocations([{ value: 'all', label: 'All Locations' }, ...opts]);
             } catch (e) {
                 console.error('Failed to fetch locations', e);
             }
         })();
     }, [apiUrl]);
 
-    // Build provider list for chosen date/time (& location)
+    // Fetch all appointments with pagination
+    useEffect(() => {
+        const loadAppointments = async () => {
+            try {
+                let page = 0;
+                const size = 50; // adjust as needed
+                let allEvents: CalendarEvent[] = [];
+                let lastPage = false;
+
+                while (!lastPage) {
+                    const res = await fetchWithAuth(
+                        `${apiUrl}/api/appointments?page=${page}&size=${size}`
+                    );
+                    const json = await res.json();
+
+                    if (json.success && json.data?.content) {
+                        const loaded: CalendarEvent[] = json.data.content.map((a: AppointmentDTO) => ({
+                            id: String(a.id),
+                            title: a.patientName
+                                ? `${a.visitType} — ${a.patientName}`
+                                : a.visitType,
+                            start: `${a.appointmentStartDate}T${a.appointmentStartTime}`,
+                            end: `${a.appointmentEndDate}T${a.appointmentEndTime}`,
+                            allDay: false,
+                            color: getProviderColor(a.providerId), // 👈 apply provider color
+                            extendedProps: {
+                                visitType: a.visitType,
+                                providerId: String(a.providerId),
+                                locationId: a.locationId ? String(a.locationId) : undefined, // ✅ use locationId
+                                status: a.status,
+                                notes: a.reason,
+                                patientId: String(a.patientId),
+                                patientName: a.patientName,
+                                priority: a.priority,
+                            },
+                        }));
+
+                        allEvents = [...allEvents, ...loaded];
+                        lastPage = json.data.last; // stop when backend says it's the last page
+                        page++;
+                    } else {
+                        lastPage = true;
+                    }
+                }
+
+                setEvents(allEvents);
+            } catch (err) {
+                console.error("Failed to load appointments", err);
+            }
+        };
+
+        loadAppointments();
+    }, [apiUrl]);
+
+
+
+// Build provider list for chosen date/time (& location)
     useEffect(() => {
         if (!isOpen || !combinedStart || !combinedEnd) {
             setProvidersForDate([]);
             return;
         }
+
+        // ✅ If provider already chosen from the calendar slot, stick with it
+        if (appointmentProviderId) {
+            const chosen = providers.find((p) => p.value === appointmentProviderId);
+            setProvidersForDate(chosen ? [chosen] : []);
+            return;
+        }
+
         (async () => {
             setLoadingProvidersForDate(true);
             try {
                 const res = await fetchWithAuth(`${apiUrl}/api/schedules?status=active`);
                 const json = await res.json();
                 const schedules: Schedule[] = Array.isArray(json?.data) ? json.data : [];
-                const effectiveLocation = appointmentLocationId || (location !== 'all' ? location : 'all');
+                const effectiveLocation =
+                    appointmentLocationId || (location !== "all" ? location : "all");
 
                 const providerIds = new Set<number>();
                 for (const s of schedules) {
                     if (
-                        String(s.status).toLowerCase() === 'active' &&
+                        String(s.status).toLowerCase() === "active" &&
                         hasOccurrenceCoveringSlot(s, combinedStart, combinedEnd) &&
                         scheduleHasLocation(s, effectiveLocation)
                     ) {
                         providerIds.add(Number(s.providerId));
                     }
                 }
-                const allowed = providers.filter((p) => providerIds.has(Number(p.value)));
+
+                const allowed = providers.filter((p) =>
+                    providerIds.has(Number(p.value))
+                );
                 setProvidersForDate(allowed);
-                if (appointmentProviderId && !allowed.some((a) => a.value === appointmentProviderId)) {
-                    setAppointmentProviderId('');
-                }
             } catch (e) {
-                console.error('Failed to load schedules', e);
+                console.error("Failed to load schedules", e);
                 setProvidersForDate([]);
             } finally {
                 setLoadingProvidersForDate(false);
@@ -410,6 +554,7 @@ const Calendar: React.FC = () => {
         appointmentLocationId,
         apiUrl,
     ]);
+
 
     // Slot-aware locations: ONLY the selected provider's locations.
     // If a time is chosen, further restrict to schedules covering that slot.
@@ -513,7 +658,15 @@ const Calendar: React.FC = () => {
                 );
                 const json = await res.json();
                 if (cancelled) return;
-                const list: Patient[] = Array.isArray(json?.data) ? json.data : [];
+
+                // Handle both {data: [...]} and {data: {content: [...]}}
+                let list: Patient[] = [];
+                if (Array.isArray(json?.data)) {
+                    list = json.data;
+                } else if (Array.isArray(json?.data?.content)) {
+                    list = json.data.content;
+                }
+
                 setPatientResults(list);
                 setShowPatientDropdown(true);
             } catch (e) {
@@ -533,7 +686,7 @@ const Calendar: React.FC = () => {
     }, [patientQuery, apiUrl, isOpen]);
 
     // Default 15-minute end when selecting on grid
-    const handleDateSelect = (selectInfo: DateSelectArg) => {
+    const handleDateSelect = (selectInfo: DateSelectArg, providerId?: string) => {
         resetModalFields();
 
         const start = selectInfo.start;
@@ -542,6 +695,7 @@ const Calendar: React.FC = () => {
         // UI inputs (MM/DD/YYYY)
         setStartDateInput(dateToMMDDYYYY(start));
         setEndDateInput(dateToMMDDYYYY(end));
+
         // ISO for logic
         setStartDate(dateInput(start));
         setEndDate(dateInput(end));
@@ -549,7 +703,16 @@ const Calendar: React.FC = () => {
         setStartTime(timeInput(start));
         setEndTime(timeInput(end));
 
+        // ✅ Prefill provider if passed from the calendar column
+        if (providerId && providerId !== 'all') {
+            setAppointmentProviderId(providerId);
+        } else {
+            setAppointmentProviderId('');
+        }
+
+        // ✅ Prefill location only if header filter is specific
         setAppointmentLocationId(location === 'all' ? '' : location);
+
         openModal();
     };
 
@@ -591,6 +754,25 @@ const Calendar: React.FC = () => {
         openModal();
     };
 
+    // Fetch patient details when editing an appointment (if only patientId is available)
+    useEffect(() => {
+        if (selectedPatientId && !selectedPatientName) {
+            (async () => {
+                try {
+                    const res = await fetchWithAuth(`${apiUrl}/api/patients/${selectedPatientId}`);
+                    const json = await res.json();
+                    if (json.success && json.data) {
+                        const name = getPatientFullName(json.data);
+                        setSelectedPatientName(name);
+                    }
+                } catch (err) {
+                    console.error("Failed to fetch patient name", err);
+                }
+            })();
+        }
+    }, [selectedPatientId, selectedPatientName, apiUrl]);
+
+
     const choosePatient = (p: Patient) => {
         const name = getPatientFullName(p);
         setSelectedPatientId(String(p.id));
@@ -600,66 +782,143 @@ const Calendar: React.FC = () => {
         setShowPatientDropdown(false);
     };
 
-    const handleAddOrUpdateAppointment = () => {
-        // requireds
+    const handleAddOrUpdateAppointment = async () => {
         if (!appointmentProviderId) {
-            alert('Please select a provider.');
+            setAlertData({
+                variant: "warning",
+                title: "Missing Provider",
+                message: "Please select a provider before saving the appointment.",
+            });
             return;
         }
+
         const combinedStart = startDate && startTime ? `${startDate}T${startTime}` : '';
         const combinedEnd = endDate && endTime ? `${endDate}T${endTime}` : '';
+
         if (!combinedStart || !combinedEnd) {
-            alert('Please choose start & end date/time.');
+            setAlertData({
+                variant: "warning",
+                title: "Missing Date/Time",
+                message: "Please choose start and end date/time.",
+            });
             return;
         }
         if (new Date(combinedEnd).getTime() <= new Date(combinedStart).getTime()) {
-            alert('End must be after start.');
+            setAlertData({
+                variant: "error",
+                title: "Invalid Time Range",
+                message: "End time must be after start time.",
+            });
             return;
         }
 
-        const autoTitle = selectedPatientName?.trim()
-            ? `${visitType} — ${selectedPatientName.trim()}`
-            : visitType;
-
-        const extended = {
-            visitType,
-            providerId: appointmentProviderId,
-            locationId: appointmentLocationId || undefined,
-            status: appointmentStatus,
-            notes: appointmentNotes || undefined, // reason / chief complaint
-            patientId: selectedPatientId || undefined,
-            patientName: selectedPatientName || undefined,
-            priority: appointmentPriority,
-        } as CalendarEvent['extendedProps'];
-
-        if (selectedEvent) {
-            setEvents((prev) =>
-                prev.map((event) =>
-                    event.id === selectedEvent.id
-                        ? {
-                            ...event,
-                            title: autoTitle,
-                            start: combinedStart,
-                            end: combinedEnd,
-                            extendedProps: { ...event.extendedProps, ...extended },
-                        }
-                        : event
-                )
-            );
-        } else {
-            const newEvent: CalendarEvent = {
-                id: Date.now().toString(),
-                title: autoTitle,
-                start: combinedStart,
-                end: combinedEnd,
-                allDay: false,
-                extendedProps: extended,
-            };
-            setEvents((prev) => [...prev, newEvent]);
+        if (!appointmentLocationId) {
+            setAlertData({
+                variant: "warning",
+                title: "Missing Location",
+                message: "Please select a location before saving the appointment.",
+            });
+            return;
         }
 
-        closeModal();
-        resetModalFields();
+        const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+        const dto = {
+            visitType,
+            patientId: selectedPatientId ? Number(selectedPatientId) : null,
+            providerId: Number(appointmentProviderId),
+            appointmentStartDate: startDate,
+            appointmentEndDate: endDate,
+            appointmentStartTime: startTime,
+            appointmentEndTime: endTime,
+            start: combinedStart ? new Date(combinedStart).toISOString() : null,
+            end: combinedEnd ? new Date(combinedEnd).toISOString() : null,
+            actorReferences: appointmentLocationId ? [`Location/${appointmentLocationId}`] : null,
+            timezone: browserTz,
+            priority: appointmentPriority,
+            locationId: appointmentLocationId ? Number(appointmentLocationId) : null,
+            status: appointmentStatus,
+            reason: appointmentNotes || null,
+        };
+
+        try {
+            let res;
+            if (selectedEvent) {
+                // Update existing
+                res = await fetchWithAuth(
+                    `${apiUrl}/api/appointments/${selectedEvent.id}`,
+                    {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(dto),
+                    }
+                );
+            } else {
+                // Create new
+                res = await fetchWithAuth(`${apiUrl}/api/appointments`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(dto),
+                });
+            }
+
+            const json = await res.json();
+            if (json.success) {
+                const saved = json.data;
+
+                const autoTitle = saved.patientName
+                    ? `${saved.visitType} — ${saved.patientName}`
+                    : saved.visitType;
+
+                const newEvent: CalendarEvent = {
+                    id: String(saved.id),
+                    title: autoTitle,
+                    start: saved.start,
+                    end: saved.end,
+                    allDay: false,
+                    extendedProps: {
+                        visitType: saved.visitType,
+                        providerId: String(saved.providerId),
+                        locationId: saved.locationId ? String(saved.locationId) : undefined,
+                        status: saved.status,
+                        notes: saved.notes,
+                        patientId: saved.patientId ? String(saved.patientId) : undefined,
+                        patientName: saved.patientName,
+                        priority: saved.priority,
+                    },
+                };
+
+                setEvents((prev) =>
+                    selectedEvent
+                        ? prev.map((e) => (e.id === String(saved.id) ? newEvent : e))
+                        : [...prev, newEvent]
+                );
+
+                setAlertData({
+                    variant: "success",
+                    title: selectedEvent ? "Updated" : "Created",
+                    message: selectedEvent
+                        ? "Appointment updated successfully!"
+                        : "Appointment created successfully!",
+                });
+
+                closeModal();
+                resetModalFields();
+            } else {
+                setAlertData({
+                    variant: "error",
+                    title: "Error",
+                    message: json.message || "Failed to save appointment.",
+                });
+            }
+        } catch (err) {
+            console.error("Error saving appointment", err);
+            setAlertData({
+                variant: "error",
+                title: "Network Error",
+                message: "Could not save the appointment. Please try again.",
+            });
+        }
     };
 
     const resetModalFields = () => {
@@ -724,6 +983,17 @@ const Calendar: React.FC = () => {
      * ======================= */
     return (
         <div className="relative rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+
+            {/* Alert banner */}
+            {alertData && (
+                <div className="p-4">
+                    <Alert
+                        variant={alertData.variant}
+                        title={alertData.title}
+                        message={alertData.message}
+                    />
+                </div>
+            )}
             {/* Custom header */}
             <div className="flex flex-wrap items-center gap-3 px-6 pt-4">
                 {/* Prev / Next first */}
@@ -746,6 +1016,7 @@ const Calendar: React.FC = () => {
                     </button>
                 </div>
 
+
                 {/* Create Appointment */}
                 <button
                     onClick={() => {
@@ -761,35 +1032,64 @@ const Calendar: React.FC = () => {
 
                 {/* Providers */}
                 <div className="relative w-48">
-                    <Select
-                        options={providers}
-                        onChange={setProvider}
-                        placeholder="All Providers"
-                        className="dark:bg-dark-900"
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500 dark:text-gray-400">
-            <ChevronDownIcon />
-          </span>
+                    <select
+                        value={provider}
+                        onChange={(e) => setProvider(e.target.value)}
+                        className="h-9 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-900
+       focus:outline-none focus:ring-2 focus:ring-brand-500
+       dark:border-gray-700 dark:bg-dark-900 dark:text-gray-100"
+                    >
+                        {/* Default will be All Providers */}
+                        <option value="all">All Providers</option>
+
+                        {/* Actual provider list */}
+                        {providers
+                            .filter((p) => p.value !== 'all')
+                            .map((p) => (
+                                <option key={p.value} value={p.value}>
+                                    {p.label}
+                                </option>
+                            ))}
+                    </select>
                 </div>
+
+
 
                 {/* Locations */}
                 <div className="relative w-56">
-                    <Select
-                        options={locations}
-                        onChange={setLocation}
-                        placeholder="All Locations"
-                        className="dark:bg-dark-900"
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500 dark:text-gray-400">
-            <ChevronDownIcon />
-          </span>
+                    <select
+                        value={location}
+                        onChange={(e) => setLocation(e.target.value)}
+                        className="h-9 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-900
+               focus:outline-none focus:ring-2 focus:ring-brand-500
+               dark:border-gray-700 dark:bg-dark-900 dark:text-gray-100"
+                    >
+                        {/* Explicit "All Locations" option */}
+                        <option value="all">All Locations</option>
+
+                        {/* Actual locations list */}
+                        {locations
+                            .filter((l) => l.value !== 'all')
+                            .map((loc) => (
+                                <option key={loc.value} value={loc.value}>
+                                    {loc.label}
+                                </option>
+                            ))}
+                    </select>
                 </div>
+
+
 
                 {/* Title + View switcher (together, in this order) */}
                 <div className="flex items-center gap-3">
-                    <div className="mx-1 min-w-[160px] text-base font-semibold text-gray-900 dark:text-white/90">
-                        {calendarTitle || ' '}
-                    </div>
+                <div className="mx-1 min-w-[220px] text-base font-semibold text-gray-900 dark:text-white/90">
+                    {calendarTitle||currentViewDate.toLocaleDateString('en-US', {
+                        weekday: 'long',
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric',
+                    })}
+                </div>
                     <div className="inline-flex overflow-hidden rounded-xl border border-gray-200 bg-gray-50 p-[2px] dark:border-gray-700 dark:bg-white/10">
                         {([
                             { key: 'dayGridMonth', label: 'month' },
@@ -818,24 +1118,187 @@ const Calendar: React.FC = () => {
                 </div>
             </div>
 
+
             {/* Calendar */}
             <div className="custom-calendar">
-                <FullCalendar
-                    ref={calendarRef}
-                    plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-                    initialView="dayGridMonth"
-                    headerToolbar={false} // using our custom header
-                    datesSet={(arg) => {
-                        setCalendarTitle(arg.view.title);
-                        setActiveView(arg.view.type as ViewType);
-                    }}
-                    events={events}
-                    selectable
-                    select={handleDateSelect}
-                    eventClick={handleEventClick}
-                    eventContent={renderEventContent}
-                />
+                {provider === 'all' && activeView === 'timeGridDay' ? (
+                    // === All Providers + Day View → Columns side by side
+                    <div
+                        className="grid gap-1"
+                        style={{ gridTemplateColumns: `repeat(${providers.length - 1}, minmax(0, 1fr))` }}
+                    >
+                        {providers
+                            .filter((p) => p.value !== 'all')
+                            .map((p) => (
+                                <div key={`day-${p.value}`} className="provider-col border rounded-md">
+                                    {/* Blue header with ❌ */}
+                                    <div className="flex items-center justify-between bg-blue-500 text-white px-2 py-1 text-sm font-semibold">
+                                        <span>{p.label}</span>
+                                        <button
+                                            onClick={() =>
+                                                setProviders((prev) =>
+                                                    prev.filter((prov) => prov.value !== p.value)
+                                                )
+                                            }
+                                            className="ml-2 text-xs hover:text-gray-200"
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+
+                                    {/* Provider calendar */}
+                                    <FullCalendar
+                                        key={`day-${p.value}-${activeView}`}
+                                        ref={(el) => { calendarRefs.current[p.value] = el }}
+                                        plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+                                        initialView="timeGridDay"
+                                        headerToolbar={false}
+                                        slotMinTime="08:00:00"
+                                        slotMaxTime="20:00:00"   // 👈 end of working hours (8pm here)
+                                        allDaySlot={false}
+                                        expandRows={true}
+                                        height="100%"
+                                        contentHeight="auto"
+                                        dayHeaderContent={() => null}
+                                        datesSet={(arg) => {
+                                            setCurrentViewDate(arg.start);
+                                            setCalendarTitle(arg.view.title);
+                                            setActiveView(arg.view.type as ViewType);
+                                        }}
+                                        events={events.filter((e) => e.extendedProps.providerId === p.value)}
+                                        selectable
+                                        select={(info) => handleDateSelect(info, p.value)}
+                                        eventClick={handleEventClick}
+                                        eventContent={renderEventContent}
+                                    />
+                                </div>
+                            ))}
+                    </div>
+                ) : provider === 'all' && activeView === 'timeGridWeek' ? (
+                    // === All Providers + Week View → Stacked vertically
+                    <div className="flex flex-col gap-6">
+                        {providers.filter((p) => p.value !== 'all').map((p) => (
+                            <div key={`week-${p.value}`} className="border rounded-md">
+                                <h3 className="bg-blue-500 text-white text-center font-medium py-2 rounded-t-md">
+                                    {p.label}
+                                </h3>
+                                <FullCalendar
+                                    key={`week-${p.value}-${activeView}`}
+                                    ref={(el) => { calendarRefs.current[p.value] = el }}
+                                    plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+                                    initialView={activeView}
+                                    headerToolbar={false}
+                                    slotMinTime="08:00:00"
+                                    slotMaxTime="20:00:00"
+                                    allDaySlot={false}
+                                    expandRows={true}
+                                    height="100%"
+                                    contentHeight="auto"
+                                    dayHeaderContent={() => null}
+                                    datesSet={(arg) => {
+                                        setCurrentViewDate(arg.start);
+                                        setCalendarTitle(arg.view.title);
+                                        setActiveView(arg.view.type as ViewType);
+                                    }}
+                                    events={events.filter((e) => e.extendedProps.providerId === p.value)}
+                                    selectable
+                                    select={(info) => handleDateSelect(info, p.value)}
+                                    eventClick={handleEventClick}
+                                    eventContent={renderEventContent}
+                                />
+                            </div>
+                        ))}
+                    </div>
+                ) : provider === 'all' && activeView === 'dayGridMonth' ? (
+                    // === All Providers + Month View → Stacked vertically
+                    <div className="flex flex-col gap-8">
+                        {providers.filter((p) => p.value !== 'all').map((p) => (
+                            <div key={`month-${p.value}`} className="border rounded-md">
+                                <h3 className="bg-blue-500 text-white text-center font-medium py-2 rounded-t-md">
+                                    {p.label}
+                                </h3>
+                                <FullCalendar
+                                    key={`month-${p.value}-${activeView}`}
+                                    ref={(el) => { calendarRefs.current[p.value] = el }}
+                                    plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+                                    initialView={activeView}
+                                    headerToolbar={false}
+                                    dayHeaderContent={() => null}
+                                    datesSet={(arg) => {
+                                        setCurrentViewDate(arg.start);
+                                        setCalendarTitle(arg.view.title);
+                                        setActiveView(arg.view.type as ViewType);
+                                    }}
+                                    events={events.filter((e) => e.extendedProps.providerId === p.value)}
+                                    selectable
+                                    select={(info) => handleDateSelect(info, p.value)}
+                                    eventClick={handleEventClick}
+                                    eventContent={renderEventContent}
+                                    height="auto"
+                                />
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    // === Single Provider OR "Select Provider"
+                    <div className="border rounded-md">
+                        {provider && (
+                            <h3 className="bg-blue-500 text-white text-center font-medium py-2 rounded-t-md">
+                                {provider === 'all'
+                                    ? 'All Providers'
+                                    : providers.find((p) => p.value === provider)?.label || ''}
+                            </h3>
+                        )}
+                        <FullCalendar
+                            key={`single-${provider}-${activeView}`}
+                            ref={calendarRef}
+                            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+                            initialView={activeView}
+                            headerToolbar={false}
+                            slotMinTime="08:00:00"
+                            slotMaxTime="20:00:00"
+                            allDaySlot={false}
+                            expandRows={true}
+                            height="100%"
+                            contentHeight="auto"
+                            datesSet={(arg) => {
+                                setCurrentViewDate(arg.start);
+                                setCalendarTitle(arg.view.title);
+                                setActiveView(arg.view.type as ViewType);
+                            }}
+                            events={events.filter((e) => {
+                                const matchesProvider =
+                                    provider && provider !== 'all'
+                                        ? e.extendedProps.providerId === provider
+                                        : true;
+
+                                const matchesLocation =
+                                    location === 'all' || e.extendedProps.locationId === location;
+
+                                return matchesProvider && matchesLocation;
+                            })}
+                            selectable
+                            select={(info) =>
+                                handleDateSelect(info, provider !== 'all' ? provider : undefined)
+                            }
+                            eventClick={handleEventClick}
+                            eventContent={renderEventContent}
+                        />
+                    </div>
+                )}
             </div>
+
+
+
+
+
+
+
+
+
+
+
+
 
             {/* Inline "modal" panel — no blur, rendered inside this card */}
             {isOpen && (
@@ -1060,9 +1523,13 @@ const Calendar: React.FC = () => {
                                 {/* Row 5: Location / Status */}
                                 <div>
                                     <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-400">
-                                        Location
+                                        Location{" "}
+                                        <span className="ml-2 rounded-md bg-red-100 px-2 py-[2px] text-xs font-medium text-red-700">
+      required
+    </span>
                                     </label>
                                     <select
+                                        required
                                         className="h-9 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:border-gray-700 dark:bg-dark-900 dark:text-gray-100"
                                         value={appointmentLocationId}
                                         onChange={(e) => setAppointmentLocationId(e.target.value)}
@@ -1070,10 +1537,10 @@ const Calendar: React.FC = () => {
                                     >
                                         <option value="">
                                             {!appointmentProviderId
-                                                ? 'Select provider first'
+                                                ? "Select provider first"
                                                 : providerLocationOptions.length === 0
-                                                    ? 'No locations for this provider'
-                                                    : 'Select a location'}
+                                                    ? "No locations for this provider"
+                                                    : "Select a location"}
                                         </option>
                                         {providerLocationOptions.map((l) => (
                                             <option key={l.value} value={l.value}>
