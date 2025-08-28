@@ -743,3 +743,8 @@ span.flatpickr-weekday,
 .provider-col:not(:first-child) .fc-timegrid-slot-label {
     display: none !important;
 }
+/* Remove scrollbar gutter inside provider columns */
+.provider-col .fc-scroller {
+    overflow-y: hidden !important;
+    scrollbar-gutter: stable both-edges; /* prevent extra space */
+}

@@ -40,20 +40,13 @@ const navItems: NavItem[] = [
   {
     icon: <GridIcon />,
     name: "Dashboard",
-    subItems: [{ name: "Ecommerce", path: "/dashboard", pro: false }],
+    path: "/dashboard",
   },
   {
     icon: <CalenderIcon />,
     name: "Calendar",
     path: "/calendar",
   },
-
-    {
-        icon: <GridIcon />,
-        name: "Dashboard",
-        subItems: [{ name: "Ecommerce", path: "/dashboard", pro: false }],
-    },
-    { icon: <CalenderIcon />, name: "Calendar", path: "/calendar" },
 
     // Settings with nested Forms -> Lists
     {
@@ -378,7 +371,7 @@ const AppSidebar: React.FC = () => {
             onMouseLeave={() => setIsHovered(false)}
         >
             <div className={`py-8 flex ${!isExpanded && !isHovered ? "lg:justify-center" : "justify-start"}`}>
-                <Link href="/">
+                <Link href="/dashboard">
                     {isExpanded || isHovered || isMobileOpen ? (
                         <>
                             <Image
