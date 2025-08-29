@@ -1,10 +1,7 @@
 "use client";
-
 import { useEffect, useState } from "react";
 import { fetchWithAuth } from "@/utils/fetchWithAuth";
 import AdminLayout from "@/app/(admin)/layout";
-
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
     Dialog,
@@ -12,7 +9,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
-import { Edit, Archive, CheckCircle } from "lucide-react";
+import Button from "@/components/ui/button/Button";
 
 type InsuranceCompany = {
     id: number;
@@ -99,12 +96,10 @@ export default function InsurancePage() {
             const url = editCompany
                 ? `${process.env.NEXT_PUBLIC_API_URL}/api/insurance-companies/${editCompany.id}`
                 : `${process.env.NEXT_PUBLIC_API_URL}/api/insurance-companies`;
-
             await fetchWithAuth(url, {
                 method,
                 body: JSON.stringify(form),
             });
-
             setOpen(false);
             setEditCompany(null);
             setForm({
@@ -124,7 +119,6 @@ export default function InsurancePage() {
 
     const handleToggleStatus = async (company: InsuranceCompany) => {
         const action = company.status === "ACTIVE" ? "archive" : "activate";
-
         try {
             await fetchWithAuth(
                 `${process.env.NEXT_PUBLIC_API_URL}/api/insurance-companies/${company.id}/${action}`,
@@ -178,10 +172,7 @@ export default function InsurancePage() {
                         onChange={(e) => setSearch(e.target.value)}
                         className="border-gray-300 w-64 text-sm"
                     />
-                    <Button
-                        onClick={openAddModal}
-                        className="bg-blue-500 hover:bg-blue-600 text-white shadow rounded-lg text-sm"
-                    >
+                    <Button onClick={openAddModal} variant="primary" size="sm">
                         + Add Insurance
                     </Button>
                 </div>
@@ -220,34 +211,107 @@ export default function InsurancePage() {
                                     <td className="p-2">
                                         {c.status === "ACTIVE" ? (
                                             <span className="px-1.5 py-0.5 text-[11px] rounded-full bg-green-100 text-green-700 font-medium flex items-center gap-1 w-fit">
-                          <CheckCircle className="w-3 h-3" /> Active
+                          <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="w-3 h-3"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                          >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                            />
+                          </svg>
+                          Active
                         </span>
                                         ) : (
                                             <span className="px-1.5 py-0.5 text-[11px] rounded-full bg-gray-200 text-gray-600 font-medium flex items-center gap-1 w-fit">
-                          <Archive className="w-3 h-3" /> Archived
+                          <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="w-3 h-3"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                          >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M20 7H4m16 0v12a2 2 0 01-2 2H6a2 2 0 01-2-2V7m16 0L18 3H6L4 7"
+                            />
+                          </svg>
+                          Archived
                         </span>
                                         )}
                                     </td>
                                     <td className="p-2 flex space-x-1">
                                         <Button
-                                            size="icon"
                                             variant="outline"
+                                            size="sm"
                                             onClick={() => openEditModal(c)}
-                                            className="rounded-full h-6 w-6 border-blue-300"
+                                            startIcon={
+                                                <svg
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                    className="w-3 h-3 text-blue-600"
+                                                    fill="none"
+                                                    viewBox="0 0 24 24"
+                                                    stroke="currentColor"
+                                                    strokeWidth={2}
+                                                >
+                                                    <path
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        d="M16.862 4.487l2.651 2.65m-2.651-2.65L6.75 14.6l-1.5 4.5 4.5-1.5L19.512 7.137m-2.65-2.65a1.875 1.875 0 112.651 2.65L9.75 16.35m6.75-11.863L9.75 16.35"
+                                                    />
+                                                </svg>
+                                            }
                                         >
-                                            <Edit className="w-3 h-3 text-blue-600" />
+                                            <span className="sr-only">Edit</span>
                                         </Button>
                                         <Button
-                                            size="icon"
                                             variant="outline"
+                                            size="sm"
                                             onClick={() => handleToggleStatus(c)}
-                                            className="rounded-full h-6 w-6 border-gray-300"
+                                            startIcon={
+                                                c.status === "ACTIVE" ? (
+                                                    <svg
+                                                        xmlns="http://www.w3.org/2000/svg"
+                                                        className="w-3 h-3 text-gray-600"
+                                                        fill="none"
+                                                        viewBox="0 0 24 24"
+                                                        stroke="currentColor"
+                                                        strokeWidth={2}
+                                                    >
+                                                        <path
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                            d="M20 7H4m16 0v12a2 2 0 01-2 2H6a2 2 0 01-2-2V7m16 0L18 3H6L4 7"
+                                                        />
+                                                    </svg>
+                                                ) : (
+                                                    <svg
+                                                        xmlns="http://www.w3.org/2000/svg"
+                                                        className="w-3 h-3 text-green-600"
+                                                        fill="none"
+                                                        viewBox="0 0 24 24"
+                                                        stroke="currentColor"
+                                                        strokeWidth={2}
+                                                    >
+                                                        <path
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                                                        />
+                                                    </svg>
+                                                )
+                                            }
                                         >
-                                            {c.status === "ACTIVE" ? (
-                                                <Archive className="w-3 h-3 text-gray-600" />
-                                            ) : (
-                                                <CheckCircle className="w-3 h-3 text-green-600" />
-                                            )}
+                        <span className="sr-only">
+                          {c.status === "ACTIVE" ? "Archive" : "Activate"}
+                        </span>
                                         </Button>
                                     </td>
                                 </tr>
@@ -269,7 +333,6 @@ export default function InsurancePage() {
                             size="sm"
                             disabled={page === 1}
                             onClick={() => setPage(page - 1)}
-                            className="px-2 py-1 text-xs"
                         >
                             ← Prev
                         </Button>
@@ -278,7 +341,6 @@ export default function InsurancePage() {
                             size="sm"
                             disabled={page === totalPages}
                             onClick={() => setPage(page + 1)}
-                            className="px-2 py-1 text-xs"
                         >
                             Next →
                         </Button>
@@ -305,7 +367,7 @@ export default function InsurancePage() {
                                     className="border-gray-300 text-sm"
                                 />
                             ))}
-                            <Button onClick={handleSave} className="bg-blue-500 text-white text-sm">
+                            <Button onClick={handleSave} variant="primary" size="sm">
                                 {editCompany ? "Update" : "Save"}
                             </Button>
                         </div>

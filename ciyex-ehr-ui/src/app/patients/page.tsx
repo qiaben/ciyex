@@ -3,7 +3,6 @@ import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { fetchWithAuth } from "@/utils/fetchWithAuth";
 import AdminLayout from "@/app/(admin)/layout";
-import { Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 
 interface Patient {
@@ -296,14 +295,88 @@ export default function PatientListPage() {
                                             <button
                                                 onClick={() => handleEdit(patient)}
                                                 className="text-gray-500 hover:text-blue-600"
+                                                aria-label="Edit"
                                             >
-                                                <Pencil className="w-4 h-4" />
+                                                {/* Pencil (edit) icon */}
+                                                <svg
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                    className="w-4 h-4"
+                                                    fill="none"
+                                                    viewBox="0 0 24 24"
+                                                    stroke="currentColor"
+                                                    strokeWidth={2}
+                                                >
+                                                    <path
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        d="M16.862 4.487l2.651 2.65m-2.651-2.65L6.75 14.6l-1.5 4.5 4.5-1.5L19.512 7.137m-2.65-2.65a1.875 1.875 0 112.651 2.65L9.75 16.35m6.75-11.863L9.75 16.35"
+                                                    />
+                                                </svg>
                                             </button>
                                             <button
                                                 onClick={() => handleDelete(patient)}
                                                 className="text-gray-500 hover:text-red-600"
+                                                aria-label="Delete"
                                             >
-                                                <Trash2 className="w-4 h-4" />
+                                                {/* Trash (delete) icon */}
+                                                <svg
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                    className="w-4 h-4"
+                                                    fill="none"
+                                                    viewBox="0 0 24 24"
+                                                    stroke="currentColor"
+                                                    strokeWidth={2}
+                                                >
+                                                    <path
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        d="M6 7h12m-9 4v6m6-6v6M4 7h16l-1 12a2 2 0 01-2 2H7a2 2 0 01-2-2L4 7zm3-3h10v2H7V4z"
+                                                    />
+                                                </svg>
+                                            </button>
+                                        </td>
+                                        <td className="px-1 py-1.5 text-center flex items-center justify-center gap-2">
+                                            <button
+                                                onClick={() => handleEdit(patient)}
+                                                className="text-gray-500 hover:text-blue-600"
+                                                aria-label="Edit"
+                                            >
+                                                {/* Pencil (edit) icon */}
+                                                <svg
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                    className="w-4 h-4"
+                                                    fill="none"
+                                                    viewBox="0 0 24 24"
+                                                    stroke="currentColor"
+                                                    strokeWidth={2}
+                                                >
+                                                    <path
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        d="M16.862 4.487l2.651 2.65m-2.651-2.65L6.75 14.6l-1.5 4.5 4.5-1.5L19.512 7.137m-2.65-2.65a1.875 1.875 0 112.651 2.65L9.75 16.35m6.75-11.863L9.75 16.35"
+                                                    />
+                                                </svg>
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete(patient)}
+                                                className="text-gray-500 hover:text-red-600"
+                                                aria-label="Delete"
+                                            >
+                                                {/* Trash (delete) icon */}
+                                                <svg
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                    className="w-4 h-4"
+                                                    fill="none"
+                                                    viewBox="0 0 24 24"
+                                                    stroke="currentColor"
+                                                    strokeWidth={2}
+                                                >
+                                                    <path
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        d="M6 7h12m-9 4v6m6-6v6M4 7h16l-1 12a2 2 0 01-2 2H7a2 2 0 01-2-2L4 7zm3-3h10v2H7V4z"
+                                                    />
+                                                </svg>
                                             </button>
                                         </td>
                                     </tr>

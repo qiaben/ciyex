@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { Info } from "lucide-react";
+
 import { fetchWithAuth } from "@/utils/fetchWithAuth";
 
 interface Provider {
@@ -94,9 +94,24 @@ export default function DemographicsFlat({
         <label className="block text-xs text-gray-600 mb-0.5 flex items-center gap-1">
             {text}
             {required && <span className="text-red-500" title="Required">*</span>}
-            <Info size={12} className="text-gray-400" />
+            {/* ℹ️ Info icon (inline SVG) */}
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-3 h-3 text-gray-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+            >
+                <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M13 16h-1v-4h-1m1-4h.01M12 3a9 9 0 110 18 9 9 0 010-18z"
+                />
+            </svg>
         </label>
     );
+
 
     const renderField = (
         label: string,
@@ -140,7 +155,22 @@ export default function DemographicsFlat({
     const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
         <section className="w-full mb-3">
             <h2 className="text-sm font-semibold text-blue-700 border-b pb-0.5 mb-2 flex items-center gap-1">
-                {title} <Info size={14} className="text-gray-400" />
+                {title}
+                {/* ℹ️ Info icon (inline SVG) */}
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="w-3.5 h-3.5 text-gray-400"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                >
+                    <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M13 16h-1v-4h-1m1-4h.01M12 3a9 9 0 110 18 9 9 0 010-18z"
+                    />
+                </svg>
             </h2>
             {children}
         </section>

@@ -142,9 +142,10 @@ interface HistoryForm {
 }
 
 interface EncounterFormProps {
-    onCancel: () => void;
-    onSave: () => void;
+    onCancel: () => void | Promise<void>;
+    onSave: () => void | Promise<void>;
 }
+
 
 interface Appointment {
     id: string;
