@@ -40,7 +40,8 @@ const navItems: NavItem[] = [
         icon: <SettingsIcon />, // Add this line for the Settings icon
         name: "Settings", // Name for the Settings menu item
         subItems: [
-            { name: "Providers", path: "/settings/providers" }, // New sub-item
+            { name: "Providers", path: "/settings/providers" },
+            { name: "Insurance", path: "/settings/insurance" },// New sub-item
         ],
     },
 
