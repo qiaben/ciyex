@@ -9,9 +9,8 @@ import PatientsByCountry from "../../components/ecommerce/Patients by Country";
 import AdminLayout from "@/app/(admin)/layout";
 
 export const metadata: Metadata = {
-    title:
-        "Next.js E-commerce Dashboard | TailAdmin - Next.js Dashboard Template",
-    description: "This is Next.js Home for TailAdmin Dashboard Template",
+    title: "Dashboard", // ✅ This will become "Ciyex | Dashboard"
+    description: "Dashboard overview of Ciyex system",
 };
 
 export default function Ecommerce() {

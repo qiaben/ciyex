@@ -60,6 +60,8 @@ const ProviderRegistrationForm = () => {
         setFormData({ ...formData, [name]: value });
     };
 
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL as string; //  ADD THIS LINE
+
     const handleSubmit = async () => {
         const requiredFields = [
             formData.fullName,
@@ -107,13 +109,12 @@ const ProviderRegistrationForm = () => {
         };
 
         try {
-            const response = await fetchWithAuth(
-                "http://localhost:8080/api/providers",
-                {
-                    method: "POST",
-                    body: JSON.stringify(requestData),
-                }
-            );
+            const response = await fetchWithAuth(`${apiUrl}/api/providers`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(requestData),
+            });
+
 
             const result = await response.json();
 

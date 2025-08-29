@@ -11,20 +11,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const { isExpanded, isHovered, isMobileOpen } = useSidebar();
     const pathname = usePathname() ?? ""; // ✅ declare only once with fallback
 
-    // ✅ compute title directly
+
     const mapping: Record<string, string> = {
         "/dashboard": "Dashboard",
         "/patients": "Patients",
         "/calendar": "Calendar",
         "/profile": "User Profile",
         "/settings/providers": "Providers",
-        "/settings/insurance": "Insurance Companies",
-
-        "/settings": "Providers",
+        "/settings/forms/lists": "Forms",
+        "/settings/forms/admin": "Form Admin",
+        "/settings": "Settings",
     };
 
     const pageTitle =
-        Object.entries(mapping).find(([key]) => pathname.startsWith(key))?.[1] || "";
+        Object.entries(mapping).find(([key]) => pathname.startsWith(key))?.[1] ||
+        "";
 
     const mainContentMargin = isMobileOpen
         ? "ml-0"
@@ -40,12 +41,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <div
                 className={`flex-1 transition-all duration-300 ease-in-out ${mainContentMargin}`}
             >
-                {/* ✅ Page header */}
                 <AppHeader pageTitle={pageTitle} />
 
-                {/* ✅ Smaller gap below topbar */}
-                <div className="px-2 md:px-2 pt-1">{children}</div>
-
+                <div className="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">
+                    {/* ✅ Force remount of child on route change */}
+                    <div key={pathname}>{children}</div>
+                </div>
             </div>
         </div>
     );
