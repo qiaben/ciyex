@@ -27,7 +27,6 @@ type InsuranceCompany = {
     };
 };
 
-// 🔹 Strongly typed form
 type CompanyForm = {
     payerId: string;
     name: string;
@@ -349,7 +348,7 @@ export default function InsurancePage() {
 
                 {/* Modal */}
                 <Dialog open={open} onOpenChange={setOpen}>
-                    <DialogContent>
+                    <DialogContent onClose={() => setOpen(false)}>
                         <DialogHeader>
                             <DialogTitle className="text-gray-700 text-sm">
                                 {editCompany ? "Edit Insurance Company" : "Add Insurance Company"}
