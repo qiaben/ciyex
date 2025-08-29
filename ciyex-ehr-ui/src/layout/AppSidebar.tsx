@@ -54,11 +54,13 @@ const navItems: NavItem[] = [
         name: "Settings",
         subItems: [
             { name: "Providers", path: "/settings/providers" },
+
             {
                 name: "Forms",
                 subItems: [{ name: "Lists", path: "/settings/forms/lists" },
                     { name: "Form Admin", path: "/settings/forms/admin" },],
             },
+
         ],
     },
 

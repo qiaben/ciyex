@@ -4,8 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { fetchWithAuth } from "@/utils/fetchWithAuth";
 import AdminLayout from "@/app/(admin)/layout";
+
 import Link from "next/link";
 import DemographicsFlat from "@/components/DemographicsFlat";
+
 import HistoryFlat from "@/components/HistoryFlat";
 import InsuranceFlat from "@/components/InsuranceFlat";
 import {
@@ -48,10 +50,14 @@ interface Patient {
     insuranceProvider?: string;
     primaryCarePhysician?: string;
     lastVisitDate?: string;
-    [key: string]: string | undefined;
+    familyMembers?: string[];
+    careTeam?: string[];
+    // ✅ Allow safe extension (string keys can map to different primitive types)
+    [key: string]: string | number | boolean | string[] | undefined;
 }
 
 type InsuranceLevel = "primary" | "secondary" | "tertiary";
+
 interface InsurancePolicy {
     provider?: string;
     planName?: string;
@@ -69,6 +75,7 @@ interface InsurancePolicy {
     acceptsAssignment?: "Yes" | "No";
     secondaryMedicareType?: string;
 }
+
 type InsuranceForm = Record<InsuranceLevel, InsurancePolicy>;
 
 interface EncounterFormData {
@@ -133,20 +140,12 @@ interface HistoryForm {
     };
     other: { nameValue: string; additionalHistory: string };
 }
+
 interface EncounterFormProps {
-    onCancel: () => void;
-    onSave: () => void;
+    onCancel: () => void | Promise<void>;
+    onSave: () => void | Promise<void>;
 }
 
-interface AppointmentDTO {
-    id: string;
-    appointmentStartDate: string;
-    appointmentStartTime: string;
-    providerId: string | number;
-    visitType: string;
-    status: "Scheduled" | "Completed" | "Cancelled";
-    reason?: string;
-}
 
 interface Appointment {
     id: string;
@@ -157,7 +156,6 @@ interface Appointment {
     notes?: string;
 }
 
-
 interface Medication {
     id: string;
     name: string;
@@ -167,6 +165,7 @@ interface Medication {
     status: "Active" | "Inactive" | "Completed";
     instructions?: string;
 }
+
 
 interface XmlResponse {
     success?: boolean;
@@ -211,7 +210,7 @@ export default function PatientDashboardPage() {
     const id = params?.id as string;
 
     const [historyForm, setHistoryForm] = useState<HistoryForm>({
-        general: { riskFactors: "", examsTests: "" },
+        general: {riskFactors: "", examsTests: ""},
         family: {
             father: "",
             mother: "",
@@ -246,7 +245,7 @@ export default function PatientDashboardPage() {
             sleep: "",
             seatbelt: "",
         },
-        other: { nameValue: "", additionalHistory: "" },
+        other: {nameValue: "", additionalHistory: ""},
     });
 
     const [activeHistoryTab, setActiveHistoryTab] = useState<keyof HistoryForm>("general");
@@ -294,9 +293,9 @@ export default function PatientDashboardPage() {
         subscriberSex: "Unassigned",
     };
     const [insuranceForm, setInsuranceForm] = useState<InsuranceForm>({
-        primary: { ...emptyPolicy, provider: patient?.insuranceProvider },
-        secondary: { ...emptyPolicy },
-        tertiary: { ...emptyPolicy },
+        primary: {...emptyPolicy, provider: patient?.insuranceProvider},
+        secondary: {...emptyPolicy},
+        tertiary: {...emptyPolicy},
     });
 
     const setPolicyField = <K extends keyof InsurancePolicy>(
@@ -326,8 +325,8 @@ export default function PatientDashboardPage() {
         try {
             const res = await fetchWithAuth(`/api/reports/generate?type=${type}`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ filters }),
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({filters}),
             });
             const data = await res.json();
             console.log("Report generated:", data);
@@ -340,8 +339,8 @@ export default function PatientDashboardPage() {
         try {
             const res = await fetchWithAuth(`/api/reports/download?type=${type}`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ filters }),
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({filters}),
             });
 
             if (!res.ok) {
@@ -390,7 +389,7 @@ export default function PatientDashboardPage() {
         const onScroll = () => {
             if (ignoreInitialIntersection.current) ignoreInitialIntersection.current = false;
         };
-        root.addEventListener("scroll", onScroll, { passive: true });
+        root.addEventListener("scroll", onScroll, {passive: true});
         return () => root.removeEventListener("scroll", onScroll);
     }, []);
 
@@ -403,10 +402,10 @@ export default function PatientDashboardPage() {
         }
 
         const sections = Object.entries(tabContentRefs.current)
-            .map(([key, el]) => ({ key, el }))
+            .map(([key, el]) => ({key, el}))
             .filter((s): s is { key: string; el: HTMLDivElement } => !!s.el);
 
-        sections.forEach(({ key, el }) => {
+        sections.forEach(({key, el}) => {
             (el as HTMLElement).dataset.tabkey = key;
         });
 
@@ -426,7 +425,7 @@ export default function PatientDashboardPage() {
             }
         );
 
-        sections.forEach(({ el }) => observer.observe(el));
+        sections.forEach(({el}) => observer.observe(el));
         return () => observer.disconnect();
     }, [headerH, viewMode, patient, showEncounterForm]);
 
@@ -445,7 +444,7 @@ export default function PatientDashboardPage() {
                 if (data.success) {
                     const fetched = data.data as Patient;
                     setPatient(fetched);
-                    setDemoForm({ ...fetched });
+                    setDemoForm({...fetched});
                 } else {
                     throw new Error(data.message || "Failed to fetch patient");
                 }
@@ -476,22 +475,9 @@ export default function PatientDashboardPage() {
 
                 const fetchAppointments = async () => {
                     try {
-                        const res = await fetchWithAuth(
-                            `${process.env.NEXT_PUBLIC_API_URL}/api/appointments/patient/${id}?page=0&size=10`
-                        );
+                        const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/patients/${id}/appointments`);
                         const data = await res.json();
-                        if (res.ok && data.success) {
-                            // Normalize AppointmentDTO into your frontend Appointment interface
-                            const mapped: Appointment[] = data.data.content.map((appt: AppointmentDTO) => ({
-                                id: appt.id,
-                                date: `${appt.appointmentStartDate}T${appt.appointmentStartTime}`,
-                                provider: String(appt.providerId),
-                                type: appt.visitType,
-                                status: appt.status,
-                                notes: appt.reason,
-                            }));
-                            setAppointments(mapped);
-                        }
+                        if (res.ok && data.success) setAppointments(data.data);
                     } catch (e) {
                         console.error("Failed to fetch appointments:", e);
                     }
@@ -539,10 +525,10 @@ export default function PatientDashboardPage() {
 
     async function saveDemographics() {
         if (!demoForm || !patient) return;
-        const payload = { ...patient, ...demoForm };
+        const payload = {...patient, ...demoForm};
         const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/patients/${patient.id}`, {
             method: "PUT",
-            headers: { "Content-Type": "application/json" },
+            headers: {"Content-Type": "application/json"},
             body: JSON.stringify(payload),
         });
 
@@ -565,7 +551,7 @@ export default function PatientDashboardPage() {
         if (!patient) return;
         const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/patients/${patient.id}/history`, {
             method: "PUT",
-            headers: { "Content-Type": "application/json" },
+            headers: {"Content-Type": "application/json"},
             body: JSON.stringify(historyForm),
         });
         const data = await res.json();
@@ -577,12 +563,12 @@ export default function PatientDashboardPage() {
     async function saveInsurance() {
         if (!patient) throw new Error("No patient loaded");
 
-        const payload = { policies: insuranceForm };
+        const payload = {policies: insuranceForm};
         const res = await fetchWithAuth(
             `${process.env.NEXT_PUBLIC_API_URL}/api/patients/${patient.id}/insurance`,
             {
                 method: "PUT",
-                headers: { "Content-Type": "application/json" },
+                headers: {"Content-Type": "application/json"},
                 body: JSON.stringify(payload),
             }
         );
@@ -608,7 +594,7 @@ export default function PatientDashboardPage() {
             `${process.env.NEXT_PUBLIC_API_URL}/api/patients/${patient.id}/encounters`,
             {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {"Content-Type": "application/json"},
                 body: JSON.stringify(encounterForm),
             }
         );
@@ -660,7 +646,7 @@ export default function PatientDashboardPage() {
         }
         setViewMode(key);
         setHighlightedTab(key);
-        mainContentRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+        mainContentRef.current?.scrollTo({top: 0, behavior: "smooth"});
     };
 
     const formatDateLocal = (date: string) => {
@@ -675,18 +661,8 @@ export default function PatientDashboardPage() {
     };
 
     const formatDateTimeLocal = (date: string) => {
-        return date
-            ? new Date(date).toLocaleString([], {
-                year: "numeric",
-                month: "2-digit",
-                day: "2-digit",
-                hour: "numeric",
-                minute: "2-digit",
-                hour12: true,
-            })
-            : "—";
+        return date ? new Date(date).toLocaleString() : "—";
     };
-
 
     const filteredAppointments = appointments.filter((appt) =>
         appt.provider.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -727,79 +703,474 @@ export default function PatientDashboardPage() {
     }
 
     const patientTabs = [
-        { key: "dashboard", label: "Dashboard" },
-        { key: "appointments", label: "Appointments" },
-        { key: "demographics", label: "Demographics" },
-        { key: "insurance", label: "Insurance" },
-        { key: "history", label: "History" },
-        { key: "report", label: "Report" },
-        { key: "allergies", label: "Allergies" },
-        { key: "medications", label: "Medications" },
-        { key: "labs", label: "Labs" },
-        { key: "documents", label: "Documents" },
-        { key: "messages", label: "Messages" },
-        { key: "transactions", label: "Transactions" },
-        { key: "issues", label: "Issues" },
-        { key: "vitals", label: "Vitals" },
+        {key: "dashboard", label: "Dashboard"},
+
+        {key: "demographics", label: "Demographics"},
+        {key: "appointments", label: "Appointments"},
+        {key: "insurance", label: "Insurance"},
+        {key: "history", label: "History"},
+        {key: "report", label: "Report"},
+        {key: "allergies", label: "Allergies"},
+        {key: "medications", label: "Medications"},
+        {key: "labs", label: "Labs"},
+        {key: "documents", label: "Documents"},
+        {key: "messages", label: "Messages"},
+        {key: "transactions", label: "Transactions"},
+        {key: "issues", label: "Issues"},
+        {key: "vitals", label: "Vitals"},
     ];
 
     const renderTabContent = (tabKey: string) => {
         switch (tabKey) {
             case "dashboard": {
-                const recentAppointments = appointments
-                    .filter((a) => a.status === "Completed")
-                    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                    .slice(0, 3);
-                const upcomingAppointment = appointments
-                    .filter((a) => a.status === "Scheduled" && new Date(a.date) > new Date())
-                    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0];
                 return (
                     <div className="space-y-6">
-                        <div className="grid md:grid-cols-2 gap-4">
-                            <Card title="Recent Activity" onEdit={() => onQuickAction("appointments")}>
-                                {recentAppointments.length > 0 ? (
-                                    <ul className="text-sm space-y-1 text-gray-600">
-                                        {recentAppointments.map((appt) => (
-                                            <li key={appt.id} className="text-xs">
-                                                • {formatDateTimeLocal(appt.date)} — {appt.type} with {appt.provider}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                ) : (
-                                    <div className="text-sm text-gray-500">No recent activity found</div>
-                                )}
-                            </Card>
-                            <Card title="Upcoming" onEdit={() => onQuickAction("appointments")}>
-                                {upcomingAppointment ? (
-                                    <div className="text-sm text-gray-600">
-                                        {formatDateTimeLocal(upcomingAppointment.date)} — Appointment with{" "}
-                                        {upcomingAppointment.provider} ({upcomingAppointment.type})
-                                    </div>
-                                ) : (
-                                    <div className="text-sm text-gray-500">No upcoming appointments</div>
-                                )}
-                            </Card>
-                        </div>
-                        <p className="text-sm text-gray-500"></p>
-                        <div className="space-y-6 mt-4">
-                            {patientTabs
-                                .filter((t) => t.key !== "dashboard")
-                                .map((tab) => (
-                                    <div
-                                        key={tab.key}
-                                        id={tab.key}
-                                        ref={(el) => void (tabContentRefs.current[tab.key] = el)}
-                                        style={{ scrollMarginTop: headerH + 12 }}
+                        {/* Dashboard Card */}
+                        {/* Two Column Grid: Recent Activity + Upcoming */}
+                        <div className="grid md:grid-cols-2 gap-6 ">
+                            {/* Recent Activity */}
+                            <div className="pr-6">
+                                <div className="bg-white rounded-md border border-gray-200 p-4">
+
+                                <h5 className="text-sm font-semibold text-gray-800 mb-2">Recent Activity</h5>
+                                    {appointments.length > 0 ? (
+                                        <ul className="text-sm space-y-1 text-gray-600 list-disc pl-4">
+                                            {appointments
+                                                .filter((a) => a.status === "Completed")
+                                                .slice(-3)
+                                                .map((appt) => (
+                                                    <li key={appt.id}>
+                                                        {formatDateTimeLocal(appt.date)} — {appt.type}
+                                                    </li>
+                                                ))}
+                                        </ul>
+                                    ) : (
+                                        <p className="text-gray-500 text-sm">No recent activity</p>
+                                    )}
+                                    <button
+                                        onClick={() => onTabClick("appointments")}
+                                        className="mt-3 text-xs text-blue-600 hover:underline"
                                     >
-                                        <Card title={tab.label} onClick={() => onQuickAction(tab.key)}>
-                                            {renderTabContent(tab.key)}
-                                        </Card>
+                                        View full details →
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Upcoming Appointments */}
+                            <div className="pl-6">
+                                <div className="bg-white rounded-md border border-gray-200 p-4">
+
+                                <h5 className="text-sm font-semibold text-gray-800 mb-2">Upcoming</h5>
+                                    {appointments.find((a) => a.status === "Scheduled") ? (
+                                        <p className="text-sm text-gray-600">
+                                            {formatDateTimeLocal(
+                                                appointments.find((a) => a.status === "Scheduled")!.date
+                                            )}{" "}
+                                            — with {appointments.find((a) => a.status === "Scheduled")!.provider}
+                                        </p>
+                                    ) : (
+                                        <p className="text-gray-500 text-sm">No upcoming appointments</p>
+                                    )}
+                                    <button
+                                        onClick={() => onTabClick("appointments")}
+                                        className="mt-3 text-xs text-blue-600 hover:underline"
+                                    >
+                                        View full details →
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+
+                        {/* Demographics */}
+                        <div
+                            id="demographics"
+                            ref={(el) => {
+                                if (el) tabContentRefs.current["demographics"] = el
+                            }}
+                            data-tabkey="demographics"
+                            style={{ scrollMarginTop: headerH + 12 }}
+                            className="bg-white rounded-lg border border-gray-200 shadow-sm p-4"
+                        >
+                            <h4 className="text-sm font-semibold text-gray-800 mb-3">Demographics</h4>
+                            <div className="grid md:grid-cols-2 gap-x-8 gap-y-1 text-sm text-gray-600">
+                                <div>
+                                    <div>
+                                        <span className="font-medium">Name:</span> {patient.firstName}{" "}
+                                        {patient.lastName}
                                     </div>
-                                ))}
+                                    <div>
+                                        <span className="font-medium">Gender:</span> {patient.gender || "—"}
+                                    </div>
+                                    <div>
+                                        <span className="font-medium">Address:</span>{" "}
+                                        {patient.address || "—"}
+                                    </div>
+                                </div>
+                                <div>
+                                    <div>
+                                        <span className="font-medium">DOB:</span>{" "}
+                                        {formatDateLocal(patient.dateOfBirth)}
+                                    </div>
+                                    <div>
+                                        <span className="font-medium">MRN:</span> {patient.mrn || "—"}
+                                    </div>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => onTabClick("demographics")}
+                                className="mt-3 text-xs text-blue-600 hover:underline"
+                            >
+                                View full details →
+                            </button>
+                        </div>
+
+                        {/* Appointments */}
+                        <div
+                            id="appointments"
+                            ref={(el) => {
+                                if (el) tabContentRefs.current["appointments"] = el
+                            }}
+                            data-tabkey="appointments"
+                            style={{ scrollMarginTop: headerH + 12 }}
+                            className="bg-white rounded-lg border border-gray-200 shadow-sm p-4"
+                        >
+                            <h4 className="text-sm font-semibold text-gray-800 mb-3">Appointments</h4>
+                            <div className="space-y-3">
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="text"
+                                        placeholder="Search appointments..."
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="flex-1 rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm"
+                                    />
+                                    <button
+                                        onClick={() => onTabClick("appointments")}
+                                        className="px-4 py-2 rounded-md bg-blue-600 text-white text-sm font-medium hover:bg-blue-700"
+                                    >
+                                        Schedule
+                                    </button>
+                                </div>
+                                <div className="overflow-x-auto border border-gray-200 rounded-lg">
+                                    <table className="min-w-full text-sm">
+                                        <thead className="bg-gray-50 text-gray-700 font-semibold">
+                                        <tr>
+                                            <th className="px-4 py-2 text-left">Date</th>
+                                            <th className="px-4 py-2 text-left">Provider</th>
+                                            <th className="px-4 py-2 text-left">Type</th>
+                                            <th className="px-4 py-2 text-left">Status</th>
+                                            <th className="px-4 py-2 text-left">Action</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody>
+                                        {filteredAppointments.length > 0 ? (
+                                            filteredAppointments.slice(0, 2).map((appt) => (
+                                                <tr key={appt.id} className="border-t">
+                                                    <td className="px-4 py-2">{formatDateLocal(appt.date)}</td>
+                                                    <td className="px-4 py-2">{appt.provider}</td>
+                                                    <td className="px-4 py-2">{appt.type}</td>
+                                                    <td className="px-4 py-2">
+                        <span
+                            className={`px-2 py-1 rounded text-xs font-medium ${
+                                appt.status === "Scheduled"
+                                    ? "bg-blue-100 text-blue-700"
+                                    : appt.status === "Completed"
+                                        ? "bg-green-100 text-green-700"
+                                        : "bg-gray-100 text-gray-600"
+                            }`}
+                        >
+                          {appt.status}
+                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-2">
+                                                        <button
+                                                            onClick={() => onTabClick("appointments")}
+                                                            className="px-2 py-1 text-xs bg-gray-100 rounded hover:bg-gray-200"
+                                                        >
+                                                            Encounter
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr>
+                                                <td
+                                                    colSpan={5}
+                                                    className="px-4 py-6 text-center text-gray-400"
+                                                >
+                                                    No appointments scheduled
+                                                </td>
+                                            </tr>
+                                        )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => onTabClick("appointments")}
+                                className="mt-3 text-xs text-blue-600 hover:underline"
+                            >
+                                View full details →
+                            </button>
+                        </div>
+
+                        {/* Insurance */}
+                        <div
+                            id="insurance"
+                            ref={(el) => {
+                                if (el) tabContentRefs.current["insurance"] = el
+                            }}
+                            data-tabkey="insurance"
+                            style={{ scrollMarginTop: headerH + 12 }}
+                            className="bg-white rounded-lg border border-gray-200 shadow-sm p-4"
+                        >
+                            <h4 className="text-sm font-semibold text-gray-800 mb-2">Insurance</h4>
+                            <p className="text-sm text-gray-600">
+                                {patient.insuranceProvider || "No insurance data"}
+                            </p>
+                            <button
+                                onClick={() => onTabClick("insurance")}
+                                className="mt-3 text-xs text-blue-600 hover:underline"
+                            >
+                                View full details →
+                            </button>
+                        </div>
+
+                        {/* History */}
+                        <div
+                            id="history"
+                            ref={(el) => {
+                                if (el) tabContentRefs.current["history"] = el
+                            }}
+                            data-tabkey="history"
+                            style={{ scrollMarginTop: headerH + 12 }}
+                            className="bg-white rounded-lg border border-gray-200 shadow-sm p-4"
+                        >
+                            <h4 className="text-sm font-semibold text-gray-800 mb-2">History</h4>
+                            <p className="text-sm text-gray-500">
+                                Family history and lifestyle details
+                            </p>
+                            <button
+                                onClick={() => onTabClick("history")}
+                                className="mt-3 text-xs text-blue-600 hover:underline"
+                            >
+                                View full details →
+                            </button>
+                        </div>
+
+                        {/* Report */}
+                        <div
+                            id="report"
+                            ref={(el) => {
+                                if (el) tabContentRefs.current["report"] = el
+                            }}
+                            data-tabkey="report"
+                            style={{ scrollMarginTop: headerH + 12 }}
+                            className="bg-white rounded-lg border border-gray-200 shadow-sm p-4"
+                        >
+                            <h4 className="text-sm font-semibold text-gray-800 mb-2">Report</h4>
+                            <p className="text-sm text-gray-500">Generate clinical reports</p>
+                            <button
+                                onClick={() => onTabClick("report")}
+                                className="mt-3 text-xs text-blue-600 hover:underline"
+                            >
+                                View full details →
+                            </button>
+                        </div>
+
+                        {/* Allergies */}
+                        <div
+                            id="allergies"
+                            ref={(el) => {
+                                if (el) tabContentRefs.current["allergies"] = el
+                            }}
+                            data-tabkey="allergies"
+                            style={{ scrollMarginTop: headerH + 12 }}
+                            className="bg-white rounded-lg border border-gray-200 shadow-sm p-4"
+                        >
+                            <h4 className="text-sm font-semibold text-gray-800 mb-2">Allergies</h4>
+                            {allergies.length > 0 ? (
+                                <ul className="text-sm text-gray-600 list-disc pl-4">
+                                    {allergies.slice(0, 2).map((a) => (
+                                        <li key={a.id}>{a.substance}</li>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <p className="text-sm text-gray-500">No allergies</p>
+                            )}
+                            <button
+                                onClick={() => onTabClick("allergies")}
+                                className="mt-3 text-xs text-blue-600 hover:underline"
+                            >
+                                View full details →
+                            </button>
+                        </div>
+
+                        {/* Medications */}
+                        <div
+                            id="medications"
+                            ref={(el) => {
+                                if (el) tabContentRefs.current["medications"] = el
+                            }}
+                            data-tabkey="medications"
+                            style={{ scrollMarginTop: headerH + 12 }}
+                            className="bg-white rounded-lg border border-gray-200 shadow-sm p-4"
+                        >
+                            <h4 className="text-sm font-semibold text-gray-800 mb-2">Medications</h4>
+                            {medications.length > 0 ? (
+                                <ul className="text-sm text-gray-600 list-disc pl-4">
+                                    {medications.slice(0, 2).map((m) => (
+                                        <li key={m.id}>
+                                            {m.name} {m.dosage}
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <p className="text-sm text-gray-500">No medications</p>
+                            )}
+                            <button
+                                onClick={() => onTabClick("medications")}
+                                className="mt-3 text-xs text-blue-600 hover:underline"
+                            >
+                                View full details →
+                            </button>
+                        </div>
+
+                        {/* Labs */}
+                        <div
+                            id="labs"
+                            ref={(el) => {
+                                if (el) tabContentRefs.current["labs"] = el
+                            }}
+                            data-tabkey="labs"
+                            style={{ scrollMarginTop: headerH + 12 }}
+                            className="bg-white rounded-lg border border-gray-200 shadow-sm p-4"
+                        >
+                            <h4 className="text-sm font-semibold text-gray-800 mb-2">Labs</h4>
+                            <p className="text-sm text-gray-500">View recent lab results</p>
+                            <button
+                                onClick={() => onTabClick("labs")}
+                                className="mt-3 text-xs text-blue-600 hover:underline"
+                            >
+                                View full details →
+                            </button>
+                        </div>
+
+                        {/* Documents */}
+                        <div
+                            id="documents"
+                            ref={(el) => {
+                                if (el) tabContentRefs.current["documents"] = el
+                            }}
+                            data-tabkey="documents"
+                            style={{ scrollMarginTop: headerH + 12 }}
+                            className="bg-white rounded-lg border border-gray-200 shadow-sm p-4"
+                        >
+                            <h4 className="text-sm font-semibold text-gray-800 mb-2">Documents</h4>
+                            {selectedDoc ? (
+                                <p className="text-sm text-gray-600">Last opened: {selectedDoc}</p>
+                            ) : (
+                                <p className="text-sm text-gray-500">No documents</p>
+                            )}
+                            <button
+                                onClick={() => onTabClick("documents")}
+                                className="mt-3 text-xs text-blue-600 hover:underline"
+                            >
+                                View full details →
+                            </button>
+                        </div>
+
+                        {/* Messages */}
+                        <div
+                            id="messages"
+                            ref={(el) => {
+                                if (el) tabContentRefs.current["messages"] = el
+                            }}
+                            data-tabkey="messages"
+                            style={{ scrollMarginTop: headerH + 12 }}
+                            className="bg-white rounded-lg border border-gray-200 shadow-sm p-4"
+                        >
+                            <h4 className="text-sm font-semibold text-gray-800 mb-2">Messages</h4>
+                            <p className="text-sm text-gray-500">Patient communications</p>
+                            <button
+                                onClick={() => onTabClick("messages")}
+                                className="mt-3 text-xs text-blue-600 hover:underline"
+                            >
+                                View full details →
+                            </button>
+                        </div>
+
+                        {/* Transactions */}
+                        <div
+                            id="transactions"
+                            ref={(el) => {
+                                if (el) tabContentRefs.current["transactions"] = el
+                            }}
+                            data-tabkey="transactions"
+                            style={{ scrollMarginTop: headerH + 12 }}
+                            className="bg-white rounded-lg border border-gray-200 shadow-sm p-4"
+                        >
+                            <h4 className="text-sm font-semibold text-gray-800 mb-2">Transactions</h4>
+                            {billing ? (
+                                <p className="text-sm text-gray-600">
+                                    Balance: ${billing.totalBalanceDue}
+                                </p>
+                            ) : (
+                                <p className="text-sm text-gray-500">No billing data</p>
+                            )}
+                            <button
+                                onClick={() => onTabClick("transactions")}
+                                className="mt-3 text-xs text-blue-600 hover:underline"
+                            >
+                                View full details →
+                            </button>
+                        </div>
+
+                        {/* Issues */}
+                        <div
+                            id="issues"
+                            ref={(el) => {
+                                if (el) tabContentRefs.current["issues"] = el
+                            }}
+                            data-tabkey="issues"
+                            style={{ scrollMarginTop: headerH + 12 }}
+                            className="bg-white rounded-lg border border-gray-200 shadow-sm p-4"
+                        >
+                            <h4 className="text-sm font-semibold text-gray-800 mb-2">Issues</h4>
+                            <p className="text-sm text-gray-500">No issues recorded</p>
+                            <button
+                                onClick={() => onTabClick("issues")}
+                                className="mt-3 text-xs text-blue-600 hover:underline"
+                            >
+                                View full details →
+                            </button>
+                        </div>
+
+                        {/* Vitals */}
+                        <div
+                            id="vitals"
+                            ref={(el) => {
+                                if (el) tabContentRefs.current["vitals"] = el
+                            }}
+                            data-tabkey="vitals"
+                            style={{ scrollMarginTop: headerH + 12 }}
+                            className="bg-white rounded-lg border border-gray-200 shadow-sm p-4"
+                        >
+                            <h4 className="text-sm font-semibold text-gray-800 mb-2">Vitals</h4>
+                            <p className="text-sm text-gray-500">No vitals recorded</p>
+                            <button
+                                onClick={() => onTabClick("vitals")}
+                                className="mt-3 text-xs text-blue-600 hover:underline"
+                            >
+                                View full details →
+                            </button>
                         </div>
                     </div>
-                );
+                )
             }
+
+
             case "history":
                 return (
                     <HistoryFlat
@@ -838,7 +1209,7 @@ export default function PatientDashboardPage() {
                     />
                 );
             case "billing":
-                return <BillingFlat billing={billing} />;
+                return <BillingFlat billing={billing}/>;
             case "medications":
                 return (
                     <MedicationsFlat
@@ -875,16 +1246,18 @@ export default function PatientDashboardPage() {
                     <DemographicsFlat
                         patient={patient}
                         demoForm={demoForm}
-                        // @ts-expect-error setDemoForm type mismatch due to DemographicsFlat prop definition; assuming safe as it's consistent with patient state
                         setDemoForm={setDemoForm}
                         editDemographics={editDemographics}
                         setEditDemographics={setEditDemographics}
                         saveDemographics={saveDemographics}
-                        router={router}
-                        formatDateLocal={formatDateLocal}
                         calculateAgeLocal={calculateAgeLocal}
                     />
                 );
+
+
+
+
+
             case "documents":
                 return (
                     <DocumentsFlat
@@ -893,7 +1266,7 @@ export default function PatientDashboardPage() {
                     />
                 );
             case "labs":
-                return <LabsFlat labsData={[]} />;
+                return <LabsFlat labsData={[]}/>;
             default:
                 return (
                     <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
@@ -901,7 +1274,8 @@ export default function PatientDashboardPage() {
                             <div
                                 className="mx-auto w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-3"
                             >
-                                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor"
+                                     viewBox="0 0 24 24">
                                     <path
                                         strokeLinecap="round"
                                         strokeLinejoin="round"
@@ -938,7 +1312,7 @@ export default function PatientDashboardPage() {
                     overflow-x: hidden;
                     -webkit-overflow-scrolling: touch;
                 }
-                
+
                 .patientSummary *,
                 .quickActions * {
                     overflow: visible !important;
@@ -947,13 +1321,24 @@ export default function PatientDashboardPage() {
                     -ms-overflow-style: none;
                     scrollbar-width: none;
                 }
-                
+
+                .hide-scrollbar {
+                    -ms-overflow-style: none; /* IE & Edge */
+                    scrollbar-width: none; /* Firefox */
+                }
+
+                .hide-scrollbar::-webkit-scrollbar {
+                    display: none; /* Chrome, Safari, Opera */
+                }
+
                 .patientSummary *::-webkit-scrollbar,
                 .quickActions *::-webkit-scrollbar {
                     display: none;
                 }
             `}</style>
-            <div className="pageScroll">
+
+            {/* Light gray page background */}
+            <div className="pageScroll bg-gray-50">
                 <div
                     ref={tabsHeaderRef}
                     className="sticky top-0 z-50 border-b border-gray-200 bg-white/95 backdrop-blur px-3 py-1.5"
@@ -964,22 +1349,32 @@ export default function PatientDashboardPage() {
                                 href="/patients"
                                 className="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 border border-gray-300 text-xs font-medium text-gray-700 flex items-center"
                             >
-                                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                                <svg
+                                    className="w-3 h-3 mr-1"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth="2"
+                                        d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                                    />
                                 </svg>
                                 Patients
                             </Link>
                             <div className="flex items-center min-w-0">
-                                <span className="text-xs text-gray-500 mr-1 shrink-0">Patient:</span>
+              <span className="text-xs text-gray-500 mr-1 shrink-0">
+                Patient:
+              </span>
                                 <div
-                                    className="px-2 py-0.5 rounded bg-blue-50 text-xs font-medium text-blue-800 truncate"
-                                >
+                                    className="px-2 py-0.5 rounded bg-blue-50 text-xs font-medium text-blue-800 truncate">
                                     {patient.firstName} {patient.lastName}
                                 </div>
                                 {patient.mrn && (
                                     <div
-                                        className="ml-2 px-1.5 py-0.5 rounded bg-gray-100 text-[10px] text-gray-600 shrink-0"
-                                    >
+                                        className="ml-2 px-1.5 py-0.5 rounded bg-gray-100 text-[10px] text-gray-600 shrink-0">
                                         MRN: {patient.mrn}
                                     </div>
                                 )}
@@ -990,8 +1385,18 @@ export default function PatientDashboardPage() {
                                 className="h-8 px-3 rounded bg-blue-600 hover:bg-blue-700 text-xs font-medium text-white shadow-sm inline-flex items-center"
                                 onClick={handleOpenEncounter}
                             >
-                                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                                <svg
+                                    className="w-3 h-3 mr-1"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth="2"
+                                        d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                                    />
                                 </svg>
                                 New Encounter
                             </button>
@@ -1015,16 +1420,20 @@ export default function PatientDashboardPage() {
                         </div>
                     </div>
                 </div>
+
                 <div className="w-full max-w-screen-2xl mx-auto p-4">
                     <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,17fr)_minmax(0,3fr)] gap-4">
                         <main
                             ref={mainContentRef}
-                            className="min-w-0 bg-white rounded-lg border border-gray-100 shadow-sm p-4 overflow-y-auto"
-                            style={{ height: `calc(100vh - ${headerH}px)` }}
+                            className="min-w-0 overflow-y-auto hide-scrollbar"
+                            style={{height: `calc(100vh - ${headerH}px)`}}
                         >
                             {showEncounterForm ? (
                                 <main className="flex-1 p-6 overflow-auto">
-                                    <EncounterForm onCancel={handleCloseEncounter} onSave={saveEncounter} />
+                                    <EncounterForm
+                                        onCancel={handleCloseEncounter}
+                                        onSave={saveEncounter}
+                                    />
                                 </main>
                             ) : (
                                 <>
@@ -1032,10 +1441,12 @@ export default function PatientDashboardPage() {
                                         <div
                                             id="dashboard"
                                             ref={(el) => void (tabContentRefs.current.dashboard = el)}
-                                            style={{ scrollMarginTop: headerH + 12 }}
+                                            style={{scrollMarginTop: headerH + 12}}
                                         >
-                                            <h2 className="text-lg font-semibold mb-3">Dashboard</h2>
-                                            <div className="min-w-0">{renderTabContent("dashboard")}</div>
+                                            <h2 className="text-lg font-semibold mb-3"></h2>
+                                            <div className="min-w-0">
+                                                {renderTabContent("dashboard")}
+                                            </div>
                                         </div>
                                     ) : (
                                         <div
@@ -1043,59 +1454,100 @@ export default function PatientDashboardPage() {
                                             ref={(el) => {
                                                 tabContentRefs.current[viewMode] = el;
                                             }}
-                                            style={{ scrollMarginTop: headerH + 12 }}
+                                            style={{scrollMarginTop: headerH + 12}}
                                             className="min-w-0"
                                         >
-                                            <div className="min-w-0">{renderTabContent(viewMode)}</div>
+                                            <div className="min-w-0">
+                                                {renderTabContent(viewMode)}
+                                            </div>
                                         </div>
                                     )}
                                 </>
                             )}
                         </main>
-                        <aside className="min-w-0">
+
+                        <aside className="min-w-0 hide-scrollbar overflow-y-auto">
                             <div
-                                style={{ position: "sticky", top: headerH + 12, height: `calc(100vh - ${headerH + 24}px)` }}
+                                style={{
+                                    position: "sticky",
+                                    top: headerH + 12,
+                                    height: `calc(100vh - ${headerH + 24}px)`,
+                                }}
                                 className="flex flex-col gap-4"
                             >
-                                <div className="flex-[0_0_30%] bg-gradient-to-br from-indigo-50 to-white rounded-2xl shadow-md p-4 flex flex-col">
-                                    <h3 className="text-sm font-semibold text-gray-800 mb-2 tracking-wide">Patient Summary</h3>
+                                <div
+                                    className="flex-[0_0_30%] bg-gradient-to-br from-indigo-50 to-white rounded-2xl shadow-md p-4 flex flex-col">
+                                    <h3 className="text-sm font-semibold text-gray-800 mb-2 tracking-wide">
+                                        Patient Summary
+                                    </h3>
                                     <div className="space-y-1 text-sm flex-1">
                                         <div className="font-semibold text-lg text-gray-900 truncate">
                                             {patient.firstName} {patient.lastName}
                                         </div>
                                         <div className="text-gray-500">
-                                            {formatDateLocal(patient.dateOfBirth)} · Age {calculateAgeLocal(patient.dateOfBirth)}
+                                            {formatDateLocal(patient.dateOfBirth)} · Age{" "}
+                                            {calculateAgeLocal(patient.dateOfBirth)}
                                         </div>
-                                        <div className="text-gray-700">{patient.phoneNumber || "—"}</div>
+                                        <div className="text-gray-700">
+                                            {patient.phoneNumber || "—"}
+                                        </div>
                                         <div className="text-gray-400 text-xs italic">
                                             {appointments.length > 0
-                                                ? `Last visit: ${formatDateLocal(appointments[appointments.length - 1].date)}`
+                                                ? `Last visit: ${formatDateLocal(
+                                                    appointments[appointments.length - 1].date
+                                                )}`
                                                 : "No visits recorded"}
                                         </div>
                                     </div>
                                 </div>
                                 <div className="flex-[0_0_25%] bg-white rounded-2xl shadow-md p-4 flex flex-col">
-                                    <h3 className="text-sm font-semibold text-gray-800 mb-2 tracking-wide">Quick Actions</h3>
+                                    <h3 className="text-sm font-semibold text-gray-800 mb-2 tracking-wide">
+                                        Quick Actions
+                                    </h3>
                                     <div className="grid grid-cols-1 gap-2 flex-1">
                                         {[
-                                            { key: "appointments", label: "Appointments", color: "blue" },
-                                            { key: "billing", label: "Billing", color: "yellow" },
-                                            { key: "demographics", label: "Demographics", color: "purple" },
-                                            { key: "messages", label: "Messages", color: "green" },
-                                        ].map(({ key, label, color }) => {
-                                            const colors: Record<string, { active: string; inactive: string }> = {
-                                                blue: { active: "bg-blue-600 text-white", inactive: "bg-blue-50 text-blue-700 hover:bg-blue-100" },
-                                                yellow: { active: "bg-yellow-500 text-white", inactive: "bg-yellow-50 text-yellow-700 hover:bg-yellow-100" },
-                                                purple: { active: "bg-purple-600 text-white", inactive: "bg-purple-50 text-purple-700 hover:bg-purple-100" },
-                                                green: { active: "bg-green-600 text-white", inactive: "bg-green-50 text-green-700 hover:bg-green-100" },
+                                            {key: "appointments", label: "Appointments", color: "blue"},
+                                            {key: "billing", label: "Billing", color: "yellow"},
+                                            {key: "demographics", label: "Demographics", color: "purple"},
+                                            {key: "messages", label: "Messages", color: "green"},
+                                        ].map(({key, label, color}) => {
+                                            const colors: Record<
+                                                string,
+                                                { active: string; inactive: string }
+                                            > = {
+                                                blue: {
+                                                    active: "bg-blue-600 text-white",
+                                                    inactive:
+                                                        "bg-blue-50 text-blue-700 hover:bg-blue-100",
+                                                },
+                                                yellow: {
+                                                    active: "bg-yellow-500 text-white",
+                                                    inactive:
+                                                        "bg-yellow-50 text-yellow-700 hover:bg-yellow-100",
+                                                },
+                                                purple: {
+                                                    active: "bg-purple-600 text-white",
+                                                    inactive:
+                                                        "bg-purple-50 text-purple-700 hover:bg-purple-100",
+                                                },
+                                                green: {
+                                                    active: "bg-green-600 text-white",
+                                                    inactive:
+                                                        "bg-green-50 text-green-700 hover:bg-green-100",
+                                                },
                                             };
-                                            const base = "w-full px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200 shadow-sm";
+                                            const base =
+                                                "w-full px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200 shadow-sm";
                                             const isActive = highlightedTab === key;
                                             return (
                                                 <button
                                                     key={key}
                                                     onClick={() => onQuickAction(key)}
-                                                    className={`${base} ${isActive ? colors[color].active : colors[color].inactive}`}
+                                                    className={`${base} ${
+                                                        isActive
+                                                            ? colors[color].active
+                                                            : colors[color].inactive
+                                                    }`}
                                                 >
                                                     {label}
                                                 </button>
@@ -1109,51 +1561,6 @@ export default function PatientDashboardPage() {
                 </div>
             </div>
         </AdminLayout>
-    );
-}
-
-interface CardProps {
-    title: string;
-    children: React.ReactNode;
-    onEdit?: () => void;
-    onClick?: () => void;
-}
-
-function Card({ title, children, onEdit, onClick }: CardProps) {
-    return (
-        <div
-            className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 cursor-pointer hover:shadow-md transition-shadow"
-            onClick={onClick}
-        >
-            <div className="flex justify-between items-center mb-2">
-                <h4 className="text-sm font-semibold text-gray-800">{title}</h4>
-                {onEdit && (
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onEdit();
-                        }}
-                        className="text-blue-600 hover:text-blue-800"
-                    >
-                        <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            strokeWidth={1.5}
-                            stroke="currentColor"
-                            className="h-4 w-4"
-                        >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M16.862 4.487l1.687 1.687m-2.182-2.182a2.25 2.25 0 113.182 3.182L7.5 19.5H4.5v-3l12.182-12.182z"
-                            />
-                        </svg>
-                    </button>
-                )}
-            </div>
-            {children}
-        </div>
     );
 }
 

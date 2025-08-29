@@ -1,6 +1,5 @@
 "use client";
-
-import React, { useEffect, useState,useCallback } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { fetchWithAuth } from "@/utils/fetchWithAuth";
 import AdminLayout from "@/app/(admin)/layout";
@@ -14,6 +13,7 @@ interface Patient {
     phoneNumber: string;
     dateOfBirth: string;
     gender: string;
+    mrn: number;
     status?: string;
 }
 
@@ -21,9 +21,8 @@ interface PageResponse<T> {
     content: T[];
     totalElements: number;
     totalPages: number;
-    number: number; // current page index (0-based)
+    number: number;
     size: number;
-    // optionally other Spring fields
 }
 
 interface ApiResponse<T> {
@@ -51,26 +50,12 @@ export default function PatientListPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    // Server-driven pagination state
-    const [currentPage, setCurrentPage] = useState<number>(1); // UI 1-based
+    const [currentPage, setCurrentPage] = useState<number>(1);
     const [patientsPerPage, setPatientsPerPage] = useState<number>(10);
     const [totalPages, setTotalPages] = useState<number>(1);
     const [totalItems, setTotalItems] = useState<number>(0);
 
-    // Search (server-side)
-    const [searchTerm, setSearchTerm] = useState<string>("");
-    const [debouncedSearch, setDebouncedSearch] = useState<string>("");
-
-    // debounce input to avoid a request per keystroke
-    useEffect(() => {
-        const t = setTimeout(() => setDebouncedSearch(searchTerm.trim()), 400);
-        return () => clearTimeout(t);
-    }, [searchTerm]);
-
-    // reset page to 1 when debounced search changes
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [debouncedSearch]);
+    const [search, setSearch] = useState("");
 
     useEffect(() => {
         const recent = JSON.parse(localStorage.getItem("recentPatients") || "[]");
@@ -92,10 +77,7 @@ export default function PatientListPage() {
     const getBadgeColor = (id: number) => badgeColors[id % badgeColors.length];
 
     const handlePatientClick = (patient: Patient) => {
-        const updatedRecent = [patient, ...recentPatients.filter((p) => p.id !== patient.id)].slice(
-            0,
-            5
-        );
+        const updatedRecent = [patient, ...recentPatients.filter((p) => p.id !== patient.id)].slice(0, 5);
         setRecentPatients(updatedRecent);
         localStorage.setItem("recentPatients", JSON.stringify(updatedRecent));
     };
@@ -112,7 +94,6 @@ export default function PatientListPage() {
             try {
                 const base = `${process.env.NEXT_PUBLIC_API_URL}/api/patients`;
                 const params = new URLSearchParams();
-                // backend expects 0-based page index
                 params.set("page", String(Math.max(0, page - 1)));
                 params.set("size", String(size));
                 params.set("sort", "id,asc");
@@ -123,18 +104,12 @@ export default function PatientListPage() {
                 const contentType = res.headers.get("content-type") || "";
 
                 if (!contentType.includes("application/json")) {
-                    // We expect JSON from the server (ApiResponse<Page<PatientDto>>)
-                    throw new Error("Expected JSON response from server but got: " + contentType);
+                    throw new Error("Expected JSON response but got: " + contentType);
                 }
 
                 const body = (await res.json()) as ApiResponse<PageResponse<Patient>>;
-
-                if (!body) throw new Error("Empty response from server");
-                if (!body.success) {
-                    throw new Error(body.message || "Failed to fetch patients");
-                }
+                if (!body.success) throw new Error(body.message || "Failed to fetch patients");
                 if (!body.data) {
-                    // No data payload
                     setPatients([]);
                     setTotalPages(1);
                     setTotalItems(0);
@@ -145,14 +120,9 @@ export default function PatientListPage() {
                 setPatients(pageData.content || []);
                 setTotalPages(Math.max(1, pageData.totalPages ?? 1));
                 setTotalItems(pageData.totalElements ?? (pageData.content?.length ?? 0));
-                // sync UI's 1-based page with server number (server returns 0-based)
-                setCurrentPage((prev) => {
-                    const serverPage1 = (pageData.number ?? (page - 1)) + 1;
-                    return prev === serverPage1 ? prev : serverPage1;
-                });
+                setCurrentPage((pageData.number ?? (page - 1)) + 1);
             } catch (err: unknown) {
                 if (err instanceof DOMException && err.name === "AbortError") return;
-                console.error("Fetch patients error:", err);
                 setError("An error occurred while fetching patients: " + (err as Error).message);
                 setPatients([]);
                 setTotalPages(1);
@@ -164,12 +134,35 @@ export default function PatientListPage() {
         []
     );
 
-    // Trigger fetch when page, size or debounced search changes
     useEffect(() => {
         const controller = new AbortController();
-        fetchPatients(currentPage, patientsPerPage, debouncedSearch, controller.signal);
+        fetchPatients(currentPage, patientsPerPage, search, controller.signal);
         return () => controller.abort();
-    }, [currentPage, patientsPerPage, debouncedSearch, fetchPatients]);
+    }, [currentPage, patientsPerPage, search, fetchPatients]);
+
+    const handlePrevious = () => setCurrentPage((p) => Math.max(1, p - 1));
+    const handleNext = () => setCurrentPage((p) => Math.min(totalPages, p + 1));
+
+    const handleEdit = (patient: Patient) => {
+        window.dispatchEvent(new CustomEvent("openPatientModal", { detail: patient }));
+    };
+
+    const handleDelete = async (patient: Patient) => {
+        if (!confirm(`Delete patient ${patient.firstName} ${patient.lastName}?`)) return;
+        try {
+            const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/patients/${patient.id}`, {
+                method: "DELETE",
+            });
+            const body = await res.json();
+            if (body.success) {
+                fetchPatients(currentPage, patientsPerPage, search);
+            } else {
+                alert(body.message || "Failed to delete patient");
+            }
+        } catch (err) {
+            alert("Error deleting patient: " + (err as Error).message);
+        }
+    };
 
     if (loading)
         return (
@@ -185,15 +178,11 @@ export default function PatientListPage() {
             </AdminLayout>
         );
 
-    const handlePrevious = () => setCurrentPage((p) => Math.max(1, p - 1));
-    const handleNext = () => setCurrentPage((p) => Math.min(totalPages, p + 1));
-
     return (
         <AdminLayout>
-            <div className="w-full min-h-[calc(100vh-56px)] bg-[#f8fafb] m-0 p-0">
-                {/* Top row: Recent patients (left) • Search • Create button (right) */}
-                <div className="flex flex-wrap items-center justify-between gap-2 px-2">
-                    {/* Left: Recent patients */}
+            <div className="flex flex-col min-h-[calc(100vh-56px)] bg-[#f8fafb]">
+                {/* Recent patients + search */}
+                <div className="flex flex-wrap justify-between gap-2 px-2 py-1 items-start">
                     <div className="min-w-0">
                         {recentPatients.length > 0 ? (
                             <>
@@ -204,7 +193,7 @@ export default function PatientListPage() {
                                             key={patient.id}
                                             href={`/patients/${patient.id}/`}
                                             onClick={() => handlePatientClick(patient)}
-                                            className="inline-flex items-center gap-2 px-2 py-0.5 rounded-md border border-gray-200 bg-white text-xs text-gray-700 hover:bg-gray-50"
+                                            className="inline-flex items-center gap-2 px-2 py-1 rounded-md border border-gray-200 bg-white text-xs text-gray-700 hover:bg-gray-50"
                                         >
                                             <div
                                                 className={`flex items-center justify-center h-5 w-5 rounded-full text-[11px] font-semibold text-white ${getBadgeColor(
@@ -214,11 +203,8 @@ export default function PatientListPage() {
                                                 {getInitials(patient.firstName, patient.lastName)}
                                             </div>
                                             <span className="text-xs font-medium leading-4">
-                                                {patient.firstName} {patient.lastName}
-                                            </span>
-                                            <span className="ml-1 px-1 py-0.5 bg-gray-100 text-gray-700 text-[10px] rounded">
-                                                MRN {patient.id}
-                                            </span>
+                        {patient.firstName} {patient.lastName}
+                      </span>
                                         </Link>
                                     ))}
                                 </div>
@@ -228,196 +214,206 @@ export default function PatientListPage() {
                         )}
                     </div>
 
-                    {/* Right: Search + Create */}
-                    <div className="flex items-center gap-2">
+                    {/* Search bar */}
+                    <form onSubmit={(e) => e.preventDefault()} className="relative w-52 sm:w-60 mt-6">
+            <span className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16z" />
+              </svg>
+            </span>
                         <input
                             type="text"
-                            placeholder="Search patients"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-40 px-2 py-1 border border-gray-200 rounded-md text-sm bg-white focus:outline-none focus:ring-0"
-                            aria-label="Search patients"
+                            placeholder="Search patients..."
+                            value={search}
+                            onChange={(e) => {
+                                setSearch(e.target.value);
+                                setCurrentPage(1);
+                            }}
+                            className="w-full pl-9 pr-3 py-1.5 text-xs border rounded-md shadow-sm focus:ring-2 focus:ring-blue-500"
                         />
-
-
-                        <Link
-                            href="/patients/new"
-                            className="shrink-0 inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium"
-                            aria-label="Create patient"
-                        >
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                className="h-4 w-4"
-                                aria-hidden="true"
-                            >
-                                <path d="M12 5v14M5 12h14" />
-                            </svg>
-                            <span>Create patient</span>
-                        </Link>
-                    </div>
+                    </form>
                 </div>
 
                 {/* Table */}
-                <div className="w-full">
-                    <div className="bg-white border-t border-gray-100 overflow-hidden">
-                        <div className="overflow-x-auto">
-                            <table className="w-full table-fixed text-sm">
-                                <colgroup>
-                                    <col className="w-[20%]" />
-                                    <col className="w-[8%]" />
-                                    <col className="w-[22%]" />
-                                    <col className="w-[15%]" />
-                                    <col className="w-[12%]" />
-                                    <col className="w-[10%]" />
-                                    <col className="w-[13%]" />
-                                </colgroup>
-
-                                <thead className="bg-gray-50">
-                                <tr>
-                                    <th className="px-2 py-2 text-left text-xs font-semibold text-gray-400 uppercase">
-                                        Name
-                                    </th>
-                                    <th className="px-2 py-2 text-left text-xs font-semibold text-gray-400 uppercase">
-                                        MRN
-                                    </th>
-                                    <th className="px-2 py-2 text-left text-xs font-semibold text-gray-400 uppercase">
-                                        Email
-                                    </th>
-                                    <th className="px-2 py-2 text-left text-xs font-semibold text-gray-400 uppercase">
-                                        Phone
-                                    </th>
-                                    <th className="px-2 py-2 text-left text-xs font-semibold text-gray-400 uppercase">
-                                        DOB
-                                    </th>
-                                    <th className="px-2 py-2 text-left text-xs font-semibold text-gray-400 uppercase">
-                                        Gender
-                                    </th>
-                                    <th className="px-2 py-2 text-left text-xs font-semibold text-gray-400 uppercase">
-                                        Status
-                                    </th>
-                                </tr>
-                                </thead>
-
-                                <tbody className="bg-white divide-y divide-gray-100">
-                                {patients.length > 0 ? (
-                                    patients.map((patient) => (
-                                        <tr
-                                            key={patient.id}
-                                            className="hover:bg-gray-50 cursor-pointer"
-                                            onClick={() => goToPatient(patient)}
-                                            onKeyDown={(e) => {
-                                                if (e.key === "Enter" || e.key === " ") {
-                                                    e.preventDefault();
-                                                    goToPatient(patient);
-                                                }
-                                            }}
-                                            tabIndex={0}
-                                            role="button"
-                                            aria-label={`Open patient ${patient.firstName} ${patient.lastName} dashboard`}
-                                        >
-                                            <td className="px-2 py-2 align-top">
-                                                <div className="flex items-start gap-2">
-                                                    <div
-                                                        className={`flex items-center justify-center h-8 w-8 rounded-full text-sm font-semibold text-white ${getBadgeColor(
-                                                            patient.id
-                                                        )}`}
-                                                    >
-                                                        {getInitials(patient.firstName, patient.lastName)}
-                                                    </div>
-                                                    <div className="leading-tight">
-                                                        <div className="text-sm font-semibold text-gray-700">
-                                                            {patient.firstName} {patient.lastName}
-                                                        </div>
-                                                    </div>
+                <div className="bg-white border-t border-gray-100">
+                    <div className="overflow-x-auto">
+                        <table className="w-full table-fixed text-[13px] min-h-[400px]">
+                            <colgroup>
+                                <col className="w-[15%]" />
+                                <col className="w-[6%]" />
+                                <col className="w-[20%]" />
+                                <col className="w-[14%]" />
+                                <col className="w-[12%]" />
+                                <col className="w-[8%]" />
+                                <col className="w-[8%]" />
+                                <col className="w-[10%]" />
+                            </colgroup>
+                            <thead className="bg-gray-50">
+                            <tr>
+                                <th className="px-2 py-1.5 text-[11px] font-semibold text-gray-500 uppercase text-left">Name</th>
+                                <th className="px-1 py-1.5 text-left text-[11px] font-semibold text-gray-500 uppercase">MRN</th>
+                                <th className="px-1 py-1.5 text-left text-[11px] font-semibold text-gray-500 uppercase">Email</th>
+                                <th className="px-1 py-1.5 text-left text-[11px] font-semibold text-gray-500 uppercase">Phone</th>
+                                <th className="px-1 py-1.5 text-left text-[11px] font-semibold text-gray-500 uppercase">DOB</th>
+                                <th className="px-1 py-1.5 text-left text-[11px] font-semibold text-gray-500 uppercase">Gender</th>
+                                <th className="px-1 py-1.5 text-left text-[11px] font-semibold text-gray-500 uppercase">Status</th>
+                                <th className="px-1 py-1.5 text-center text-[11px] font-semibold text-gray-500 uppercase">Actions</th>
+                            </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-100">
+                            {patients.length > 0 ? (
+                                patients.map((patient) => (
+                                    <tr key={patient.id} className="hover:bg-gray-50">
+                                        <td className="px-2 py-1.5">
+                                            <div
+                                                onClick={() => goToPatient(patient)}
+                                                className="flex items-center gap-2 cursor-pointer"
+                                            >
+                                                <div
+                                                    className={`flex items-center justify-center h-6 w-6 rounded-full text-[11px] font-semibold text-white ${getBadgeColor(
+                                                        patient.id
+                                                    )}`}
+                                                >
+                                                    {getInitials(patient.firstName, patient.lastName)}
                                                 </div>
-                                            </td>
-
-                                            <td className="px-2 py-2 align-top text-sm text-gray-500">
-                                                {patient.id}
-                                            </td>
-
-                                            <td className="px-2 py-2 align-top text-sm text-gray-500 break-words">
-                                                {patient.email || "N/A"}
-                                            </td>
-
-                                            <td className="px-2 py-2 align-top text-sm text-gray-500">
-                                                {patient.phoneNumber || "N/A"}
-                                            </td>
-
-                                            <td className="px-2 py-2 align-top text-sm text-gray-500">
-                                                {formatDate(patient.dateOfBirth)}
-                                            </td>
-
-                                            <td className="px-2 py-2 align-top text-sm text-gray-500">
-                                                {patient.gender || "N/A"}
-                                            </td>
-
-                                            <td className="px-2 py-2 align-top">
-                                                    <span className="inline-block bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-semibold">
-                                                        {patient.status || "Active"}
-                                                    </span>
-                                            </td>
-                                        </tr>
-                                    ))
-                                ) : (
-                                    <tr>
-                                        <td colSpan={7} className="px-2 py-5 text-center text-gray-500">
-                                            No patients found
+                                                <span className="font-medium text-gray-700">
+                            {patient.firstName} {patient.lastName}
+                          </span>
+                                            </div>
+                                        </td>
+                                        <td className="px-1 py-1.5 text-gray-600">{patient.id}</td>
+                                        <td className="px-1 py-1.5 text-gray-600 break-words">{patient.email || "N/A"}</td>
+                                        <td className="px-1 py-1.5 text-gray-600">{patient.phoneNumber || "N/A"}</td>
+                                        <td className="px-1 py-1.5 text-gray-600">{formatDate(patient.dateOfBirth)}</td>
+                                        <td className="px-1 py-1.5 text-gray-600">{patient.gender || "N/A"}</td>
+                                        <td className="px-1 py-1.5">
+                        <span className="inline-block bg-green-100 text-green-700 text-[10px] px-2 py-0.5 rounded-full font-semibold">
+                          {patient.status || "Active"}
+                        </span>
+                                        </td>
+                                        <td className="px-1 py-1.5 text-center flex items-center justify-center gap-2">
+                                            <button
+                                                onClick={() => handleEdit(patient)}
+                                                className="text-gray-500 hover:text-blue-600"
+                                                aria-label="Edit"
+                                            >
+                                                {/* Pencil (edit) icon */}
+                                                <svg
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                    className="w-4 h-4"
+                                                    fill="none"
+                                                    viewBox="0 0 24 24"
+                                                    stroke="currentColor"
+                                                    strokeWidth={2}
+                                                >
+                                                    <path
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        d="M16.862 4.487l2.651 2.65m-2.651-2.65L6.75 14.6l-1.5 4.5 4.5-1.5L19.512 7.137m-2.65-2.65a1.875 1.875 0 112.651 2.65L9.75 16.35m6.75-11.863L9.75 16.35"
+                                                    />
+                                                </svg>
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete(patient)}
+                                                className="text-gray-500 hover:text-red-600"
+                                                aria-label="Delete"
+                                            >
+                                                {/* Trash (delete) icon */}
+                                                <svg
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                    className="w-4 h-4"
+                                                    fill="none"
+                                                    viewBox="0 0 24 24"
+                                                    stroke="currentColor"
+                                                    strokeWidth={2}
+                                                >
+                                                    <path
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        d="M6 7h12m-9 4v6m6-6v6M4 7h16l-1 12a2 2 0 01-2 2H7a2 2 0 01-2-2L4 7zm3-3h10v2H7V4z"
+                                                    />
+                                                </svg>
+                                            </button>
+                                        </td>
+                                        <td className="px-1 py-1.5 text-center flex items-center justify-center gap-2">
+                                            <button
+                                                onClick={() => handleEdit(patient)}
+                                                className="text-gray-500 hover:text-blue-600"
+                                                aria-label="Edit"
+                                            >
+                                                {/* Pencil (edit) icon */}
+                                                <svg
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                    className="w-4 h-4"
+                                                    fill="none"
+                                                    viewBox="0 0 24 24"
+                                                    stroke="currentColor"
+                                                    strokeWidth={2}
+                                                >
+                                                    <path
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        d="M16.862 4.487l2.651 2.65m-2.651-2.65L6.75 14.6l-1.5 4.5 4.5-1.5L19.512 7.137m-2.65-2.65a1.875 1.875 0 112.651 2.65L9.75 16.35m6.75-11.863L9.75 16.35"
+                                                    />
+                                                </svg>
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete(patient)}
+                                                className="text-gray-500 hover:text-red-600"
+                                                aria-label="Delete"
+                                            >
+                                                {/* Trash (delete) icon */}
+                                                <svg
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                    className="w-4 h-4"
+                                                    fill="none"
+                                                    viewBox="0 0 24 24"
+                                                    stroke="currentColor"
+                                                    strokeWidth={2}
+                                                >
+                                                    <path
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        d="M6 7h12m-9 4v6m6-6v6M4 7h16l-1 12a2 2 0 01-2 2H7a2 2 0 01-2-2L4 7zm3-3h10v2H7V4z"
+                                                    />
+                                                </svg>
+                                            </button>
                                         </td>
                                     </tr>
-                                )}
-                                </tbody>
-                            </table>
+                                ))
+                            ) : (
+                                <tr>
+                                    <td colSpan={8} className="px-2 py-3 text-center text-gray-500">
+                                        No patients found
+                                    </td>
+                                </tr>
+                            )}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Pagination */}
+                    <div className="flex items-center justify-between px-2 py-1.5 border-t bg-white text-[11px]">
+                        <div className="flex items-center gap-2">
+                            <button disabled={currentPage === 1} onClick={handlePrevious} className="px-2 py-0.5 border rounded disabled:opacity-50">Prev</button>
+                            <div>Page {currentPage} of {totalPages}</div>
+                            <button disabled={currentPage === totalPages} onClick={handleNext} className="px-2 py-0.5 border rounded disabled:opacity-50">Next</button>
                         </div>
-
-                        {/* Pagination */}
-                        <div className="flex items-center justify-between px-2 py-2 border-t bg-white">
-                            <div className="flex items-center gap-2">
-                                <button
-                                    disabled={currentPage === 1}
-                                    onClick={handlePrevious}
-                                    className="px-2 py-1 text-sm border rounded disabled:opacity-50"
-                                >
-                                    Previous
-                                </button>
-
-                                <div className="text-sm text-gray-600">
-                                    Page {currentPage} of {totalPages}
-                                </div>
-
-                                <button
-                                    disabled={currentPage === totalPages}
-                                    onClick={handleNext}
-                                    className="px-2 py-1 text-sm border rounded disabled:opacity-50"
-                                >
-                                    Next
-                                </button>
-                            </div>
-
-                            <div className="flex items-center gap-4">
-                                <div className="text-sm text-gray-600">
-                                    Showing {patients.length} of {totalItems} patients
-                                </div>
-
-                                <select
-                                    value={patientsPerPage}
-                                    onChange={(e) => {
-                                        setPatientsPerPage(Number(e.target.value));
-                                        setCurrentPage(1); // reset page when page size changes
-                                    }}
-                                    className="text-sm border rounded px-2 py-1 bg-white"
-                                    aria-label="Patients per page"
-                                >
-                                    <option value={5}>5</option>
-                                    <option value={10}>10</option>
-                                    <option value={25}>25</option>
-                                    <option value={50}>50</option>
-                                </select>
-                            </div>
+                        <div className="flex items-center gap-3">
+                            <div>Showing {patients.length} of {totalItems}</div>
+                            <select
+                                value={patientsPerPage}
+                                onChange={(e) => {
+                                    setPatientsPerPage(Number(e.target.value));
+                                    setCurrentPage(1);
+                                }}
+                                className="border rounded px-2 py-0.5 bg-white text-[11px]"
+                            >
+                                <option value={5}>5</option>
+                                <option value={10}>10</option>
+                                <option value={25}>25</option>
+                                <option value={50}>50</option>
+                            </select>
                         </div>
                     </div>
                 </div>
