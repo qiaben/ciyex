@@ -738,3 +738,13 @@ span.flatpickr-weekday,
   opacity: 0.8;
   cursor: grabbing; /* Changes the cursor to indicate dragging */
 }
+/* Only show time axis on the first provider column */
+.provider-col:not(:first-child) .fc-timegrid-axis,
+.provider-col:not(:first-child) .fc-timegrid-slot-label {
+    display: none !important;
+}
+/* Remove scrollbar gutter inside provider columns */
+.provider-col .fc-scroller {
+    overflow-y: hidden !important;
+    scrollbar-gutter: stable both-edges; /* prevent extra space */
+}

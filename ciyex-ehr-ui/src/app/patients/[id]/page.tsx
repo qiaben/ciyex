@@ -146,6 +146,16 @@ interface EncounterFormProps {
     onSave: () => void;
 }
 
+interface AppointmentDTO {
+    id: string;
+    appointmentStartDate: string;
+    appointmentStartTime: string;
+    providerId: string | number;
+    visitType: string;
+    status: "Scheduled" | "Completed" | "Cancelled";
+    reason?: string;
+}
+
 interface Appointment {
     id: string;
     date: string;
@@ -154,6 +164,7 @@ interface Appointment {
     status: "Scheduled" | "Completed" | "Cancelled";
     notes?: string;
 }
+
 
 interface Medication {
     id: string;
@@ -474,9 +485,22 @@ export default function PatientDashboardPage() {
 
                 const fetchAppointments = async () => {
                     try {
-                        const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/patients/${id}/appointments`);
+                        const res = await fetchWithAuth(
+                            `${process.env.NEXT_PUBLIC_API_URL}/api/appointments/patient/${id}?page=0&size=10`
+                        );
                         const data = await res.json();
-                        if (res.ok && data.success) setAppointments(data.data);
+                        if (res.ok && data.success) {
+                            // Normalize AppointmentDTO into your frontend Appointment interface
+                            const mapped: Appointment[] = data.data.content.map((appt: AppointmentDTO) => ({
+                                id: appt.id,
+                                date: `${appt.appointmentStartDate}T${appt.appointmentStartTime}`,
+                                provider: String(appt.providerId),
+                                type: appt.visitType,
+                                status: appt.status,
+                                notes: appt.reason,
+                            }));
+                            setAppointments(mapped);
+                        }
                     } catch (e) {
                         console.error("Failed to fetch appointments:", e);
                     }
@@ -660,8 +684,18 @@ export default function PatientDashboardPage() {
     };
 
     const formatDateTimeLocal = (date: string) => {
-        return date ? new Date(date).toLocaleString() : "—";
+        return date
+            ? new Date(date).toLocaleString([], {
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+                hour: "numeric",
+                minute: "2-digit",
+                hour12: true,
+            })
+            : "—";
     };
+
 
     const filteredAppointments = appointments.filter((appt) =>
         appt.provider.toLowerCase().includes(searchTerm.toLowerCase()) ||
