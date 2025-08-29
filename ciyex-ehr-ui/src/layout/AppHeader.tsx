@@ -28,12 +28,14 @@ const AppHeader: React.FC<AppHeaderProps> = ({ pageTitle }) => {
     const inputRef = useRef<HTMLInputElement>(null);
     const router = useRouter();
 
+    // ✅ correct fields for backend
     const [formData, setFormData] = useState({
+        medicalRecordNumber: "",
         firstName: "",
         middleName: "",
         lastName: "",
         gender: "",
-        dob: "",
+        dateOfBirth: "",
         phoneNumber: "",
         email: "",
     });
@@ -42,11 +44,12 @@ const AppHeader: React.FC<AppHeaderProps> = ({ pageTitle }) => {
 
     const resetForm = () => {
         setFormData({
+            medicalRecordNumber: "",
             firstName: "",
             middleName: "",
             lastName: "",
             gender: "",
-            dob: "",
+            dateOfBirth: "",
             phoneNumber: "",
             email: "",
         });
@@ -64,13 +67,16 @@ const AppHeader: React.FC<AppHeaderProps> = ({ pageTitle }) => {
     const handleSave = async () => {
         try {
             let response: Response;
+
+            const payload = { ...formData };
+
             if (editingPatientId) {
                 response = await fetchWithAuth(
                     `${process.env.NEXT_PUBLIC_API_URL}/api/patients/${editingPatientId}`,
                     {
                         method: "PUT",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ ...formData, id: editingPatientId }),
+                        body: JSON.stringify({ ...payload, id: editingPatientId }),
                     }
                 );
             } else {
@@ -79,7 +85,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({ pageTitle }) => {
                     {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(formData),
+                        body: JSON.stringify(payload),
                     }
                 );
             }
@@ -132,11 +138,12 @@ const AppHeader: React.FC<AppHeaderProps> = ({ pageTitle }) => {
             const detail = (e as CustomEvent).detail;
             if (detail) {
                 setFormData({
+                    medicalRecordNumber: detail.medicalRecordNumber || "",
                     firstName: detail.firstName || "",
                     middleName: detail.middleName || "",
                     lastName: detail.lastName || "",
                     gender: detail.gender || "",
-                    dob: detail.dateOfBirth || "",
+                    dateOfBirth: detail.dateOfBirth || "",
                     phoneNumber: detail.phoneNumber || "",
                     email: detail.email || "",
                 });
@@ -233,7 +240,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({ pageTitle }) => {
                 </div>
             </div>
 
-            {/* Patient Modal using custom Dialog */}
+            {/* Patient Modal */}
             <Dialog open={isModalOpen} onOpenChange={setModalOpen}>
                 <DialogContent onClose={() => setModalOpen(false)}>
                     <DialogHeader>
@@ -246,17 +253,66 @@ const AppHeader: React.FC<AppHeaderProps> = ({ pageTitle }) => {
                     </DialogHeader>
 
                     <form className="space-y-3">
-                        <input name="firstName" placeholder="First Name" value={formData.firstName} onChange={handleInputChange} className="w-full p-2 border rounded" />
-                        <input name="middleName" placeholder="Middle Name" value={formData.middleName} onChange={handleInputChange} className="w-full p-2 border rounded" />
-                        <input name="lastName" placeholder="Last Name" value={formData.lastName} onChange={handleInputChange} className="w-full p-2 border rounded" />
-                        <input name="phoneNumber" placeholder="Phone Number" value={formData.phoneNumber} onChange={handleInputChange} className="w-full p-2 border rounded" />
-                        <select name="gender" value={formData.gender} onChange={handleInputChange} className="w-full p-2 border rounded">
+                        <input
+                            name="medicalRecordNumber"
+                            placeholder="Medical Record Number"
+                            value={formData.medicalRecordNumber}
+                            onChange={handleInputChange}
+                            className="w-full p-2 border rounded"
+                        />
+                        <input
+                            name="firstName"
+                            placeholder="First Name"
+                            value={formData.firstName}
+                            onChange={handleInputChange}
+                            className="w-full p-2 border rounded"
+                        />
+                        <input
+                            name="middleName"
+                            placeholder="Middle Name"
+                            value={formData.middleName}
+                            onChange={handleInputChange}
+                            className="w-full p-2 border rounded"
+                        />
+                        <input
+                            name="lastName"
+                            placeholder="Last Name"
+                            value={formData.lastName}
+                            onChange={handleInputChange}
+                            className="w-full p-2 border rounded"
+                        />
+                        <input
+                            name="phoneNumber"
+                            placeholder="Phone Number"
+                            value={formData.phoneNumber}
+                            onChange={handleInputChange}
+                            className="w-full p-2 border rounded"
+                        />
+                        <select
+                            name="gender"
+                            value={formData.gender}
+                            onChange={handleInputChange}
+                            className="w-full p-2 border rounded"
+                        >
                             <option value="">Select Gender</option>
                             <option value="male">Male</option>
                             <option value="female">Female</option>
                         </select>
-                        <input type="date" name="dob" value={formData.dob} onChange={handleInputChange} className="w-full p-2 border rounded" />
-                        <input type="email" name="email" placeholder="Email" value={formData.email} onChange={handleInputChange} className="w-full p-2 border rounded" />
+                        <input
+                            type="date"
+                            name="dateOfBirth"
+                            value={formData.dateOfBirth}
+                            onChange={handleInputChange}
+                            className="w-full p-2 border rounded"
+                        />
+                        <input
+                            type="email"
+                            name="email"
+                            placeholder="Email"
+                            value={formData.email}
+                            onChange={handleInputChange}
+                            className="w-full p-2 border rounded"
+                        />
                     </form>
 
                     {errorMessage && <p className="text-red-500 text-sm mt-2">{errorMessage}</p>}
@@ -280,10 +336,19 @@ const AppHeader: React.FC<AppHeaderProps> = ({ pageTitle }) => {
                                 Delete
                             </button>
                         )}
-                        <button onClick={() => { setModalOpen(false); resetForm(); }} className="px-3 py-1.5 bg-gray-200 rounded hover:bg-gray-300">
+                        <button
+                            onClick={() => {
+                                setModalOpen(false);
+                                resetForm();
+                            }}
+                            className="px-3 py-1.5 bg-gray-200 rounded hover:bg-gray-300"
+                        >
                             Cancel
                         </button>
-                        <button onClick={handleSave} className="px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700">
+                        <button
+                            onClick={handleSave}
+                            className="px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700"
+                        >
                             {editingPatientId ? "Update" : "Save"}
                         </button>
                     </DialogFooter>
