@@ -104,6 +104,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({ pageTitle }) => {
             setErrorMessage("Something went wrong.");
         }
     };
+
     const handleDelete = async () => {
         if (!editingPatientId) return;
         if (!confirm("Are you sure you want to delete this patient?")) return;
@@ -253,7 +254,97 @@ const AppHeader: React.FC<AppHeaderProps> = ({ pageTitle }) => {
                     </DialogHeader>
 
                     <form className="space-y-6">
-                        {/* Form fields... */}
+                        <div className="grid grid-cols-3 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium mb-1">First Name *</label>
+                                <input
+                                    name="firstName"
+                                    required
+                                    placeholder="First name"
+                                    value={formData.firstName}
+                                    onChange={handleInputChange}
+                                    className="w-full p-2 border rounded"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Middle Name</label>
+                                <input
+                                    name="middleName"
+                                    placeholder="Middle (optional)"
+                                    value={formData.middleName}
+                                    onChange={handleInputChange}
+                                    className="w-full p-2 border rounded"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Last Name *</label>
+                                <input
+                                    name="lastName"
+                                    required
+                                    placeholder="Last name"
+                                    value={formData.lastName}
+                                    onChange={handleInputChange}
+                                    className="w-full p-2 border rounded"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Phone Number *</label>
+                                <input
+                                    name="phoneNumber"
+                                    required
+                                    placeholder="(555) 123-4567"
+                                    value={formData.phoneNumber}
+                                    onChange={handleInputChange}
+                                    className="w-full p-2 border rounded"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">
+                                    Include country code if outside your region.
+                                </p>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Gender *</label>
+                                <select
+                                    name="gender"
+                                    required
+                                    value={formData.gender}
+                                    onChange={handleInputChange}
+                                    className="w-full p-2 border rounded"
+                                >
+                                    <option value="">Select gender</option>
+                                    <option value="male">Male</option>
+                                    <option value="female">Female</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Date of Birth *</label>
+                                <input
+                                    type="date"
+                                    name="dateOfBirth"
+                                    required
+                                    value={formData.dateOfBirth}
+                                    onChange={handleInputChange}
+                                    className="w-full p-2 border rounded"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Email *</label>
+                                <input
+                                    type="email"
+                                    name="email"
+                                    required
+                                    placeholder="name@example.com"
+                                    value={formData.email}
+                                    onChange={handleInputChange}
+                                    className="w-full p-2 border rounded"
+                                />
+                            </div>
+                        </div>
                     </form>
 
                     {errorMessage && (
