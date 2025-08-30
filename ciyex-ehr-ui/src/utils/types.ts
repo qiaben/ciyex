@@ -242,9 +242,148 @@ export type ProcedureDto = {
     };
 };
 
-// already present in your project:
+export type CodeDto = {
+id?: number;
+patientId: number;
+encounterId: number;
+
+codeType: "CPT" | "HCPCS" | "ICD10" | "ICD10PCS" | "Modifier" | "Other";
+code: string;                 // e.g., 99214, J1885, M54.50
+description?: string;
+units?: number;               // e.g., 1, 2
+amount?: number;              // charge amount (optional)
+diagnosisPointers?: string;   // e.g., "A,B" mapping to Assessment list (free text for now)
+modifiers?: string;           // comma‑separated: "25,59" (for CPT/HCPCS)
+status?: "Draft" | "Ready" | "Billed" | "Denied" | "Paid";
+notes?: string;
+
+audit?: {
+    createdDate?: string;
+    lastModifiedDate?: string;
+};
+};
+
+export type SignoffStatus =
+    | "Draft"
+    | "ReadyForSignature"
+    | "Signed"
+    | "CosignRequested"
+    | "Cosigned"
+    | "Locked";
+
+export type SignoffDto = {
+    id?: number;
+    patientId: number;
+    encounterId: number;
+
+    status: SignoffStatus;            // workflow state
+    attestationText?: string;         // free text visible on the signed note
+    acknowledgeBillingComplete?: boolean;
+    lockEncounter?: boolean;          // lock charts upon sign
+
+    // signature fields
+    signedBy?: string;                // provider display name / id
+    signedAt?: string;                // ISO/Date string
+    cosigner?: string;                // optional cosigner
+    cosignedAt?: string;
+
+    // optional extra message
+    notes?: string;
+
+    audit?: {
+        createdDate?: string;
+        lastModifiedDate?: string;
+    };
+};
+
+export type ProviderSignatureStatus = "Draft" | "Signed" | "Locked";
+
+export type ProviderSignatureDto = {
+    id?: number;
+    patientId: number;
+    encounterId: number;
+
+    signatureText?: string;     // could be "Electronically signed by Dr. Smith"
+    signatureImage?: string;    // optional: base64 encoded drawn signature
+    signedBy?: string;          // provider name or ID
+    signedAt?: string;          // ISO datetime
+    status: ProviderSignatureStatus;
+
+    audit?: {
+        createdDate?: string;
+        lastModifiedDate?: string;
+    };
+};
+
+export type DateTimeFinalizedDto = {
+    id?: number;
+    patientId: number;
+    encounterId: number;
+
+    finalizedAt?: string;     // ISO string, e.g., "2025-08-23T10:45:00Z" or local ISO
+    finalizedBy?: string;     // provider display name/ID
+    timezone?: string;        // e.g., "Asia/Kolkata"
+    locked?: boolean;         // whether encounter is locked after finalization
+    source?: string;          // e.g., "Signoff", "ProviderSignature", "Manual"
+    notes?: string;           // optional free text
+
+    audit?: {
+        createdDate?: string;
+        lastModifiedDate?: string;
+    };
+};
+
+export type AssignedProviderDto = {
+    id?: number;
+    patientId: number;
+    encounterId: number;
+
+    providerId: number;        // required
+    providerName?: string;     // optional display name from backend
+    role: "Primary" | "Attending" | "Consultant" | "Nurse" | "Scribe" | "Other";
+    startDate?: string;        // yyyy-MM-dd
+    endDate?: string;          // yyyy-MM-dd
+    notes?: string;
+
+    audit?: {
+        createdDate?: string;
+        lastModifiedDate?: string;
+    };
+};
+
+export type FeeScheduleEntryDto = {
+    id?: number;
+    code?: string;              // CPT/HCPCS/ICD-10-PCS/etc.
+    description?: string;
+    modifiers?: string;         // "25,59" etc.
+    units?: number;             // default 1
+    unitPrice?: number;         // per unit charge
+    lineTotal?: number;         // server can calc; UI also calculates
+    notes?: string;
+};
+
+export type FeeScheduleDto = {
+    id?: number;
+    patientId: number;
+    encounterId: number;
+
+    effectiveDate?: string;     // yyyy-MM-dd
+    payer?: string;             // payer/plan name (optional)
+    remarks?: string;           // free text
+
+    entries: FeeScheduleEntryDto[];
+
+    // rollups (optional; UI calculates locally too)
+    subtotal?: number;
+    discount?: number;
+    tax?: number;
+    total?: number;
+
+    audit?: {
+        createdDate?: string;
+        lastModifiedDate?: string;
+    };
+};
+
+// already in your project:
 // export type ApiResponse<T> = { success: boolean; message?: string; data?: T };
-
-
-
-

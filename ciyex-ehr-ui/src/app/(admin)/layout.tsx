@@ -7,25 +7,25 @@ import Backdrop from "@/layout/Backdrop";
 import React from "react";
 import { usePathname } from "next/navigation";
 
-export default function AdminLayout({
-                                        children,
-                                    }: {
-    children: React.ReactNode;
-}) {
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
     const { isExpanded, isHovered, isMobileOpen } = useSidebar();
-    const pathname = usePathname();
+    const pathname = usePathname() || ""; // ✅ fallback if undefined
 
-    // ✅ compute title directly (no useEffect, no flicker)
+    // Route → Title mapping
     const mapping: Record<string, string> = {
         "/dashboard": "Dashboard",
         "/patients": "Patients",
         "/calendar": "Calendar",
         "/profile": "User Profile",
         "/settings/providers": "Providers",
-        "/settings":"Providers",
-        // "/settings/providers/edit": "Provider",
+        "/settings/forms/lists": "Forms",
+        "/settings/forms/admin": "Form Admin",
+        "/settings/insurance": "Insurance Companies", // ✅ added
+        "/settings": "Settings",
     };
-    const pageTitle = Object.entries(mapping).find(([key]) => pathname.startsWith(key))?.[1] || "";
+
+    const pageTitle =
+        Object.entries(mapping).find(([key]) => pathname.startsWith(key))?.[1] || "";
 
     const mainContentMargin = isMobileOpen
         ? "ml-0"
@@ -41,11 +41,11 @@ export default function AdminLayout({
             <div
                 className={`flex-1 transition-all duration-300 ease-in-out ${mainContentMargin}`}
             >
-                {/* ✅ Pass pageTitle down */}
                 <AppHeader pageTitle={pageTitle} />
 
                 <div className="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">
-                    {children}
+                    {/* ✅ Force remount of child on route change */}
+                    <div key={pathname}>{children}</div>
                 </div>
             </div>
         </div>
