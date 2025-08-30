@@ -1,10 +1,10 @@
 "use client";
 
+import React from "react";
 import { useSidebar } from "@/context/SidebarContext";
 import AppHeader from "@/layout/AppHeader";
 import AppSidebar from "@/layout/AppSidebar";
 import Backdrop from "@/layout/Backdrop";
-import React from "react";
 import { usePathname } from "next/navigation";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -22,10 +22,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         "/settings/forms/admin": "Form Admin",
         "/settings/insurance": "Insurance Companies", // ✅ added
         "/settings": "Settings",
+        "/appointments": "Appointments",
     };
 
     const pageTitle =
-        Object.entries(mapping).find(([key]) => pathname.startsWith(key))?.[1] || "";
+        Object.entries(mapping)
+            .filter(([key]) => pathname.startsWith(key))
+            .sort((a, b) => b[0].length - a[0].length)[0]?.[1] || "";
+
 
     const mainContentMargin = isMobileOpen
         ? "ml-0"
@@ -34,18 +38,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             : "lg:ml-[90px]";
 
     return (
-        <div className="min-h-screen xl:flex">
+        // Base layer now theme-aware + unified typography
+        <div className="min-h-screen xl:flex font-sans text-[15px] leading-6 antialiased transition-colors duration-300 bg-slate-50 text-slate-700 dark:bg-slate-950 dark:text-slate-200">
             <AppSidebar />
             <Backdrop />
 
-            <div
-                className={`flex-1 transition-all duration-300 ease-in-out ${mainContentMargin}`}
-            >
+            <div className={`flex-1 transition-all duration-300 ease-in-out ${mainContentMargin}`}>
                 <AppHeader pageTitle={pageTitle} />
 
+                {/* Content area picks up theme automatically; children can use their own cards*/}
                 <div className="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">
                     {/* ✅ Force remount of child on route change */}
-                    <div key={pathname}>{children}</div>
+                    <div key={pathname} className="transition-colors duration-300">{children}</div>
                 </div>
             </div>
         </div>

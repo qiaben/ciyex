@@ -234,63 +234,79 @@ const Page = () => {
         try {
             const recurrences: PreviewOccurrence[] = [];
 
-            // ✅ Generate recurrence preview only if recurrence fields are set
-            if (showRecurrence && startDate && startTime && endTime) {
-                const start = parseTimeToDate(new Date(startDate), startTime);
-                const endLimit = endDate ? new Date(endDate) : null;
-                let cursor = new Date(start);
+            // ✅ Skip preview if recurrence or endTime is invalid
+            if (
+                !showRecurrence ||
+                !startDate ||
+                !startTime ||
+                !endTime || // check for empty or invalid endTime
+                !endTime.includes(":") // ensure endTime has a valid time format
+            ) {
+                return oneTimeSchedules.map((s) => {
+                    const base = new Date(s.date);
+                    return {
+                        start: parseTimeToDate(base, s.startTime),
+                        end: parseTimeToDate(base, s.endTime),
+                        isOneTime: true,
+                    };
+                });
+            }
 
-                if (freq === "DAILY") {
-                    while (recurrences.length < maxOccurrences) {
-                        if (!endLimit || cursor <= addDays(endLimit, 1)) {
-                            const s = new Date(cursor);
-                            const e = parseTimeToDate(s, endTime);
-                            if (!isNaN(e.getTime()) && e > s) {
+            // Generate recurrence preview only if recurrence fields are set and valid
+            const start = parseTimeToDate(new Date(startDate), startTime);
+            const endLimit = endDate ? new Date(endDate) : null;
+            let cursor = new Date(start);
+
+            if (freq === "DAILY") {
+                while (recurrences.length < maxOccurrences) {
+                    if (!endLimit || cursor <= addDays(endLimit, 1)) {
+                        const s = new Date(cursor);
+                        const e = parseTimeToDate(s, endTime);
+                        if (!isNaN(e.getTime()) && e > s) {
+                            recurrences.push({ start: s, end: e });
+                        }
+                        cursor = addDays(cursor, interval);
+                    } else break;
+                }
+            } else if (freq === "WEEKLY") {
+                let guard = 0;
+                while (recurrences.length < maxOccurrences && guard < 10000) {
+                    guard++;
+                    for (let dow = 0; dow < 7 && recurrences.length < maxOccurrences; dow++) {
+                        const d = addDays(cursor, dow);
+                        if (weeklyDays[d.getDay()]) {
+                            const s = parseTimeToDate(d, startTime);
+                            const e = parseTimeToDate(d, endTime);
+                            if ((!endLimit || s <= addDays(endLimit, 1)) && !isNaN(e.getTime()) && e > s) {
                                 recurrences.push({ start: s, end: e });
-                            }
-                            cursor = addDays(cursor, interval);
-                        } else break;
-                    }
-                } else if (freq === "WEEKLY") {
-                    let guard = 0;
-                    while (recurrences.length < maxOccurrences && guard < 10000) {
-                        guard++;
-                        for (let dow = 0; dow < 7 && recurrences.length < maxOccurrences; dow++) {
-                            const d = addDays(cursor, dow);
-                            if (weeklyDays[d.getDay()]) {
-                                const s = parseTimeToDate(d, startTime);
-                                const e = parseTimeToDate(d, endTime);
-                                if ((!endLimit || s <= addDays(endLimit, 1)) && !isNaN(e.getTime()) && e > s) {
-                                    recurrences.push({ start: s, end: e });
-                                }
                             }
                         }
-                        cursor = addDays(cursor, 7 * interval);
-                        if (endLimit && cursor > addDays(endLimit, 1)) break;
                     }
-                } else if (freq === "MONTHLY") {
-                    const targetDay = new Date(startDate).getDate();
-                    let monthCursor = new Date(start);
-                    let guard = 0;
-                    while (recurrences.length < maxOccurrences && guard < 1000) {
-                        guard++;
-                        if (!endLimit || monthCursor <= addDays(endLimit, 1)) {
-                            const s = parseTimeToDate(monthCursor, startTime);
-                            const e = parseTimeToDate(monthCursor, endTime);
-                            if (!isNaN(e.getTime()) && e > s) {
-                                recurrences.push({ start: s, end: e });
-                            }
-                            monthCursor = addMonths(monthCursor, interval);
-                            const fix = new Date(monthCursor);
-                            fix.setDate(
-                                Math.min(
-                                    targetDay,
-                                    new Date(fix.getFullYear(), fix.getMonth() + 1, 0).getDate()
-                                )
-                            );
-                            monthCursor = fix;
-                        } else break;
-                    }
+                    cursor = addDays(cursor, 7 * interval);
+                    if (endLimit && cursor > addDays(endLimit, 1)) break;
+                }
+            } else if (freq === "MONTHLY") {
+                const targetDay = new Date(startDate).getDate();
+                let monthCursor = new Date(start);
+                let guard = 0;
+                while (recurrences.length < maxOccurrences && guard < 1000) {
+                    guard++;
+                    if (!endLimit || monthCursor <= addDays(endLimit, 1)) {
+                        const s = parseTimeToDate(monthCursor, startTime);
+                        const e = parseTimeToDate(monthCursor, endTime);
+                        if (!isNaN(e.getTime()) && e > s) {
+                            recurrences.push({ start: s, end: e });
+                        }
+                        monthCursor = addMonths(monthCursor, interval);
+                        const fix = new Date(monthCursor);
+                        fix.setDate(
+                            Math.min(
+                                targetDay,
+                                new Date(fix.getFullYear(), fix.getMonth() + 1, 0).getDate()
+                            )
+                        );
+                        monthCursor = fix;
+                    } else break;
                 }
             }
 
@@ -329,6 +345,7 @@ const Page = () => {
 
 
 
+
     const fullName = provider
         ? `${provider.identification?.firstName ?? ""} ${provider.identification?.lastName ?? ""}`.trim()
         : "";
@@ -339,8 +356,10 @@ const Page = () => {
                 {/* Header */}
                 <div className="mb-6 flex items-center justify-between">
                     <div>
-                        <h1 className="text-3xl font-semibold text-gray-900">Provider Schedule</h1>
-                        <p className="text-sm text-gray-500 mt-1">
+                        <h2 className="text-3xl font-normal text-slate-900 dark:text-slate-100">
+                            Provider Schedule
+                        </h2>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">
                             {loading
                                 ? "Loading provider…"
                                 : fullName
@@ -371,11 +390,13 @@ const Page = () => {
 
 
                         {/* One-Time Schedules Card */}
-                        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                        <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900 p-6 shadow-sm">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <h2 className="text-lg font-medium text-gray-900">One-Time Schedules</h2>
-                                    <p className="text-sm text-gray-500">
+                                    <h2 className="text-lg font-medium text-slate-900 dark:text-slate-100">
+                                        One-Time Schedules
+                                    </h2>
+                                    <p className="text-sm text-slate-500 dark:text-slate-400">
                                         Add specific dates/times in addition to recurring schedule
                                     </p>
                                 </div>
@@ -398,9 +419,14 @@ const Page = () => {
                             {oneTimeSchedules.map((s, idx) => (
                                 <div
                                     key={idx}
-                                    className="grid grid-cols-5 gap-3 mt-4 p-4 border rounded-lg bg-gray-50 items-center"
+                                    className="grid grid-cols-5 gap-3 mt-4 p-4
+             border border-gray-200 dark:border-gray-700
+             rounded-lg
+             bg-gray-50 dark:bg-slate-800
+             items-center"
                                 >
-                                    {/* Date */}
+
+                                {/* Date */}
                                     <input
                                         type="text"
                                         value={s.dateInput}
@@ -413,8 +439,7 @@ const Page = () => {
                                             copy[idx].date = iso;
                                             setOneTimeSchedules(copy);
                                         }}
-                                        className="h-10 w-full rounded border px-2 text-sm"
-                                    />
+                                        className="h-10 w-full rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500 px-2 text-sm"                                    />
 
                                     {/* Start Time */}
                                     <input
@@ -425,8 +450,7 @@ const Page = () => {
                                             copy[idx].startTime = e.target.value;
                                             setOneTimeSchedules(copy);
                                         }}
-                                        className="h-10 w-full rounded border px-2 text-sm"
-                                    />
+                                        className="h-10 w-full rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500 px-2 text-sm"                                    />
 
                                     {/* End Time */}
                                     <input
@@ -437,8 +461,7 @@ const Page = () => {
                                             copy[idx].endTime = e.target.value;
                                             setOneTimeSchedules(copy);
                                         }}
-                                        className="h-10 w-full rounded border px-2 text-sm"
-                                    />
+                                        className="h-10 w-full rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500 px-2 text-sm"                                    />
 
                                     {/* Location */}
                                     <select
@@ -448,8 +471,7 @@ const Page = () => {
                                             copy[idx].locationId = e.target.value ? Number(e.target.value) : undefined;
                                             setOneTimeSchedules(copy);
                                         }}
-                                        className="h-10 w-35 rounded border px-2 text-sm"  // ✅ slightly bigger
-                                    >
+                                        className="h-10 w-full rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500 px-2 text-sm"                                    >
                                         <option value="">Select Location</option>
                                         {locations.map((loc) => (
                                             <option key={loc.id} value={loc.id}>
@@ -480,11 +502,11 @@ const Page = () => {
 
 
                         {/* Recurrence (mirrors One-Time Schedules) */}
-                        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                        <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900 p-6 shadow-sm">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <h3 className="text-base font-medium text-gray-900">Recurrence</h3>
-                                    <p className="mt-1 text-sm text-gray-500">
+                                    <h3 className="text-base font-medium text-slate-900 dark:text-slate-100">Recurrence</h3>
+                                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                                         Define repeating availability in addition to one-time schedules.
                                     </p>
                                 </div>
@@ -575,7 +597,7 @@ const Page = () => {
                                     {/* Dates */}
                                     <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700">Start Date</label>
+                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Start Date</label>
                                             <input
                                                 type="text"
                                                 value={startDateInput}
@@ -635,8 +657,7 @@ const Page = () => {
                                                 <select
                                                     value={locationId}
                                                     onChange={(e) => setLocationId(e.target.value ? Number(e.target.value) : "")}
-                                                    className="block w-full rounded-md border border-gray-300 bg-white py-2 px-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                                                >
+                                                    className="block w-full h-10 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500 px-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"                                                >
                                                     <option value="">Select an option</option>
                                                     {locations.map((loc) => (
                                                         <option key={loc.id} value={loc.id}>
@@ -650,7 +671,7 @@ const Page = () => {
 
                                     {/* Occurrence cap */}
                                     <div className="mt-4">
-                                        <label className="block text-sm font-medium text-gray-700">
+                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
                                             Max Occurrences (preview & save)
                                         </label>
                                         <input
@@ -770,20 +791,19 @@ const Page = () => {
                     </div>
 
                     {/* Right: Preview */}
-                    <div className="lg:col-span-2 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-                        <h2 className="text-lg font-medium text-gray-900">Preview</h2>
-                        <p className="text-sm text-gray-500 mt-1">
+                    <div className="lg:col-span-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900 p-6 shadow-sm">
+                        <h2 className="text-lg font-medium text-slate-900 dark:text-slate-100">Preview</h2>                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
                             Next {Math.min(preview.length, 10)} occurrence(s)
                         </p>
 
                         <div className="mt-4 space-y-2">
                             {preview.length === 0 ? (
-                                <div className="text-sm text-gray-500">No occurrences with the current settings.</div>
+                                <div className="text-sm text-slate-500 dark:text-slate-400">No occurrences with the current settings.</div>
                             ) : (
                                 preview.slice(0, 10).map((o, i) => (
                                     <div
                                         key={i}
-                                        className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800"
+                                        className="rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2 text-sm text-slate-800 dark:text-slate-200"
                                     >
                                         {formatRange(o.start, o.end)}
                                         {o.isOneTime && (
@@ -794,8 +814,7 @@ const Page = () => {
                             )}
                         </div>
 
-                        <div className="mt-6 rounded-lg bg-gray-50 p-3 text-xs text-gray-600">
-                            The preview uses your browser’s <strong>local timezone</strong>. Location is stored as text only.
+                        <div className="mt-6 rounded-lg bg-gray-50 dark:bg-slate-800/40 p-3 text-xs text-slate-600 dark:text-slate-400">                            The preview uses your browser’s <strong>local timezone</strong>. Location is stored as text only.
                         </div>
                     </div>
                 </div>
