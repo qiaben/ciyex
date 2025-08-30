@@ -87,7 +87,11 @@ const AppHeader: React.FC<AppHeaderProps> = ({ pageTitle }) => {
             {/* Cross Icon */}
           </button>
 
-            {pageTitle && <h1 className="ml-3 text-lg font-semibold">{pageTitle}</h1>}
+            {pageTitle && (
+                <h1 className="ml-3 text-lg font-normal text-slate-700 dark:text-slate-200">
+                    {pageTitle}
+                </h1>
+            )}
 
 
             <Link href="/" className="lg:hidden">

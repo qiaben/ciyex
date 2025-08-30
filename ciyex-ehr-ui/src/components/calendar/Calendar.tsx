@@ -331,7 +331,6 @@ const Calendar: React.FC = () => {
     const [appointmentProviderId, setAppointmentProviderId] = useState<string>('');
     const [appointmentLocationId, setAppointmentLocationId] = useState<string>('');
     const [appointmentStatus, setAppointmentStatus] = useState<AppointmentStatus>('Scheduled');
-    const [currentViewDate, setCurrentViewDate] = useState<Date>(new Date());
 
 
     // Date & Time — input (MM/DD/YYYY) + ISO (YYYY-MM-DD)
@@ -422,6 +421,8 @@ const Calendar: React.FC = () => {
                             value: String(p.id),
                             label: `${p.identification?.firstName || ''} ${p.identification?.lastName || ''}`.trim(),
                         }));
+
+                    // Always store "all" in the state list, but we’ll hide it in Week/Month dropdown
                     setProviders([{ value: 'all', label: 'All Providers' }, ...active]);
                 }
             } catch (e) {
@@ -429,6 +430,15 @@ const Calendar: React.FC = () => {
             }
         })();
     }, [apiUrl]);
+
+/// Auto-select a real provider when in Week/Month view
+    useEffect(() => {
+        if (activeView !== "timeGridDay" && provider === "all" && providers.length > 1) {
+            setProvider(providers[1].value); // default to first provider
+        }
+    }, [activeView, provider, providers]);
+
+
 
     // Fetch locations (header & modal base)
     useEffect(() => {
@@ -471,59 +481,70 @@ const Calendar: React.FC = () => {
         })();
     }, [apiUrl]);
 
-    // Fetch all appointments with pagination
-    useEffect(() => {
-        const loadAppointments = async () => {
-            try {
-                let page = 0;
-                const size = 50; // adjust as needed
-                let allEvents: CalendarEvent[] = [];
-                let lastPage = false;
+// Memoize loadAppointments function using useCallback
+    const loadAppointments = useCallback(async () => {
+        // Avoid reloading appointments if they already exist (cached state check)
+        if (events.length > 0) return; // Skip if appointments are already loaded
 
-                while (!lastPage) {
-                    const res = await fetchWithAuth(
-                        `${apiUrl}/api/appointments?page=${page}&size=${size}`
-                    );
-                    const json = await res.json();
+        try {
+            let page = 0;
+            const size = 50; // adjust as needed
+            let allEvents: CalendarEvent[] = [];
+            let lastPage = false;
 
-                    if (json.success && json.data?.content) {
-                        const loaded: CalendarEvent[] = json.data.content.map((a: AppointmentDTO) => ({
-                            id: String(a.id),
-                            title: a.patientName
-                                ? `${a.visitType} — ${a.patientName}`
-                                : a.visitType,
-                            start: `${a.appointmentStartDate}T${a.appointmentStartTime}`,
-                            end: `${a.appointmentEndDate}T${a.appointmentEndTime}`,
-                            allDay: false,
-                            color: getProviderColor(a.providerId), // 👈 apply provider color
-                            extendedProps: {
-                                visitType: a.visitType,
-                                providerId: String(a.providerId),
-                                locationId: a.locationId ? String(a.locationId) : undefined, // ✅ use locationId
-                                status: a.status,
-                                notes: a.reason,
-                                patientId: String(a.patientId),
-                                patientName: a.patientName,
-                                priority: a.priority,
-                            },
-                        }));
+            while (!lastPage) {
+                const res = await fetchWithAuth(
+                    `${apiUrl}/api/appointments?page=${page}&size=${size}`
+                );
+                const json = await res.json();
 
-                        allEvents = [...allEvents, ...loaded];
-                        lastPage = json.data.last; // stop when backend says it's the last page
-                        page++;
-                    } else {
-                        lastPage = true;
-                    }
+                if (json.success && json.data?.content) {
+                    const loaded: CalendarEvent[] = json.data.content.map((a: AppointmentDTO) => ({
+                        id: String(a.id),
+                        title: a.patientName
+                            ? `${a.visitType} — ${a.patientName}`
+                            : a.visitType,
+                        start: `${a.appointmentStartDate}T${a.appointmentStartTime}`,
+                        end: `${a.appointmentEndDate}T${a.appointmentEndTime}`,
+                        allDay: false,
+                        color: getProviderColor(a.providerId), // 👈 apply provider color
+                        extendedProps: {
+                            visitType: a.visitType,
+                            providerId: String(a.providerId),
+                            locationId: a.locationId ? String(a.locationId) : undefined, // ✅ use locationId
+                            status: a.status,
+                            notes: a.reason,
+                            patientId: String(a.patientId),
+                            patientName: a.patientName,
+                            priority: a.priority,
+                        },
+                    }));
+
+                    // Append the newly fetched events to the allEvents array
+                    allEvents = [...allEvents, ...loaded];
+
+                    // If this is the last page, stop fetching
+                    lastPage = json.data.last;
+                    page++;
+                } else {
+                    // If no data is returned, stop the loop
+                    lastPage = true;
                 }
-
-                setEvents(allEvents);
-            } catch (err) {
-                console.error("Failed to load appointments", err);
             }
-        };
 
+            // Update the events state with the loaded appointments
+            setEvents(allEvents);
+        } catch (err) {
+            console.error("Failed to load appointments", err);
+            // You can show an error message to the user here if necessary
+        }
+    }, [events, apiUrl]);
+
+// Trigger loadAppointments when apiUrl changes
+    useEffect(() => {
         loadAppointments();
-    }, [apiUrl]);
+    }, [loadAppointments]); // Add loadAppointments as a dependency
+
 
 
 
@@ -811,6 +832,15 @@ const Calendar: React.FC = () => {
     };
 
     const handleAddOrUpdateAppointment = async () => {
+        if (!selectedPatientId) {
+            setAlertData({
+                variant: "warning",
+                title: "Missing Patient",
+                message: "Please select a patient before saving the appointment.",
+            });
+            return;
+        }
+
         if (!appointmentProviderId) {
             setAlertData({
                 variant: "warning",
@@ -892,35 +922,8 @@ const Calendar: React.FC = () => {
 
             const json = await res.json();
             if (json.success) {
-                const saved = json.data;
-
-                const autoTitle = saved.patientName
-                    ? `${saved.visitType} — ${saved.patientName}`
-                    : saved.visitType;
-
-                const newEvent: CalendarEvent = {
-                    id: String(saved.id),
-                    title: autoTitle,
-                    start: saved.start,
-                    end: saved.end,
-                    allDay: false,
-                    extendedProps: {
-                        visitType: saved.visitType,
-                        providerId: String(saved.providerId),
-                        locationId: saved.locationId ? String(saved.locationId) : undefined,
-                        status: saved.status,
-                        notes: saved.notes,
-                        patientId: saved.patientId ? String(saved.patientId) : undefined,
-                        patientName: saved.patientName,
-                        priority: saved.priority,
-                    },
-                };
-
-                setEvents((prev) =>
-                    selectedEvent
-                        ? prev.map((e) => (e.id === String(saved.id) ? newEvent : e))
-                        : [...prev, newEvent]
-                );
+                // ✅ Re-fetch all appointments to keep calendar consistent
+                await loadAppointments();
 
                 setAlertData({
                     variant: "success",
@@ -1035,15 +1038,23 @@ const Calendar: React.FC = () => {
                             value={provider}
                             onChange={(e) => setProvider(e.target.value)}
                             className="h-9 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-900
-          focus:outline-none focus:ring-2 focus:ring-brand-500
-          dark:border-gray-700 dark:bg-dark-900 dark:text-gray-100"
+      focus:outline-none focus:ring-2 focus:ring-brand-500
+      dark:border-gray-700 dark:bg-dark-900 dark:text-gray-100"
                         >
-                            <option value="all">All Providers</option>
-                            {providers.filter((p) => p.value !== 'all').map((p) => (
-                                <option key={p.value} value={p.value}>{p.label}</option>
-                            ))}
+                            {/* Show "All Providers" only in Day view */}
+                            {activeView === "timeGridDay" && (
+                                <option value="all">All Providers</option>
+                            )}
+                            {providers
+                                .filter((p) => p.value !== "all")
+                                .map((p) => (
+                                    <option key={p.value} value={p.value}>
+                                        {p.label}
+                                    </option>
+                                ))}
                         </select>
                     </div>
+
 
                     {/* Locations */}
                     <div className="relative w-52">
@@ -1062,7 +1073,7 @@ const Calendar: React.FC = () => {
                     </div>
 
                     {/* Prev / Date / Next */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-1">
                         <button
                             type="button"
                             onClick={goPrev}
@@ -1071,13 +1082,9 @@ const Calendar: React.FC = () => {
                             &lt;
                         </button>
 
-                        <div className="px-2 text-center text-base font-semibold text-gray-900 dark:text-white/90">
-                            {calendarTitle && currentViewDate.toLocaleDateString('en-US', {
-                                weekday: 'long',
-                                day: 'numeric',
-                                month: 'long',
-                                year: 'numeric',
-                            })}
+                        {/* FIXED WIDTH TITLE */}
+                        <div className="flex-1 min-w-[240px] text-center text-base font-semibold text-gray-900 dark:text-white/90">
+                            {calendarTitle}
                         </div>
 
                         <button
@@ -1118,6 +1125,7 @@ const Calendar: React.FC = () => {
                 </div>
 
                 {/* Right side: Create Appointment */}
+                <span className="ml-4">
                 <button
                     onClick={() => {
                         resetModalFields();
@@ -1126,7 +1134,7 @@ const Calendar: React.FC = () => {
                     }}
                     type="button"
                     aria-label="Create Appointment"
-                    className="ml-4 rounded-lg bg-brand-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-brand-600"
+                    className="flex items-center rounded-lg bg-brand-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-brand-600"
                 >
                     <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -1138,172 +1146,185 @@ const Calendar: React.FC = () => {
                     >
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                     </svg>
+                    create
                 </button>
+                </span>
             </div>
-
-
-
-
-
 
             {/* Calendar */}
             <div className="custom-calendar">
-                {provider === "all" && activeView === "timeGridDay" && providers.length > 1 ? (
-                    // === All Providers + Day View → Columns side by side
-                    <div
-                        className="grid gap-1 h-full overflow-y-auto"
-                        style={{
-                            gridTemplateColumns: `repeat(${Math.max(
-                                providers.length - 1,
-                                1
-                            )}, minmax(0, 1fr))`,
-                        }}
-                    >
-                        {providers
-                            .filter((p) => p.value !== "all")
-                            .map((p) => (
-                                <div
-                                    key={`day-${p.value}`}
-                                    className="provider-col flex flex-col h-full border rounded-md overflow-hidden"
-                                >
-                                    {/* Blue header with ❌ */}
-                                    <div className="flex items-center justify-between bg-blue-500 text-white px-2 py-1 text-sm font-semibold">
-                                        <span>{p.label}</span>
-                                        <button
-                                            onClick={() =>
-                                                setProviders((prev) =>
-                                                    prev.filter((prov) => prov.value !== p.value)
-                                                )
-                                            }
-                                            className="ml-2 text-xs hover:text-gray-200"
-                                        >
-                                            ✕
-                                        </button>
-                                    </div>
+                {provider === "all" && providers.length > 1 ? (
+                    <>
+                        {/* Shared day headers */}
+                        {(activeView === "timeGridWeek" || activeView === "dayGridMonth") && (
+                            <div className="border rounded-md mb-4">
+                                <FullCalendar
+                                    plugins={[dayGridPlugin, timeGridPlugin]}
+                                    initialView={activeView}
+                                    headerToolbar={false}
+                                    events={[]} // no events, just headers
+                                    selectable={false}
+                                    editable={false}
+                                    height="auto"
+                                    dayHeaderFormat={{ weekday: "short", month: "numeric", day: "numeric" }}
+                                    views={{
+                                        dayGridMonth: { titleFormat: { year: "numeric", month: "long" } },
+                                        timeGridWeek: { titleFormat: { month: "short", day: "numeric" } },
+                                        timeGridDay: {
+                                            titleFormat: {
+                                                year: "numeric",
+                                                month: "long",
+                                                day: "numeric",
+                                                weekday: "long",
+                                            },
+                                        },
+                                    }}
+                                />
+                            </div>
+                        )}
 
-                                    {/* Provider calendar */}
-                                    <div className="flex-1 overflow-hidden">
-                                        <FullCalendar
-                                            key={`day-${p.value}-${activeView}`}
-                                            ref={(el) => {
-                                                calendarRefs.current[p.value] = el;
-                                            }}
-                                            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-                                            initialView="timeGridDay"
-                                            headerToolbar={false}
-                                            slotMinTime="08:00:00"
-                                            slotMaxTime="20:00:00"
-                                            allDaySlot={false}
-                                            expandRows={true}
-                                            height="100%"
-                                            contentHeight="100%"
-                                            dayHeaderContent={() => null}
-                                            datesSet={(arg) => {
-                                                setCurrentViewDate(arg.start);
-                                                setCalendarTitle(arg.view.title);
-                                                setActiveView(arg.view.type as ViewType);
-                                            }}
-                                            events={events.filter(
-                                                (e) => e.extendedProps.providerId === p.value
-                                            )}
-                                            selectable
-                                            select={(info) => handleDateSelect(info, p.value)}
-                                            eventClick={handleEventClick}
-                                            eventContent={renderEventContent}
-                                        />
-                                    </div>
-                                </div>
-                            ))}
-                    </div>
-                ) : provider === "all" &&
-                activeView === "timeGridWeek" &&
-                providers.length > 1 ? (
-                    // === All Providers + Week View → Stacked vertically
-                    <div className="flex flex-col gap-6">
-                        {providers
-                            .filter((p) => p.value !== "all")
-                            .map((p) => (
-                                <div key={`week-${p.value}`} className="border rounded-md">
-                                    <h3 className="bg-blue-500 text-white text-center font-medium py-2 rounded-t-md">
-                                        {p.label}
-                                    </h3>
-                                    <FullCalendar
-                                        key={`week-${p.value}-${activeView}`}
-                                        ref={(el) => {
-                                            calendarRefs.current[p.value] = el;
-                                        }}
-                                        plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-                                        initialView={activeView}
-                                        headerToolbar={false}
-                                        slotMinTime="08:00:00"
-                                        slotMaxTime="20:00:00"
-                                        allDaySlot={false}
-                                        expandRows={true}
-                                        height="100%"
-                                        contentHeight="auto"
-                                        dayHeaderContent={() => null}
-                                        datesSet={(arg) => {
-                                            setCurrentViewDate(arg.start);
-                                            setCalendarTitle(arg.view.title);
-                                            setActiveView(arg.view.type as ViewType);
-                                        }}
-                                        events={events.filter(
-                                            (e) => e.extendedProps.providerId === p.value
-                                        )}
-                                        selectable
-                                        select={(info) => handleDateSelect(info, p.value)}
-                                        eventClick={handleEventClick}
-                                        eventContent={renderEventContent}
-                                    />
-                                </div>
-                            ))}
-                    </div>
-                ) : provider === "all" &&
-                activeView === "dayGridMonth" &&
-                providers.length > 1 ? (
-                    // === All Providers + Month View → Stacked vertically
-                    <div className="flex flex-col gap-8">
-                        {providers
-                            .filter((p) => p.value !== "all")
-                            .map((p) => (
-                                <div key={`month-${p.value}`} className="border rounded-md">
-                                    <h3 className="bg-blue-500 text-white text-center font-medium py-2 rounded-t-md">
-                                        {p.label}
-                                    </h3>
-                                    <FullCalendar
-                                        key={`month-${p.value}-${activeView}`}
-                                        ref={(el) => {
-                                            calendarRefs.current[p.value] = el;
-                                        }}
-                                        plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-                                        initialView={activeView}
-                                        headerToolbar={false}
-                                        dayHeaderContent={() => null}
-                                        datesSet={(arg) => {
-                                            setCurrentViewDate(arg.start);
-                                            setCalendarTitle(arg.view.title);
-                                            setActiveView(arg.view.type as ViewType);
-                                        }}
-                                        events={events.filter(
-                                            (e) => e.extendedProps.providerId === p.value
-                                        )}
-                                        selectable
-                                        select={(info) => handleDateSelect(info, p.value)}
-                                        eventClick={handleEventClick}
-                                        eventContent={renderEventContent}
-                                        height="auto"
-                                    />
-                                </div>
-                            ))}
-                    </div>
+                        {activeView === "timeGridDay" ? (
+                            // === All Providers + Day View → Columns side by side
+                            <div
+                                className="grid gap-1 h-full overflow-y-auto"
+                                style={{
+                                    gridTemplateColumns: `repeat(${Math.max(
+                                        providers.length - 1,
+                                        1
+                                    )}, minmax(0, 1fr))`,
+                                }}
+                            >
+                                {providers
+                                    .filter((p) => p.value !== "all")
+                                    .map((p) => (
+                                        <div
+                                            key={`day-${p.value}`}
+                                            className="provider-col flex flex-col h-full border rounded-md overflow-hidden"
+                                        >
+                                            <div className="flex items-center justify-between bg-blue-500 text-white px-2 py-1 text-sm font-semibold">
+                                                <span>{p.label}</span>
+                                                <button
+                                                    onClick={() =>
+                                                        setProviders((prev) =>
+                                                            prev.filter((prov) => prov.value !== p.value)
+                                                        )
+                                                    }
+                                                    className="ml-2 text-xs hover:text-gray-200"
+                                                >
+                                                    ✕
+                                                </button>
+                                            </div>
+
+                                            <div className="flex-1 overflow-hidden">
+                                                <FullCalendar
+                                                    key={`day-${p.value}-${activeView}`}
+                                                    ref={(el) => {
+                                                        calendarRefs.current[p.value] = el;
+                                                    }}
+                                                    plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+                                                    initialView="timeGridDay"
+                                                    headerToolbar={false}
+                                                    slotMinTime="08:00:00"
+                                                    slotMaxTime="20:00:00"
+                                                    allDaySlot={false}
+                                                    expandRows={true}
+                                                    height="100%"
+                                                    contentHeight="100%"
+                                                    views={{
+                                                        dayGridMonth: { titleFormat: { year: "numeric", month: "long" } },
+                                                        timeGridWeek: { titleFormat: { month: "short", day: "numeric" } },
+                                                        timeGridDay: {
+                                                            titleFormat: {
+                                                                year: "numeric",
+                                                                month: "long",
+                                                                day: "numeric",
+                                                                weekday: "long",
+                                                            },
+                                                        },
+                                                    }}
+                                                    datesSet={(arg) => {
+                                                        setCalendarTitle(arg.view.title);  // Keep the calendar title
+                                                        setActiveView(arg.view.type as ViewType);  // Update active view
+                                                    }}
+
+                                                    events={events.filter(
+                                                        (e) => e.extendedProps.providerId === p.value
+                                                    )}
+                                                    selectable
+                                                    select={(info) => handleDateSelect(info, p.value)}
+                                                    eventClick={handleEventClick}
+                                                    eventContent={renderEventContent}
+                                                />
+                                            </div>
+                                        </div>
+                                    ))}
+                            </div>
+                        ) : (
+                            // === All Providers + Week/Month View → Stacked vertically
+                            <div className="flex flex-col gap-6">
+                                {providers
+                                    .filter((p) => p.value !== "all")
+                                    .map((p) => (
+                                        <div key={`${activeView}-${p.value}`} className="border rounded-md">
+                                            <h3 className="bg-blue-500 text-white text-center font-medium py-2 rounded-t-md">
+                                                {p.label}
+                                            </h3>
+                                            <FullCalendar
+                                                key={`single-${provider}-${activeView}`}
+                                                ref={calendarRef}
+                                                plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+                                                initialView={activeView}
+                                                headerToolbar={false}
+                                                slotMinTime="00:00:00" // Start at 12 AM (midnight)
+                                                slotMaxTime="24:00:00" // End at 12 AM (next day)
+                                                allDaySlot={false}
+                                                expandRows={true}
+                                                height="auto" // Ensure the calendar height is flexible for scroll
+                                                contentHeight="auto" // Allow content height to adjust with the scroll
+                                                views={{
+                                                    dayGridMonth: { titleFormat: { year: "numeric", month: "long" } },
+                                                    timeGridWeek: { titleFormat: { month: "short", day: "numeric" } },
+                                                    timeGridDay: {
+                                                        titleFormat: {
+                                                            year: "numeric",
+                                                            month: "long",
+                                                            day: "numeric",
+                                                            weekday: "long",
+                                                        },
+                                                    },
+                                                }}
+                                                datesSet={(arg) => {
+                                                    setCalendarTitle(arg.view.title);  // Keep the calendar title
+                                                    setActiveView(arg.view.type as ViewType);  // Update active view
+                                                }}
+                                                events={events.filter((e) => {
+                                                    const matchesProvider = provider && provider !== "all"
+                                                        ? e.extendedProps.providerId === provider
+                                                        : true;
+
+                                                    const matchesLocation =
+                                                        location === "all" || e.extendedProps.locationId === location;
+
+                                                    return matchesProvider && matchesLocation;
+                                                })}
+                                                selectable
+                                                select={(info) =>
+                                                    handleDateSelect(info, provider !== "all" ? provider : undefined)
+                                                }
+                                                eventClick={handleEventClick}
+                                                eventContent={renderEventContent}
+                                            />
+                                        </div>
+                                    ))}
+                            </div>
+                        )}
+                    </>
                 ) : (
-                    // === Single Provider OR "Select Provider"
+                    // === Single Provider Selected
                     <div className="border rounded-md">
                         {provider && (
                             <h3 className="bg-blue-500 text-white text-center font-medium py-2 rounded-t-md">
-                                {provider === "all"
-                                    ? "All Providers"
-                                    : providers.find((p) => p.value === provider)?.label || ""}
+                                {providers.find((p) => p.value === provider)?.label || ""}
                             </h3>
                         )}
                         <FullCalendar
@@ -1318,10 +1339,21 @@ const Calendar: React.FC = () => {
                             expandRows={true}
                             height="100%"
                             contentHeight="auto"
+                            views={{
+                                dayGridMonth: { titleFormat: { year: "numeric", month: "long" } },
+                                timeGridWeek: { titleFormat: { month: "short", day: "numeric", year: "numeric" } },
+                                timeGridDay: {
+                                    titleFormat: {
+                                        year: "numeric",
+                                        month: "long",
+                                        day: "numeric",
+                                        weekday: "long",
+                                    },
+                                },
+                            }}
                             datesSet={(arg) => {
-                                setCurrentViewDate(arg.start);
-                                setCalendarTitle(arg.view.title);
-                                setActiveView(arg.view.type as ViewType);
+                                setCalendarTitle(arg.view.title);  // Keep the calendar title
+                                setActiveView(arg.view.type as ViewType);  // Update active view
                             }}
                             events={events.filter((e) => {
                                 const matchesProvider =
@@ -1344,6 +1376,7 @@ const Calendar: React.FC = () => {
                     </div>
                 )}
             </div>
+
 
             {/* Inline "modal" panel — no blur, rendered inside this card */}
             {isOpen && (
@@ -1399,8 +1432,12 @@ const Calendar: React.FC = () => {
 
                                 <div>
                                     <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-400">
-                                        Patient
+                                        Patient{" "}
+                                        <span className="ml-2 rounded-md bg-red-100 px-2 py-[2px] text-xs font-medium text-red-700">
+                                            required
+                                        </span>
                                     </label>
+
                                     <div className="relative">
                                         <input
                                             type="text"

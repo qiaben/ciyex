@@ -16,6 +16,7 @@ import {
     PlugInIcon,
     SettingsIcon, // ensure this exists in ../icons/index
     TableIcon,
+    AppointmentIcon,
 } from "../icons/index";
 
 // ===== Types (nested) =====
@@ -47,6 +48,11 @@ const navItems: NavItem[] = [
     name: "Calendar",
     path: "/calendar",
   },
+    {
+        icon: <AppointmentIcon />,
+        name: "Appointments",
+        path: "/appointments", // ✅ top-level now
+    },
 
     // Settings with nested Forms -> Lists
     {
@@ -56,11 +62,16 @@ const navItems: NavItem[] = [
             { name: "Providers", path: "/settings/providers" },
             {
                 name: "Forms",
-                subItems: [{ name: "Lists", path: "/settings/forms/lists" },
-                    { name: "Form Admin", path: "/settings/forms/admin" },],
+                subItems: [
+                    { name: "Lists", path: "/settings/forms/lists" },
+                    { name: "Form Admin", path: "/settings/forms/admin" },
+                ],
             },
         ],
     },
+
+
+
 
     {
         name: "Forms",
@@ -196,11 +207,17 @@ const AppSidebar: React.FC = () => {
                                 onClick={() => toggleTop(type, topIdx)}
                                 className={`menu-item group ${
                                     topOpen ? "menu-item-active" : "menu-item-inactive"
-                                } cursor-pointer ${!isExpanded && !isHovered ? "lg:justify-center" : "lg:justify-start"}`}
+                                } cursor-pointer ${
+                                    !isExpanded && !isHovered ? "lg:justify-center" : "lg:justify-start"
+                                }`}
                             >
-                <span className={`${topOpen ? "menu-item-icon-active" : "menu-item-icon-inactive"}`}>
-                  {nav.icon}
-                </span>
+              <span
+                  className={`${
+                      topOpen ? "menu-item-icon-active" : "menu-item-icon-inactive"
+                  }`}
+              >
+                {nav.icon}
+              </span>
                                 {(isExpanded || isHovered || isMobileOpen) && (
                                     <span className="menu-item-text">{nav.name}</span>
                                 )}
@@ -219,9 +236,15 @@ const AppSidebar: React.FC = () => {
                                     isActive(nav.path) ? "menu-item-active" : "menu-item-inactive"
                                 }`}
                             >
-                <span className={`${isActive(nav.path) ? "menu-item-icon-active" : "menu-item-icon-inactive"}`}>
-                  {nav.icon}
-                </span>
+              <span
+                  className={`${
+                      isActive(nav.path)
+                          ? "menu-item-icon-active"
+                          : "menu-item-icon-inactive"
+                  }`}
+              >
+                {nav.icon}
+              </span>
                                 {(isExpanded || isHovered || isMobileOpen) && (
                                     <span className="menu-item-text">{nav.name}</span>
                                 )}
@@ -246,7 +269,9 @@ const AppSidebar: React.FC = () => {
                                                             type="button"
                                                             onClick={() => toggleL2(k)}
                                                             className={`menu-dropdown-item ${
-                                                                l2Open ? "menu-dropdown-item-active" : "menu-dropdown-item-inactive"
+                                                                l2Open
+                                                                    ? "menu-dropdown-item-active"
+                                                                    : "menu-dropdown-item-inactive"
                                                             } w-full flex items-center`}
                                                         >
                                                             <span>{sub.name}</span>
@@ -257,53 +282,79 @@ const AppSidebar: React.FC = () => {
                                                             />
                                                         </button>
 
-                                                        {/* Level-3 (simple show/hide) */}
+                                                        {/* Level-3 (e.g. Forms → Lists/Form Admin) */}
                                                         <div className={`${l2Open ? "block" : "hidden"}`}>
                                                             <ul className="ml-6 mt-1 space-y-1">
-                                                                {sub.subItems!.map((g) => (
-                                                                    <li key={g.name}>
-                                                                        {g.path ? (
-                                                                            <Link
-                                                                                href={g.path}
-                                                                                className={`menu-dropdown-item ${
-                                                                                    isActive(g.path)
-                                                                                        ? "menu-dropdown-item-active"
-                                                                                        : "menu-dropdown-item-inactive"
-                                                                                }`}
-                                                                            >
-                                                                                {g.name}
-                                                                                <span className="flex items-center gap-1 ml-auto">
-                                          {g.new && (
-                                              <span
-                                                  className={`${
-                                                      isActive(g.path)
-                                                          ? "menu-dropdown-badge-active"
-                                                          : "menu-dropdown-badge-inactive"
-                                                  } menu-dropdown-badge`}
-                                              >
-                                              new
-                                            </span>
-                                          )}
-                                                                                    {g.pro && (
-                                                                                        <span
-                                                                                            className={`${
-                                                                                                isActive(g.path)
-                                                                                                    ? "menu-dropdown-badge-active"
-                                                                                                    : "menu-dropdown-badge-inactive"
-                                                                                            } menu-dropdown-badge`}
-                                                                                        >
-                                              pro
-                                            </span>
-                                                                                    )}
-                                        </span>
-                                                                            </Link>
-                                                                        ) : (
-                                                                            <div className="menu-dropdown-item menu-dropdown-item-inactive cursor-default">
-                                                                                {g.name}
-                                                                            </div>
-                                                                        )}
-                                                                    </li>
-                                                                ))}
+                                                                {sub.subItems!.map((g, gIdx) => {
+                                                                    const hasGrandKids = !!g.subItems?.length;
+                                                                    const gKey = `${k}-${gIdx}`;
+                                                                    const l3Open = !!openL2[gKey];
+
+                                                                    return (
+                                                                        <li key={g.name}>
+                                                                            {hasGrandKids ? (
+                                                                                <>
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => toggleL2(gKey)}
+                                                                                        className={`menu-dropdown-item ${
+                                                                                            l3Open
+                                                                                                ? "menu-dropdown-item-active"
+                                                                                                : "menu-dropdown-item-inactive"
+                                                                                        } w-full flex items-center`}
+                                                                                    >
+                                                                                        <span>{g.name}</span>
+                                                                                        <ChevronDownIcon
+                                                                                            className={`ml-auto w-4 h-4 transition-transform duration-200 ${
+                                                                                                l3Open ? "rotate-180 text-brand-500" : ""
+                                                                                            }`}
+                                                                                        />
+                                                                                    </button>
+
+                                                                                    <div className={`${l3Open ? "block" : "hidden"}`}>
+                                                                                        <ul className="ml-6 mt-1 space-y-1">
+                                                                                            {g.subItems!.map((c) => (
+                                                                                                <li key={c.name}>
+                                                                                                    {c.path ? (
+                                                                                                        <Link
+                                                                                                            href={c.path}
+                                                                                                            className={`menu-dropdown-item ${
+                                                                                                                isActive(c.path)
+                                                                                                                    ? "menu-dropdown-item-active"
+                                                                                                                    : "menu-dropdown-item-inactive"
+                                                                                                            }`}
+                                                                                                        >
+                                                                                                            {c.name}
+                                                                                                        </Link>
+                                                                                                    ) : (
+                                                                                                        <div className="menu-dropdown-item menu-dropdown-item-inactive cursor-default">
+                                                                                                            {c.name}
+                                                                                                        </div>
+                                                                                                    )}
+                                                                                                </li>
+                                                                                            ))}
+                                                                                        </ul>
+                                                                                    </div>
+                                                                                </>
+                                                                            ) : g.path ? (
+                                                                                <Link
+                                                                                    href={g.path}
+                                                                                    className={`menu-dropdown-item ${
+                                                                                        isActive(g.path)
+                                                                                            ? "menu-dropdown-item-active"
+                                                                                            : "menu-dropdown-item-inactive"
+                                                                                    }`}
+                                                                                >
+                                                                                    {g.name}
+                                                                                </Link>
+                                                                            ) : (
+                                                                                <div className="menu-dropdown-item menu-dropdown-item-inactive cursor-default">
+                                                                                    {g.name}
+                                                                                </div>
+                                                                            )}
+                                                                        </li>
+                                                                    );
+                                                                })}
                                                             </ul>
                                                         </div>
                                                     </>
@@ -318,33 +369,9 @@ const AppSidebar: React.FC = () => {
                                                         }`}
                                                     >
                                                         {sub.name}
-                                                        <span className="flex items-center gap-1 ml-auto">
-                              {sub.new && (
-                                  <span
-                                      className={`${
-                                          isActive(sub.path)
-                                              ? "menu-dropdown-badge-active"
-                                              : "menu-dropdown-badge-inactive"
-                                      } menu-dropdown-badge`}
-                                  >
-                                  new
-                                </span>
-                              )}
-                                                            {sub.pro && (
-                                                                <span
-                                                                    className={`${
-                                                                        isActive(sub.path)
-                                                                            ? "menu-dropdown-badge-active"
-                                                                            : "menu-dropdown-badge-inactive"
-                                                                    } menu-dropdown-badge`}
-                                                                >
-                                  pro
-                                </span>
-                                                            )}
-                            </span>
                                                     </Link>
                                                 ) : (
-                                                    // Level-2 plain label (rare)
+                                                    // Level-2 plain label
                                                     <div className="menu-dropdown-item menu-dropdown-item-inactive cursor-default">
                                                         {sub.name}
                                                     </div>
