@@ -89,7 +89,7 @@ const InsuranceFlat: React.FC<Props> = ({
         <div className="p-4">
             {/* Header Row */}
             <div className="flex justify-between items-center">
-                <h4 className="font-semibold text-lg text-gray-800"></h4>
+                <h4 className="font-semibold text-lg text-gray-800">Insurance</h4>
                 {!editInsurance && (
                     <button
                         onClick={() => setEditInsurance(true)}

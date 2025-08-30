@@ -7,14 +7,11 @@ import AppSidebar from "@/layout/AppSidebar";
 import Backdrop from "@/layout/Backdrop";
 import { usePathname } from "next/navigation";
 
-export default function AdminLayout({
-                                        children,
-                                    }: {
-    children: React.ReactNode;
-}) {
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
     const { isExpanded, isHovered, isMobileOpen } = useSidebar();
-    const pathname = usePathname();
+    const pathname = usePathname() || ""; // ✅ fallback if undefined
 
+    // Route → Title mapping
     const mapping: Record<string, string> = {
         "/dashboard": "Dashboard",
         "/patients": "Patients",
@@ -23,6 +20,7 @@ export default function AdminLayout({
         "/settings/providers": "Providers",
         "/settings/forms/lists": "Forms",
         "/settings/forms/admin": "Form Admin",
+        "/settings/insurance": "Insurance Companies", // ✅ added
         "/settings": "Settings",
         "/appointments": "Appointments",
     };
@@ -31,6 +29,7 @@ export default function AdminLayout({
         Object.entries(mapping)
             .filter(([key]) => pathname.startsWith(key))
             .sort((a, b) => b[0].length - a[0].length)[0]?.[1] || "";
+
 
     const mainContentMargin = isMobileOpen
         ? "ml-0"

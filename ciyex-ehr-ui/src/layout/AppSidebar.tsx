@@ -60,6 +60,8 @@ const navItems: NavItem[] = [
         name: "Settings",
         subItems: [
             { name: "Providers", path: "/settings/providers" },
+            {name:"Insurance companies", path:"/settings/insurance"},
+
             {
                 name: "Forms",
                 subItems: [
@@ -67,6 +69,7 @@ const navItems: NavItem[] = [
                     { name: "Form Admin", path: "/settings/forms/admin" },
                 ],
             },
+
         ],
     },
 
