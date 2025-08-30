@@ -4,11 +4,13 @@ import { useRouter } from "next/navigation";
 import { fetchWithAuth } from "@/utils/fetchWithAuth";
 import AdminLayout from "@/app/(admin)/layout";
 import Link from "next/link";
+import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 interface Patient {
     id: number;
     firstName: string;
     lastName: string;
+    middleName: string;
     email: string;
     phoneNumber: string;
     dateOfBirth: string;
@@ -54,6 +56,7 @@ export default function PatientListPage() {
     const [totalItems, setTotalItems] = useState<number>(0);
 
     const [search, setSearch] = useState("");
+    const [editPatient, setEditPatient] = useState<Patient | null>(null);
 
     useEffect(() => {
         const recent = JSON.parse(localStorage.getItem("recentPatients") || "[]");
@@ -101,7 +104,7 @@ export default function PatientListPage() {
                 if (search) params.set("search", search);
 
                 const url = `${base}?${params.toString()}`;
-                const res = await fetchWithAuth(url, { signal });
+                const res = await fetchWithAuth(url, {signal});
                 const body = (await res.json()) as ApiResponse<PageResponse<Patient>>;
                 if (!body.success) throw new Error(body.message || "Failed to fetch patients");
                 if (!body.data) {
@@ -136,8 +139,9 @@ export default function PatientListPage() {
     const handlePrevious = () => setCurrentPage((p) => Math.max(1, p - 1));
     const handleNext = () => setCurrentPage((p) => Math.min(totalPages, p + 1));
 
-    const handleEdit = (patient: Patient) =>
-        window.dispatchEvent(new CustomEvent("openPatientModal", { detail: patient }));
+    const handleEdit = (patient: Patient) => {
+        setEditPatient(patient);
+    };
 
     const handleDelete = async (patient: Patient) => {
         if (!confirm(`Delete patient ${patient.firstName} ${patient.lastName}?`)) return;
@@ -145,6 +149,20 @@ export default function PatientListPage() {
             method: "DELETE",
         });
         fetchPatients(currentPage, patientsPerPage, search);
+    };
+
+    const handleSaveEdit = async (updatedPatient: Patient) => {
+        if (!updatedPatient) return;
+        await fetchWithAuth(
+            `${process.env.NEXT_PUBLIC_API_URL}/api/patients/${updatedPatient.id}`,
+            {
+                method: "PUT",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify(updatedPatient),
+            }
+        );
+        fetchPatients(currentPage, patientsPerPage, search); // Refresh list after saving
+        setEditPatient(null); // Close the edit modal
     };
 
     // ✅ Loading / Error
@@ -208,7 +226,8 @@ export default function PatientListPage() {
                   strokeWidth="2"
                   viewBox="0 0 24 24"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16z" />
+                <path strokeLinecap="round" strokeLinejoin="round"
+                      d="M21 21l-4.35-4.35M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16z"/>
               </svg>
             </span>
                         <input
@@ -264,7 +283,8 @@ export default function PatientListPage() {
                                     <td className="px-2 py-1 text-gray-600">{formatDate(patient.dateOfBirth)}</td>
                                     <td className="px-2 py-1 text-gray-600">{patient.gender || "N/A"}</td>
                                     <td className="px-2 py-1">
-                      <span className="inline-block bg-green-100 text-green-700 text-[10px] px-2 py-0.5 rounded-full font-semibold">
+                      <span
+                          className="inline-block bg-green-100 text-green-700 text-[10px] px-2 py-0.5 rounded-full font-semibold">
                         {patient.status || "Active"}
                       </span>
                                     </td>
@@ -360,6 +380,117 @@ export default function PatientListPage() {
                     </div>
                 </div>
             </div>
+
+            {/* Edit Patient Modal */}
+            {editPatient && (
+                <Dialog open={true} onOpenChange={() => setEditPatient(null)}>
+                    <DialogContent
+                        className="max-w-2xl"
+                        onClose={() => setEditPatient(null)}
+                    >
+
+                        <DialogHeader>
+                            <DialogTitle>Edit Patient</DialogTitle>
+                            <DialogDescription>Update the patient details</DialogDescription>
+                        </DialogHeader>
+                        <form
+                            onSubmit={(e) => {
+                                e.preventDefault();
+                                handleSaveEdit(editPatient);
+                            }}
+                            className="space-y-6"
+                        >
+                            <div className="grid grid-cols-3 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium mb-1 text-red-500">First Name *</label>
+                                    <input
+                                        name="firstName"
+                                        required
+                                        placeholder="First name"
+                                        value={editPatient.firstName}
+                                        onChange={(e) =>
+                                            setEditPatient({...editPatient, firstName: e.target.value})
+                                        }
+                                        className="w-full p-2 border rounded"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">Middle Name</label>
+                                    <input
+                                        name="middleName"
+                                        placeholder="Middle (optional)"
+                                        value={editPatient.middleName}
+                                        onChange={(e) =>
+                                            setEditPatient({...editPatient, middleName: e.target.value})
+                                        }
+                                        className="w-full p-2 border rounded"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-1 text-red-500">Last Name *</label>
+                                    <input
+                                        name="lastName"
+                                        required
+                                        placeholder="Last name"
+                                        value={editPatient.lastName}
+                                        onChange={(e) =>
+                                            setEditPatient({...editPatient, lastName: e.target.value})
+                                        }
+                                        className="w-full p-2 border rounded"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">Phone Number</label>
+                                    <input
+                                        name="phoneNumber"
+                                        value={editPatient.phoneNumber}
+                                        onChange={(e) =>
+                                            setEditPatient({...editPatient, phoneNumber: e.target.value})
+                                        }
+                                        className="w-full p-2 border rounded"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">Gender</label>
+                                    <select
+                                        name="gender"
+                                        value={editPatient.gender}
+                                        onChange={(e) =>
+                                            setEditPatient({...editPatient, gender: e.target.value})
+                                        }
+                                        className="w-full p-2 border rounded"
+                                    >
+                                        <option value="">Select gender</option>
+                                        <option value="male">Male</option>
+                                        <option value="female">Female</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <DialogFooter>
+                                <button
+                                    type="button"
+                                    onClick={() => setEditPatient(null)}
+                                    className="px-3 py-1.5 bg-gray-200 rounded hover:bg-gray-300"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700"
+                                >
+                                    Save
+                                </button>
+                            </DialogFooter>
+                        </form>
+
+                    </DialogContent>
+
+                </Dialog>
+            )}
         </AdminLayout>
     );
 }
