@@ -54,7 +54,22 @@ const navItems: NavItem[] = [
     icon: <TableIcon />,
     subItems: [{ name: "Basic Tables", path: "/basic-tables", pro: false }],
   },
-  {
+    {
+        name: "Labs",
+        icon: <BoxCubeIcon />,   // replace with your lab-related icon
+        subItems: [
+            { name: "Orders", path: "/labs/orders", pro: false },
+            { name: "Results", path: "/labs/results", pro: false }
+        ],
+    },
+    {
+        icon: <BoxCubeIcon />, // Use your codes/lab icon
+        name: "Codes",
+        path:"/codes",
+    },
+
+
+    {
     name: "Pages",
     icon: <PageIcon />,
     subItems: [
