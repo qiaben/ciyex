@@ -162,57 +162,60 @@ export default function InsurancePage() {
 
     return (
         <AdminLayout>
-            <div className="p-3 space-y-3">
-                {/* Search & Add Row */}
-                <div className="flex justify-between items-center">
+            <div className="p-4">
+                {/* Search + Add Row */}
+                <div className="flex justify-between items-center gap-2 mt-1 mb-3">
                     <Input
-                        placeholder="Search companies..."
+                        placeholder="Search Companies"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        className="border-gray-300 w-64 text-sm"
+                        className="!w-40 max-w-[180px] text-xs border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition"
                     />
-                    <Button onClick={openAddModal} variant="primary" size="sm">
+                    <button
+                        onClick={openAddModal}
+                        className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-xs font-medium px-3 py-1.5 rounded-md shadow hover:from-blue-600 hover:to-indigo-600 transition"
+                    >
                         + Add Insurance
-                    </Button>
+                    </button>
                 </div>
 
                 {/* Table */}
                 <div className="bg-white rounded-lg shadow border border-gray-200 overflow-x-auto">
                     {loading ? (
-                        <p className="p-4 text-gray-500 text-sm">
+                        <p className="p-3 text-gray-500 text-xs">
                             Loading insurance companies...
                         </p>
                     ) : (
                         <table className="w-full text-xs">
-                            <thead>
-                            <tr className="bg-gray-50 text-left text-gray-600 text-sm">
-                                <th className="p-2">Payer ID</th>
-                                <th className="p-2">Name</th>
-                                <th className="p-2">Address</th>
-                                <th className="p-2">City</th>
-                                <th className="p-2">State</th>
-                                <th className="p-2">Postal Code</th>
-                                <th className="p-2">Country</th>
-                                <th className="p-2">Status</th>
-                                <th className="p-2">Actions</th>
+                            <thead className="sticky top-0 bg-gray-50 z-10">
+                            <tr className="text-left text-gray-600">
+                                <th className="px-2 py-1.5">Payer ID</th>
+                                <th className="px-2 py-1.5">Name</th>
+                                <th className="px-2 py-1.5">Address</th>
+                                <th className="px-2 py-1.5">City</th>
+                                <th className="px-2 py-1.5">State</th>
+                                <th className="px-2 py-1">Postal Code</th>
+                                <th className="px-2 py-1">Country</th>
+                                <th className="px-2 py-1">Status</th>
+                                <th className="px-2 py-1">Actions</th>
                             </tr>
                             </thead>
                             <tbody>
                             {paginated.map((c) => (
                                 <tr key={c.id} className="hover:bg-blue-50 text-gray-700">
-                                    <td className="p-2">{c.payerId || "-"}</td>
-                                    <td className="p-2 font-medium">{c.name}</td>
-                                    <td className="p-2">{c.address}</td>
-                                    <td className="p-2">{c.city}</td>
-                                    <td className="p-2">{c.state}</td>
-                                    <td className="p-2">{c.postalCode}</td>
-                                    <td className="p-2">{c.country}</td>
-                                    <td className="p-2">
+                                    <td className="px-2 py-1">{c.payerId || "-"}</td>
+                                    <td className="px-2 py-1 font-medium">{c.name}</td>
+                                    <td className="px-2 py-1">{c.address}</td>
+                                    <td className="px-2 py-1">{c.city}</td>
+                                    <td className="px-2 py-1">{c.state}</td>
+                                    <td className="px-2 py-1">{c.postalCode}</td>
+                                    <td className="px-2 py-1">{c.country}</td>
+                                    <td className="px-2 py-1">
                                         {c.status === "ACTIVE" ? (
-                                            <span className="px-1.5 py-0.5 text-[11px] rounded-full bg-green-100 text-green-700 font-medium flex items-center gap-1 w-fit">
+                                            <span className="px-2 py-0.5 text-[11px] rounded-full bg-green-100 text-green-700 font-medium inline-flex items-center gap-1">
                           <svg
                               xmlns="http://www.w3.org/2000/svg"
-                              className="w-3 h-3"
+                              className="h-3.5 w-3.5"
                               fill="none"
                               viewBox="0 0 24 24"
                               stroke="currentColor"
@@ -227,10 +230,10 @@ export default function InsurancePage() {
                           Active
                         </span>
                                         ) : (
-                                            <span className="px-1.5 py-0.5 text-[11px] rounded-full bg-gray-200 text-gray-600 font-medium flex items-center gap-1 w-fit">
+                                            <span className="px-2 py-0.5 text-[11px] rounded-full bg-gray-200 text-gray-600 font-medium inline-flex items-center gap-1">
                           <svg
                               xmlns="http://www.w3.org/2000/svg"
-                              className="w-3 h-3"
+                              className="h-3.5 w-3.5"
                               fill="none"
                               viewBox="0 0 24 24"
                               stroke="currentColor"
@@ -246,15 +249,42 @@ export default function InsurancePage() {
                         </span>
                                         )}
                                     </td>
-                                    <td className="p-2 flex space-x-1">
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
+                                    <td className="px-2 py-1.5 flex space-x-2">
+                                        {/* Edit */}
+                                        <button
                                             onClick={() => openEditModal(c)}
-                                            startIcon={
+                                            className="h-8 w-8 flex items-center justify-center rounded-md border border-gray-300 hover:bg-blue-50"
+                                            title="Edit"
+                                        >
+                                            <svg
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                className="h-4 w-4 text-blue-600"
+                                                viewBox="0 0 30 30"
+                                                fill="currentColor"
+                                            >
+                                                <path d="M 22.828125 3 C 22.316375 3 21.804562 3.1954375 21.414062 3.5859375 L 19 6 L 24 11 L 26.414062 8.5859375 C 27.195062 7.8049375 27.195062 6.5388125 26.414062 5.7578125 L 24.242188 3.5859375 C 23.851688 3.1954375 23.339875 3 22.828125 3 z M 17 8 L 5.2597656 19.740234 C 5.2597656 19.740234 6.1775313 19.658 6.5195312 20 C 6.8615312 20.342 6.58 22.58 7 23 C 7.42 23.42 9.6438906 23.124359 9.9628906 23.443359 C 10.281891 23.762359 10.259766 24.740234 10.259766 24.740234 L 22 13 L 17 8 z M 4 23 L 3.0566406 25.671875 A 1 1 0 0 0 3 26 A 1 1 0 0 0 4 27 A 1 1 0 0 0 4.328125 26.943359 A 1 1 0 0 0 4.3378906 26.939453 L 4.3632812 26.931641 A 1 1 0 0 0 4.3691406 26.927734 L 7 26 L 5.5 24.5 L 4 23 z"></path>
+                                            </svg>
+                                        </button>
+
+                                        {/* Archive / Activate */}
+                                        <button
+                                            onClick={() => handleToggleStatus(c)}
+                                            className="h-8 w-8 flex items-center justify-center rounded-md border border-gray-300 hover:bg-gray-50"
+                                            title={c.status === "ACTIVE" ? "Archive" : "Activate"}
+                                        >
+                                            {c.status === "ACTIVE" ? (
                                                 <svg
                                                     xmlns="http://www.w3.org/2000/svg"
-                                                    className="w-3 h-3 text-blue-600"
+                                                    className="h-4 w-4 text-gray-600"
+                                                    viewBox="0 0 24 24"
+                                                    fill="currentColor"
+                                                >
+                                                    <path d="M20.54 5.23l-1.39-1.39C18.77 3.34 18.4 3 18 3H6c-.4 0-.77.34-1.15.84L3.46 5.23C3.18 5.5 3 5.9 3 6.31V8c0 .55.45 1 1 1v9c0 1.66 1.34 3 3 3h10c1.66 0 3-1.34 3-3V9c.55 0 1-.45 1-1V6.31c0-.41-.18-.81-.46-1.08zM12 17c-1.1 0-2-.9-2-2h4c0 1.1-.9 2-2 2zm6-9H6V7h12v1z"></path>
+                                                </svg>
+                                            ) : (
+                                                <svg
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                    className="h-4 w-4 text-green-600"
                                                     fill="none"
                                                     viewBox="0 0 24 24"
                                                     stroke="currentColor"
@@ -263,55 +293,11 @@ export default function InsurancePage() {
                                                     <path
                                                         strokeLinecap="round"
                                                         strokeLinejoin="round"
-                                                        d="M16.862 4.487l2.651 2.65m-2.651-2.65L6.75 14.6l-1.5 4.5 4.5-1.5L19.512 7.137m-2.65-2.65a1.875 1.875 0 112.651 2.65L9.75 16.35m6.75-11.863L9.75 16.35"
+                                                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
                                                     />
                                                 </svg>
-                                            }
-                                        >
-                                            <span className="sr-only">Edit</span>
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => handleToggleStatus(c)}
-                                            startIcon={
-                                                c.status === "ACTIVE" ? (
-                                                    <svg
-                                                        xmlns="http://www.w3.org/2000/svg"
-                                                        className="w-3 h-3 text-gray-600"
-                                                        fill="none"
-                                                        viewBox="0 0 24 24"
-                                                        stroke="currentColor"
-                                                        strokeWidth={2}
-                                                    >
-                                                        <path
-                                                            strokeLinecap="round"
-                                                            strokeLinejoin="round"
-                                                            d="M20 7H4m16 0v12a2 2 0 01-2 2H6a2 2 0 01-2-2V7m16 0L18 3H6L4 7"
-                                                        />
-                                                    </svg>
-                                                ) : (
-                                                    <svg
-                                                        xmlns="http://www.w3.org/2000/svg"
-                                                        className="w-3 h-3 text-green-600"
-                                                        fill="none"
-                                                        viewBox="0 0 24 24"
-                                                        stroke="currentColor"
-                                                        strokeWidth={2}
-                                                    >
-                                                        <path
-                                                            strokeLinecap="round"
-                                                            strokeLinejoin="round"
-                                                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                                                        />
-                                                    </svg>
-                                                )
-                                            }
-                                        >
-                        <span className="sr-only">
-                          {c.status === "ACTIVE" ? "Archive" : "Activate"}
-                        </span>
-                                        </Button>
+                                            )}
+                                        </button>
                                     </td>
                                 </tr>
                             ))}
@@ -321,7 +307,7 @@ export default function InsurancePage() {
                 </div>
 
                 {/* Pagination */}
-                <div className="flex justify-between items-center mt-3 text-xs text-gray-600">
+                <div className="flex justify-between items-center mt-2 text-xs text-gray-600">
                     <p>
                         Showing {(page - 1) * pageSize + 1}-
                         {Math.min(page * pageSize, filtered.length)} of {filtered.length}
@@ -333,7 +319,7 @@ export default function InsurancePage() {
                             disabled={page === 1}
                             onClick={() => setPage(page - 1)}
                         >
-                            ← Prev
+                            Prev
                         </Button>
                         <Button
                             variant="outline"
@@ -341,7 +327,7 @@ export default function InsurancePage() {
                             disabled={page === totalPages}
                             onClick={() => setPage(page + 1)}
                         >
-                            Next →
+                            Next
                         </Button>
                     </div>
                 </div>

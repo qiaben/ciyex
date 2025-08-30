@@ -143,7 +143,7 @@ interface HistoryForm {
 
 interface EncounterFormProps {
     onCancel: () => void | Promise<void>;
-    onSave: () => void | Promise<void>;
+    onSave: (form: EncounterFormData) => void | Promise<void>;
 }
 
 
@@ -262,7 +262,7 @@ export default function PatientDashboardPage() {
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [medications, setMedications] = useState<Medication[]>([]);
     const [allergies, setAllergies] = useState<Allergy[]>([]);
-    const [searchTerm, setSearchTerm] = useState("");
+    // const [searchTerm, setSearchTerm] = useState("");
     const [viewMode, setViewMode] = useState<string>("dashboard");
     const [highlightedTab, setHighlightedTab] = useState<string>("dashboard");
     const [selectedDoc, setSelectedDoc] = useState<string | null>(null);
@@ -664,11 +664,11 @@ export default function PatientDashboardPage() {
         return date ? new Date(date).toLocaleString() : "—";
     };
 
-    const filteredAppointments = appointments.filter((appt) =>
-        appt.provider.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        appt.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        appt.status.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    // const filteredAppointments = appointments.filter((appt) =>
+    //     appt.provider.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    //     appt.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    //     appt.status.toLowerCase().includes(searchTerm.toLowerCase())
+    // );
 
     if (loading) {
         return (
@@ -709,30 +709,38 @@ export default function PatientDashboardPage() {
         {key: "appointments", label: "Appointments"},
         {key: "insurance", label: "Insurance"},
         {key: "history", label: "History"},
+        {key: "documents", label: "Documents"},
         {key: "report", label: "Report"},
         {key: "allergies", label: "Allergies"},
         {key: "medications", label: "Medications"},
         {key: "labs", label: "Labs"},
-        {key: "documents", label: "Documents"},
-        {key: "messages", label: "Messages"},
         {key: "transactions", label: "Transactions"},
         {key: "issues", label: "Issues"},
         {key: "vitals", label: "Vitals"},
+        {key: "messages", label: "Messages"},
     ];
 
     const renderTabContent = (tabKey: string) => {
         switch (tabKey) {
-            case "dashboard": {
+            case "dashboard":
                 return (
-                    <div className="space-y-6">
-                        {/* Dashboard Card */}
-                        {/* Two Column Grid: Recent Activity + Upcoming */}
-                        <div className="grid md:grid-cols-2 gap-6 ">
-                            {/* Recent Activity */}
-                            <div className="pr-6">
-                                <div className="bg-white rounded-md border border-gray-200 p-4">
-
-                                <h5 className="text-sm font-semibold text-gray-800 mb-2">Recent Activity</h5>
+                    <div className="space-y-10">
+                        {/* ✅ Recent & Upcoming in one card */}
+                        <div
+                            id="activity"
+                            ref={(el) => { tabContentRefs.current["activity"] = el }}
+                            style={{ scrollMarginTop: headerH + 12 }}
+                            className="bg-white rounded-lg border border-gray-200 shadow-sm p-6"
+                        >
+                            <h4 className="text-lg font-semibold text-gray-800 mb-4">
+                                Recent & Upcoming
+                            </h4>
+                            <div className="grid md:grid-cols-2 gap-6">
+                                {/* Recent Activity */}
+                                <div>
+                                    <h5 className="text-sm font-medium text-blue-700 mb-2">
+                                        Recent Activity
+                                    </h5>
                                     {appointments.length > 0 ? (
                                         <ul className="text-sm space-y-1 text-gray-600 list-disc pl-4">
                                             {appointments
@@ -747,545 +755,227 @@ export default function PatientDashboardPage() {
                                     ) : (
                                         <p className="text-gray-500 text-sm">No recent activity</p>
                                     )}
-                                    <button
-                                        onClick={() => onTabClick("appointments")}
-                                        className="mt-3 text-xs text-blue-600 hover:underline"
-                                    >
-                                        View full details →
-                                    </button>
                                 </div>
-                            </div>
 
-                            {/* Upcoming Appointments */}
-                            <div className="pl-6">
-                                <div className="bg-white rounded-md border border-gray-200 p-4">
-
-                                <h5 className="text-sm font-semibold text-gray-800 mb-2">Upcoming</h5>
+                                {/* Upcoming Appointments */}
+                                <div>
+                                    <h5 className="text-sm font-medium text-blue-700 mb-2">
+                                        Upcoming
+                                    </h5>
                                     {appointments.find((a) => a.status === "Scheduled") ? (
                                         <p className="text-sm text-gray-600">
                                             {formatDateTimeLocal(
                                                 appointments.find((a) => a.status === "Scheduled")!.date
                                             )}{" "}
-                                            — with {appointments.find((a) => a.status === "Scheduled")!.provider}
+                                            — with{" "}
+                                            {appointments.find((a) => a.status === "Scheduled")!.provider}
                                         </p>
                                     ) : (
-                                        <p className="text-gray-500 text-sm">No upcoming appointments</p>
+                                        <p className="text-gray-500 text-sm">
+                                            No upcoming appointments
+                                        </p>
                                     )}
-                                    <button
-                                        onClick={() => onTabClick("appointments")}
-                                        className="mt-3 text-xs text-blue-600 hover:underline"
-                                    >
-                                        View full details →
-                                    </button>
                                 </div>
                             </div>
                         </div>
 
-
-                        {/* Demographics */}
+                        {/* ✅ Demographics */}
                         <div
                             id="demographics"
-                            ref={(el) => {
-                                if (el) tabContentRefs.current["demographics"] = el
-                            }}
-                            data-tabkey="demographics"
+                            ref={(el) => { tabContentRefs.current["demographics"] = el }}
                             style={{ scrollMarginTop: headerH + 12 }}
-                            className="bg-white rounded-lg border border-gray-200 shadow-sm p-4"
                         >
-                            <h4 className="text-sm font-semibold text-gray-800 mb-3">Demographics</h4>
-                            <div className="grid md:grid-cols-2 gap-x-8 gap-y-1 text-sm text-gray-600">
-                                <div>
-                                    <div>
-                                        <span className="font-medium">Name:</span> {patient.firstName}{" "}
-                                        {patient.lastName}
-                                    </div>
-                                    <div>
-                                        <span className="font-medium">Gender:</span> {patient.gender || "—"}
-                                    </div>
-                                    <div>
-                                        <span className="font-medium">Address:</span>{" "}
-                                        {patient.address || "—"}
-                                    </div>
-                                </div>
-                                <div>
-                                    <div>
-                                        <span className="font-medium">DOB:</span>{" "}
-                                        {formatDateLocal(patient.dateOfBirth)}
-                                    </div>
-                                    <div>
-                                        <span className="font-medium">MRN:</span> {patient.mrn || "—"}
-                                    </div>
-                                </div>
-                            </div>
-                            <button
-                                onClick={() => onTabClick("demographics")}
-                                className="mt-3 text-xs text-blue-600 hover:underline"
-                            >
-                                View full details →
-                            </button>
+                            <DemographicsFlat
+                                patient={patient}
+                                demoForm={demoForm}
+                                setDemoForm={setDemoForm}
+                                editDemographics={editDemographics}
+                                setEditDemographics={setEditDemographics}
+                                saveDemographics={saveDemographics}
+                                calculateAgeLocal={calculateAgeLocal}
+                            />
                         </div>
 
-                        {/* Appointments */}
+                        {/* ✅ Appointments */}
                         <div
                             id="appointments"
-                            ref={(el) => {
-                                if (el) tabContentRefs.current["appointments"] = el
-                            }}
-                            data-tabkey="appointments"
+                            ref={(el) => { tabContentRefs.current["appointments"] = el }}
                             style={{ scrollMarginTop: headerH + 12 }}
-                            className="bg-white rounded-lg border border-gray-200 shadow-sm p-4"
                         >
-                            <h4 className="text-sm font-semibold text-gray-800 mb-3">Appointments</h4>
-                            <div className="space-y-3">
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        type="text"
-                                        placeholder="Search appointments..."
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                        className="flex-1 rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm"
-                                    />
-                                    <button
-                                        onClick={() => onTabClick("appointments")}
-                                        className="px-4 py-2 rounded-md bg-blue-600 text-white text-sm font-medium hover:bg-blue-700"
-                                    >
-                                        Schedule
-                                    </button>
-                                </div>
-                                <div className="overflow-x-auto border border-gray-200 rounded-lg">
-                                    <table className="min-w-full text-sm">
-                                        <thead className="bg-gray-50 text-gray-700 font-semibold">
-                                        <tr>
-                                            <th className="px-4 py-2 text-left">Date</th>
-                                            <th className="px-4 py-2 text-left">Provider</th>
-                                            <th className="px-4 py-2 text-left">Type</th>
-                                            <th className="px-4 py-2 text-left">Status</th>
-                                            <th className="px-4 py-2 text-left">Action</th>
-                                        </tr>
-                                        </thead>
-                                        <tbody>
-                                        {filteredAppointments.length > 0 ? (
-                                            filteredAppointments.slice(0, 2).map((appt) => (
-                                                <tr key={appt.id} className="border-t">
-                                                    <td className="px-4 py-2">{formatDateLocal(appt.date)}</td>
-                                                    <td className="px-4 py-2">{appt.provider}</td>
-                                                    <td className="px-4 py-2">{appt.type}</td>
-                                                    <td className="px-4 py-2">
-                        <span
-                            className={`px-2 py-1 rounded text-xs font-medium ${
-                                appt.status === "Scheduled"
-                                    ? "bg-blue-100 text-blue-700"
-                                    : appt.status === "Completed"
-                                        ? "bg-green-100 text-green-700"
-                                        : "bg-gray-100 text-gray-600"
-                            }`}
-                        >
-                          {appt.status}
-                        </span>
-                                                    </td>
-                                                    <td className="px-4 py-2">
-                                                        <button
-                                                            onClick={() => onTabClick("appointments")}
-                                                            className="px-2 py-1 text-xs bg-gray-100 rounded hover:bg-gray-200"
-                                                        >
-                                                            Encounter
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            ))
-                                        ) : (
-                                            <tr>
-                                                <td
-                                                    colSpan={5}
-                                                    className="px-4 py-6 text-center text-gray-400"
-                                                >
-                                                    No appointments scheduled
-                                                </td>
-                                            </tr>
-                                        )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                            <button
-                                onClick={() => onTabClick("appointments")}
-                                className="mt-3 text-xs text-blue-600 hover:underline"
-                            >
-                                View full details →
-                            </button>
+                            <AppointmentsFlat
+                                patientId={Number(patient.id)}
+                                formatDateTimeLocal={formatDateTimeLocal}
+                            />
                         </div>
 
-                        {/* Insurance */}
+                        {/* ✅ Insurance */}
                         <div
                             id="insurance"
-                            ref={(el) => {
-                                if (el) tabContentRefs.current["insurance"] = el
-                            }}
-                            data-tabkey="insurance"
+                            ref={(el) => { tabContentRefs.current["insurance"] = el }}
                             style={{ scrollMarginTop: headerH + 12 }}
-                            className="bg-white rounded-lg border border-gray-200 shadow-sm p-4"
                         >
-                            <h4 className="text-sm font-semibold text-gray-800 mb-2">Insurance</h4>
-                            <p className="text-sm text-gray-600">
-                                {patient.insuranceProvider || "No insurance data"}
-                            </p>
-                            <button
-                                onClick={() => onTabClick("insurance")}
-                                className="mt-3 text-xs text-blue-600 hover:underline"
-                            >
-                                View full details →
-                            </button>
+                            <InsuranceFlat
+                                patient={patient}
+                                insuranceForm={insuranceForm}
+                                setInsuranceForm={setInsuranceForm}
+                                editInsurance={editInsurance}
+                                setEditInsurance={setEditInsurance}
+                                insuranceSubTab={insuranceSubTab}
+                                setInsuranceSubTab={setInsuranceSubTab}
+                                saveInsurance={saveInsurance}
+                                setPolicyField={setPolicyField}
+                                setViewMode={setViewMode}
+                                setHighlightedTab={setHighlightedTab}
+                            />
                         </div>
 
-                        {/* History */}
+                        {/* ✅ History */}
                         <div
                             id="history"
-                            ref={(el) => {
-                                if (el) tabContentRefs.current["history"] = el
-                            }}
-                            data-tabkey="history"
+                            ref={(el) => { tabContentRefs.current["history"] = el }}
                             style={{ scrollMarginTop: headerH + 12 }}
-                            className="bg-white rounded-lg border border-gray-200 shadow-sm p-4"
                         >
-                            <h4 className="text-sm font-semibold text-gray-800 mb-2">History</h4>
-                            <p className="text-sm text-gray-500">
-                                Family history and lifestyle details
-                            </p>
-                            <button
-                                onClick={() => onTabClick("history")}
-                                className="mt-3 text-xs text-blue-600 hover:underline"
-                            >
-                                View full details →
-                            </button>
+                            <HistoryFlat
+                                historyForm={historyForm}
+                                setHistoryForm={setHistoryForm}
+                                editHistory={editHistory}
+                                setEditHistory={setEditHistory}
+                                activeHistoryTab={activeHistoryTab}
+                                setActiveHistoryTab={setActiveHistoryTab}
+                                saveHistory={saveHistory}
+                            />
                         </div>
 
-                        {/* Report */}
-                        <div
-                            id="report"
-                            ref={(el) => {
-                                if (el) tabContentRefs.current["report"] = el
-                            }}
-                            data-tabkey="report"
-                            style={{ scrollMarginTop: headerH + 12 }}
-                            className="bg-white rounded-lg border border-gray-200 shadow-sm p-4"
-                        >
-                            <h4 className="text-sm font-semibold text-gray-800 mb-2">Report</h4>
-                            <p className="text-sm text-gray-500">Generate clinical reports</p>
-                            <button
-                                onClick={() => onTabClick("report")}
-                                className="mt-3 text-xs text-blue-600 hover:underline"
-                            >
-                                View full details →
-                            </button>
-                        </div>
-
-                        {/* Allergies */}
-                        <div
-                            id="allergies"
-                            ref={(el) => {
-                                if (el) tabContentRefs.current["allergies"] = el
-                            }}
-                            data-tabkey="allergies"
-                            style={{ scrollMarginTop: headerH + 12 }}
-                            className="bg-white rounded-lg border border-gray-200 shadow-sm p-4"
-                        >
-                            <h4 className="text-sm font-semibold text-gray-800 mb-2">Allergies</h4>
-                            {allergies.length > 0 ? (
-                                <ul className="text-sm text-gray-600 list-disc pl-4">
-                                    {allergies.slice(0, 2).map((a) => (
-                                        <li key={a.id}>{a.substance}</li>
-                                    ))}
-                                </ul>
-                            ) : (
-                                <p className="text-sm text-gray-500">No allergies</p>
-                            )}
-                            <button
-                                onClick={() => onTabClick("allergies")}
-                                className="mt-3 text-xs text-blue-600 hover:underline"
-                            >
-                                View full details →
-                            </button>
-                        </div>
-
-                        {/* Medications */}
-                        <div
-                            id="medications"
-                            ref={(el) => {
-                                if (el) tabContentRefs.current["medications"] = el
-                            }}
-                            data-tabkey="medications"
-                            style={{ scrollMarginTop: headerH + 12 }}
-                            className="bg-white rounded-lg border border-gray-200 shadow-sm p-4"
-                        >
-                            <h4 className="text-sm font-semibold text-gray-800 mb-2">Medications</h4>
-                            {medications.length > 0 ? (
-                                <ul className="text-sm text-gray-600 list-disc pl-4">
-                                    {medications.slice(0, 2).map((m) => (
-                                        <li key={m.id}>
-                                            {m.name} {m.dosage}
-                                        </li>
-                                    ))}
-                                </ul>
-                            ) : (
-                                <p className="text-sm text-gray-500">No medications</p>
-                            )}
-                            <button
-                                onClick={() => onTabClick("medications")}
-                                className="mt-3 text-xs text-blue-600 hover:underline"
-                            >
-                                View full details →
-                            </button>
-                        </div>
-
-                        {/* Labs */}
-                        <div
-                            id="labs"
-                            ref={(el) => {
-                                if (el) tabContentRefs.current["labs"] = el
-                            }}
-                            data-tabkey="labs"
-                            style={{ scrollMarginTop: headerH + 12 }}
-                            className="bg-white rounded-lg border border-gray-200 shadow-sm p-4"
-                        >
-                            <h4 className="text-sm font-semibold text-gray-800 mb-2">Labs</h4>
-                            <p className="text-sm text-gray-500">View recent lab results</p>
-                            <button
-                                onClick={() => onTabClick("labs")}
-                                className="mt-3 text-xs text-blue-600 hover:underline"
-                            >
-                                View full details →
-                            </button>
-                        </div>
-
-                        {/* Documents */}
+                        {/* ✅ Documents */}
                         <div
                             id="documents"
-                            ref={(el) => {
-                                if (el) tabContentRefs.current["documents"] = el
-                            }}
-                            data-tabkey="documents"
+                            ref={(el) => { tabContentRefs.current["documents"] = el }}
                             style={{ scrollMarginTop: headerH + 12 }}
-                            className="bg-white rounded-lg border border-gray-200 shadow-sm p-4"
                         >
-                            <h4 className="text-sm font-semibold text-gray-800 mb-2">Documents</h4>
-                            {selectedDoc ? (
-                                <p className="text-sm text-gray-600">Last opened: {selectedDoc}</p>
-                            ) : (
-                                <p className="text-sm text-gray-500">No documents</p>
-                            )}
-                            <button
-                                onClick={() => onTabClick("documents")}
-                                className="mt-3 text-xs text-blue-600 hover:underline"
-                            >
-                                View full details →
-                            </button>
+                            <DocumentsFlat
+                                selectedDoc={selectedDoc}
+                                setSelectedDoc={setSelectedDoc}
+                            />
                         </div>
 
-                        {/* Messages */}
+                        {/* ✅ Report */}
                         <div
-                            id="messages"
-                            ref={(el) => {
-                                if (el) tabContentRefs.current["messages"] = el
-                            }}
-                            data-tabkey="messages"
+                            id="report"
+                            ref={(el) => { tabContentRefs.current["report"] = el }}
                             style={{ scrollMarginTop: headerH + 12 }}
-                            className="bg-white rounded-lg border border-gray-200 shadow-sm p-4"
                         >
-                            <h4 className="text-sm font-semibold text-gray-800 mb-2">Messages</h4>
-                            <p className="text-sm text-gray-500">Patient communications</p>
-                            <button
-                                onClick={() => onTabClick("messages")}
-                                className="mt-3 text-xs text-blue-600 hover:underline"
-                            >
-                                View full details →
-                            </button>
+                            <ReportFlat
+                                useDateRange={useDateRange}
+                                setUseDateRange={setUseDateRange}
+                                startDate={startDate}
+                                setStartDate={setStartDate}
+                                endDate={endDate}
+                                setEndDate={setEndDate}
+                                generateReport={generateReport}
+                                downloadReport={downloadReport}
+                                reportFilters={reportFilters}
+                                toggleFilter={toggleFilter}
+                                lastVisitedTab={lastVisitedTab}
+                                setActiveTab={setViewMode}
+                            />
                         </div>
 
-                        {/* Transactions */}
+                        {/* ✅ Allergies */}
+                        <div
+                            id="allergies"
+                            ref={(el) => { tabContentRefs.current["allergies"] = el }}
+                            style={{ scrollMarginTop: headerH + 12 }}
+                        >
+                            <AllergiesFlat allergies={allergies} />
+                        </div>
+
+                        {/* ✅ Medications */}
+                        <div
+                            id="medications"
+                            ref={(el) => { tabContentRefs.current["medications"] = el }}
+                            style={{ scrollMarginTop: headerH + 12 }}
+                        >
+                            <MedicationsFlat medications={medications} />
+                        </div>
+
+                        {/* ✅ Labs */}
+                        <div
+                            id="labs"
+                            ref={(el) => { tabContentRefs.current["labs"] = el }}
+                            style={{ scrollMarginTop: headerH + 12 }}
+                        >
+                            <LabsFlat labsData={[]} />
+                        </div>
+
+                        {/* ✅ Transactions */}
                         <div
                             id="transactions"
-                            ref={(el) => {
-                                if (el) tabContentRefs.current["transactions"] = el
-                            }}
-                            data-tabkey="transactions"
+                            ref={(el) => { tabContentRefs.current["transactions"] = el }}
                             style={{ scrollMarginTop: headerH + 12 }}
-                            className="bg-white rounded-lg border border-gray-200 shadow-sm p-4"
                         >
-                            <h4 className="text-sm font-semibold text-gray-800 mb-2">Transactions</h4>
-                            {billing ? (
-                                <p className="text-sm text-gray-600">
-                                    Balance: ${billing.totalBalanceDue}
-                                </p>
-                            ) : (
-                                <p className="text-sm text-gray-500">No billing data</p>
-                            )}
-                            <button
-                                onClick={() => onTabClick("transactions")}
-                                className="mt-3 text-xs text-blue-600 hover:underline"
-                            >
-                                View full details →
-                            </button>
+                            <BillingFlat billing={billing} />
                         </div>
 
-                        {/* Issues */}
+                        {/* ✅ Issues */}
                         <div
                             id="issues"
-                            ref={(el) => {
-                                if (el) tabContentRefs.current["issues"] = el
-                            }}
-                            data-tabkey="issues"
+                            ref={(el) => { tabContentRefs.current["issues"] = el }}
                             style={{ scrollMarginTop: headerH + 12 }}
-                            className="bg-white rounded-lg border border-gray-200 shadow-sm p-4"
+                            className="bg-white rounded-lg border border-gray-200 shadow-sm p-6"
                         >
                             <h4 className="text-sm font-semibold text-gray-800 mb-2">Issues</h4>
                             <p className="text-sm text-gray-500">No issues recorded</p>
-                            <button
-                                onClick={() => onTabClick("issues")}
-                                className="mt-3 text-xs text-blue-600 hover:underline"
-                            >
-                                View full details →
-                            </button>
                         </div>
 
-                        {/* Vitals */}
+                        {/* ✅ Vitals */}
                         <div
                             id="vitals"
-                            ref={(el) => {
-                                if (el) tabContentRefs.current["vitals"] = el
-                            }}
-                            data-tabkey="vitals"
+                            ref={(el) => { tabContentRefs.current["vitals"] = el }}
                             style={{ scrollMarginTop: headerH + 12 }}
-                            className="bg-white rounded-lg border border-gray-200 shadow-sm p-4"
+                            className="bg-white rounded-lg border border-gray-200 shadow-sm p-6"
                         >
                             <h4 className="text-sm font-semibold text-gray-800 mb-2">Vitals</h4>
                             <p className="text-sm text-gray-500">No vitals recorded</p>
-                            <button
-                                onClick={() => onTabClick("vitals")}
-                                className="mt-3 text-xs text-blue-600 hover:underline"
-                            >
-                                View full details →
-                            </button>
+                        </div>
+
+                        {/* ✅ Messages */}
+                        <div
+                            id="messages"
+                            ref={(el) => { tabContentRefs.current["messages"] = el }}
+                            style={{ scrollMarginTop: headerH + 12 }}
+                            className="bg-white rounded-lg border border-gray-200 shadow-sm p-6"
+                        >
+                            <h4 className="text-sm font-semibold text-gray-800 mb-2">Messages</h4>
+                            <p className="text-sm text-gray-500">Patient communications</p>
                         </div>
                     </div>
-                )
-            }
-
-
-            case "history":
-                return (
-                    <HistoryFlat
-                        historyForm={historyForm}
-                        setHistoryForm={setHistoryForm}
-                        editHistory={editHistory}
-                        setEditHistory={setEditHistory}
-                        activeHistoryTab={activeHistoryTab}
-                        setActiveHistoryTab={setActiveHistoryTab}
-                        saveHistory={saveHistory}
-                    />
-                );
-            case "insurance":
-                return (
-                    <InsuranceFlat
-                        patient={patient}
-                        insuranceForm={insuranceForm}
-                        setInsuranceForm={setInsuranceForm}
-                        editInsurance={editInsurance}
-                        setEditInsurance={setEditInsurance}
-                        insuranceSubTab={insuranceSubTab}
-                        setInsuranceSubTab={setInsuranceSubTab}
-                        saveInsurance={saveInsurance}
-                        setPolicyField={setPolicyField}
-                        setViewMode={setViewMode}
-                        setHighlightedTab={setHighlightedTab}
-                    />
-                );
-            case "appointments":
-                return (
-                    <AppointmentsFlat
-                        filteredAppointments={filteredAppointments}
-                        searchTerm={searchTerm}
-                        setSearchTerm={setSearchTerm}
-                        formatDateTimeLocal={formatDateTimeLocal}
-                    />
-                );
-            case "billing":
-                return <BillingFlat billing={billing}/>;
-            case "medications":
-                return (
-                    <MedicationsFlat
-                        medications={medications}
-                        setActiveTab={setViewMode}
-                    />
-                );
-            case "report":
-                return (
-                    <ReportFlat
-                        useDateRange={useDateRange}
-                        setUseDateRange={setUseDateRange}
-                        startDate={startDate}
-                        setStartDate={setStartDate}
-                        endDate={endDate}
-                        setEndDate={setEndDate}
-                        generateReport={generateReport}
-                        downloadReport={downloadReport}
-                        reportFilters={reportFilters}
-                        toggleFilter={toggleFilter}
-                        lastVisitedTab={lastVisitedTab}
-                        setActiveTab={setViewMode}
-                    />
-                );
-            case "allergies":
-                return (
-                    <AllergiesFlat
-                        allergies={allergies}
-                        setActiveTab={setViewMode}
-                    />
-                );
-            case "demographics":
-                return (
-                    <DemographicsFlat
-                        patient={patient}
-                        demoForm={demoForm}
-                        setDemoForm={setDemoForm}
-                        editDemographics={editDemographics}
-                        setEditDemographics={setEditDemographics}
-                        saveDemographics={saveDemographics}
-                        calculateAgeLocal={calculateAgeLocal}
-                    />
                 );
 
 
 
-
-
-            case "documents":
-                return (
-                    <DocumentsFlat
-                        selectedDoc={selectedDoc}
-                        setSelectedDoc={setSelectedDoc}
-                    />
-                );
-            case "labs":
-                return <LabsFlat labsData={[]}/>;
             default:
                 return (
                     <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
                         <div className="text-center py-8">
-                            <div
-                                className="mx-auto w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-3"
-                            >
-                                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor"
-                                     viewBox="0 0 24 24">
+                            <div className="mx-auto w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-3">
+                                <svg
+                                    className="w-8 h-8 text-gray-400"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
                                     <path
                                         strokeLinecap="round"
                                         strokeLinejoin="round"
                                         strokeWidth="2"
                                         d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                                    ></path>
+                                    />
                                 </svg>
                             </div>
                             <h5 className="text-gray-700 font-medium">No data available</h5>
-                            <p className="text-gray-500 text-sm mt-1">This section is currently empty</p>
+                            <p className="text-gray-500 text-sm mt-1">
+                                This section is currently empty
+                            </p>
                         </div>
                     </div>
                 );
@@ -1305,13 +995,13 @@ export default function PatientDashboardPage() {
                 }
             `}</style>
             <style jsx>{`
-                .pageScroll {
-                    min-height: 100vh;
-                    width: 100%;
-                    overflow-y: auto;
-                    overflow-x: hidden;
-                    -webkit-overflow-scrolling: touch;
-                }
+                //.pageScroll {
+                //    min-height: 100vh;
+                //    width: 100%;
+                //    overflow-y: auto;
+                //    overflow-x: hidden;
+                //    -webkit-overflow-scrolling: touch;
+                //}
 
                 .patientSummary *,
                 .quickActions * {
@@ -1322,14 +1012,14 @@ export default function PatientDashboardPage() {
                     scrollbar-width: none;
                 }
 
-                .hide-scrollbar {
-                    -ms-overflow-style: none; /* IE & Edge */
-                    scrollbar-width: none; /* Firefox */
-                }
+                //.hide-scrollbar {
+                //    -ms-overflow-style: none; /* IE & Edge */
+                //    scrollbar-width: none; /* Firefox */
+                //}
 
-                .hide-scrollbar::-webkit-scrollbar {
-                    display: none; /* Chrome, Safari, Opera */
-                }
+                //.hide-scrollbar::-webkit-scrollbar {
+                //    display: none; /* Chrome, Safari, Opera */
+                //}
 
                 .patientSummary *::-webkit-scrollbar,
                 .quickActions *::-webkit-scrollbar {
@@ -1565,15 +1255,224 @@ export default function PatientDashboardPage() {
 }
 
 function EncounterForm({ onCancel, onSave }: EncounterFormProps) {
+    const [form, setForm] = useState<EncounterFormData>({
+        visitCategory: "",
+        encounterClass: "Outpatient",
+        encounterType: "",
+        sensitivity: "Normal",
+        encounterProvider: "",
+        referringProvider: "",
+        facility: "",
+        billingFacility: "",
+        inCollection: "No",
+        dischargeDisposition: "",
+        reasonForVisit: "",
+        issues: [],
+    });
+
+    const setField = <K extends keyof EncounterFormData>(
+        field: K,
+        value: EncounterFormData[K]
+    ) => {
+        setForm((prev) => ({ ...prev, [field]: value }));
+    };
+
     return (
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold mb-4">New Encounter</h2>
-            {/* Form fields here */}
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+            <h3 className="text-lg font-semibold mb-4">New Encounter</h3>
+
+            {/* --- Encounter Fields --- */}
+            <div className="grid md:grid-cols-2 gap-4 mb-6">
+                {/* Visit Category */}
+                <div>
+                    <label className="block text-sm font-medium">Visit Category</label>
+                    <select
+                        value={form.visitCategory}
+                        onChange={(e) => setField("visitCategory", e.target.value)}
+                        className="w-full border rounded px-3 py-2"
+                    >
+                        <option>-- Select One --</option>
+                        <option>Inpatient</option>
+                        <option>Outpatient</option>
+                        <option>Emergency</option>
+                        <option>Observation</option>
+                        <option>Telehealth</option>
+                        <option>Preventive Care</option>
+                        <option>Home Health</option>
+                        <option>Ambulatory Surgery</option>
+                        <option>Urgent Care</option>
+                    </select>
+                </div>
+
+                {/* Class */}
+                <div>
+                    <label className="block text-sm font-medium">Class</label>
+                    <select
+                        value={form.encounterClass}
+                        onChange={(e) => setField("encounterClass", e.target.value)}
+                        className="w-full border rounded px-3 py-2"
+                    >
+                        <option>Outpatient</option>
+                        <option>Inpatient</option>
+                        <option>Emergency</option>
+                        <option>Day Care</option>
+                        <option>Virtual</option>
+                    </select>
+                </div>
+
+                {/* Type */}
+                <div>
+                    <label className="block text-sm font-medium">Type</label>
+                    <select
+                        value={form.encounterType}
+                        onChange={(e) => setField("encounterType", e.target.value)}
+                        className="w-full border rounded px-3 py-2"
+                    >
+                        <option>-- Select One --</option>
+                        <option>Consultation</option>
+                        <option>Follow-up</option>
+                        <option>Routine Exam</option>
+                        <option>Initial Visit</option>
+                        <option>Post-Op Visit</option>
+                        <option>Telemedicine</option>
+                        <option>Walk-in</option>
+                    </select>
+                </div>
+
+                {/* Sensitivity */}
+                <div>
+                    <label className="block text-sm font-medium">Sensitivity</label>
+                    <select
+                        value={form.sensitivity}
+                        onChange={(e) => setField("sensitivity", e.target.value)}
+                        className="w-full border rounded px-3 py-2"
+                    >
+                        <option>Normal</option>
+                        <option>High</option>
+                        <option>Restricted</option>
+                    </select>
+                </div>
+
+                {/* Encounter Provider */}
+                <div>
+                    <label className="block text-sm font-medium">Encounter Provider</label>
+                    <input
+                        className="w-full border rounded px-3 py-2"
+                        value={form.encounterProvider}
+                        onChange={(e) => setField("encounterProvider", e.target.value)}
+                        placeholder="e.g. Dr. John Doe"
+                    />
+                </div>
+
+                {/* Referring Provider */}
+                <div>
+                    <label className="block text-sm font-medium">Referring Provider</label>
+                    <input
+                        className="w-full border rounded px-3 py-2"
+                        value={form.referringProvider}
+                        onChange={(e) => setField("referringProvider", e.target.value)}
+                        placeholder="e.g. Dr. Patel"
+                    />
+                </div>
+
+                {/* Facility */}
+                <div>
+                    <label className="block text-sm font-medium">Facility</label>
+                    <input
+                        className="w-full border rounded px-3 py-2"
+                        value={form.facility}
+                        onChange={(e) => setField("facility", e.target.value)}
+                        placeholder="e.g. Main Hospital"
+                    />
+                </div>
+
+                {/* Billing Facility */}
+                <div>
+                    <label className="block text-sm font-medium">Billing Facility</label>
+                    <input
+                        className="w-full border rounded px-3 py-2"
+                        value={form.billingFacility}
+                        onChange={(e) => setField("billingFacility", e.target.value)}
+                        placeholder="e.g. Qiaben Uptown"
+                    />
+                </div>
+
+                {/* In Collection */}
+                <div>
+                    <label className="block text-sm font-medium">In Collection</label>
+                    <select
+                        value={form.inCollection}
+                        onChange={(e) => setField("inCollection", e.target.value)}
+                        className="w-full border rounded px-3 py-2"
+                    >
+                        <option>No</option>
+                        <option>Yes</option>
+                        <option>Pending</option>
+                    </select>
+                </div>
+
+                {/* Discharge Disposition */}
+                <div>
+                    <label className="block text-sm font-medium">Discharge Disposition</label>
+                    <select
+                        value={form.dischargeDisposition}
+                        onChange={(e) => setField("dischargeDisposition", e.target.value)}
+                        className="w-full border rounded px-3 py-2"
+                    >
+                        <option>-- Select One --</option>
+                        <option>Home (Self-Care)</option>
+                        <option>Transfer to Another Facility</option>
+                        <option>Skilled Nursing Facility</option>
+                        <option>Expired</option>
+                        <option>Left Against Medical Advice</option>
+                        <option>Hospice</option>
+                        <option>Rehabilitation Facility</option>
+                        <option>Still Patient</option>
+                    </select>
+                </div>
+            </div>
+
+            {/* Reason & Issues */}
+            <div className="grid md:grid-cols-2 gap-4 mb-6">
+                <div>
+                    <label className="block text-sm font-medium">Reason for Visit</label>
+                    <textarea
+                        className="w-full border rounded px-3 py-2"
+                        value={form.reasonForVisit}
+                        onChange={(e) => setField("reasonForVisit", e.target.value)}
+                    />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium">Link/Add Issues</label>
+                    <div className="border rounded p-3 h-32 overflow-y-auto text-sm">
+                        <button
+                            type="button"
+                            className="bg-blue-600 text-white px-2 py-1 rounded text-xs mb-2"
+                            onClick={() => setField("issues", [...form.issues, "New Issue"])}
+                        >
+                            + Add Issue
+                        </button>
+                        <div className="mt-2 space-y-1">
+                            {form.issues.map((issue, i) => (
+                                <div key={i}>{issue}</div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Action Buttons */}
             <div className="flex justify-end gap-2 mt-6">
-                <button onClick={onCancel} className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">
+                <button
+                    onClick={onCancel}
+                    className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                >
                     Cancel
                 </button>
-                <button onClick={onSave} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                <button
+                    onClick={() => onSave(form)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
                     Save
                 </button>
             </div>

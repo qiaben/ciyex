@@ -231,7 +231,7 @@ export default function PatientListPage() {
                             <thead className="bg-gray-50">
                             <tr>
                                 <th className="px-2 py-1 text-left text-[11px] text-gray-500 uppercase">Name</th>
-                                <th className="px-2 py-1 text-left text-[11px] text-gray-500 uppercase">Patient ID</th>
+                                <th className="px-2 py-1 text-left text-[11px] text-gray-500 uppercase">MRN</th>
                                 <th className="px-2 py-1 text-left text-[11px] text-gray-500 uppercase">Email</th>
                                 <th className="px-2 py-1 text-left text-[11px] text-gray-500 uppercase">Phone</th>
                                 <th className="px-2 py-1 text-left text-[11px] text-gray-500 uppercase">DOB</th>

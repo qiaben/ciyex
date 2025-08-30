@@ -47,10 +47,10 @@ const HistoryFlat: React.FC<Props> = ({
     };
 
     return (
-        <div className="w-full p-6">
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
             {/* Header */}
             <div className="flex justify-between items-center mb-4">
-                <h4 className="text-2xl font-semibold text-gray-800">History</h4>
+                <h4 className="text-lg font-semibold text-gray-800">History</h4>
                 {!editHistory && (
                     <button
                         onClick={() => setEditHistory(true)}
@@ -77,7 +77,6 @@ const HistoryFlat: React.FC<Props> = ({
                     </button>
                 ))}
             </div>
-
 
             {/* View Mode */}
             {!editHistory ? (
