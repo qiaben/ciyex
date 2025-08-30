@@ -1,6 +1,5 @@
 "use client";
 import React, { useState, useEffect } from "react";
-
 import { fetchWithAuth } from "@/utils/fetchWithAuth";
 
 interface Provider {
@@ -36,7 +35,7 @@ export default function DemographicsFlat({
                                              editDemographics,
                                              setEditDemographics,
                                              saveDemographics,
-                                             calculateAgeLocal,
+
                                          }: Props) {
     const [providers, setProviders] = useState<Provider[]>([]);
     const [patients, setPatients] = useState<PatientRef[]>([]);
@@ -86,32 +85,12 @@ export default function DemographicsFlat({
         setDemoForm((prev) => ({ ...prev, [field]: value }));
     };
 
-    const initials = `${typeof patient.firstName === "string" ? patient.firstName[0] : ""}${
-        typeof patient.lastName === "string" ? patient.lastName[0] : ""
-    }`.toUpperCase();
-
     const Label = ({ text, required }: { text: string; required?: boolean }) => (
         <label className="block text-xs text-gray-600 mb-0.5 flex items-center gap-1">
             {text}
             {required && <span className="text-red-500" title="Required">*</span>}
-            {/* ℹ️ Info icon (inline SVG) */}
-            <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="w-3 h-3 text-gray-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-            >
-                <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M13 16h-1v-4h-1m1-4h.01M12 3a9 9 0 110 18 9 9 0 010-18z"
-                />
-            </svg>
         </label>
     );
-
 
     const renderField = (
         label: string,
@@ -153,31 +132,16 @@ export default function DemographicsFlat({
     );
 
     const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
-        <section className="w-full mb-3">
-            <h2 className="text-sm font-semibold text-blue-700 border-b pb-0.5 mb-2 flex items-center gap-1">
+        <section className="w-full mb-4">
+            <h2 className="text-sm font-semibold text-blue-700 border-b pb-0.5 mb-2">
                 {title}
-                {/* ℹ️ Info icon (inline SVG) */}
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="w-3.5 h-3.5 text-gray-400"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                >
-                    <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M13 16h-1v-4h-1m1-4h.01M12 3a9 9 0 110 18 9 9 0 010-18z"
-                    />
-                </svg>
             </h2>
             {children}
         </section>
     );
 
     return (
-        <div className="container mx-auto p-2 max-w-full">
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
             {/* ✅ Alert Banner */}
             {alertState && (
                 <div
@@ -191,25 +155,10 @@ export default function DemographicsFlat({
                 </div>
             )}
 
-            {/* Header */}
-            <div className="flex justify-between items-center bg-gradient-to-r from-blue-50 to-purple-50 p-2 rounded shadow mb-3">
-                <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 flex items-center justify-center rounded-full bg-blue-200 text-blue-800 font-bold text-xs">
-                        {initials}
-                    </div>
-                    <div>
-                        <h1 className="text-sm font-semibold leading-tight">
-                            {patient.firstName} {patient.lastName}{" "}
-                            {typeof patient.dateOfBirth === "string"
-                                ? `| ${calculateAgeLocal(patient.dateOfBirth)} yrs`
-                                : ""}
-                        </h1>
-                        <div className="text-xs text-gray-600">
-                            {patient.phoneNumber} • {patient.email}
-                        </div>
-                    </div>
-                </div>
-                <div className="flex gap-1">
+            {/* Header with Edit/Save/Cancel */}
+            <div className="flex justify-between items-center mb-4">
+                <h1 className="text-lg font-semibold text-gray-800">Demographics</h1>
+                <div className="flex gap-2">
                     {!editDemographics ? (
                         <button
                             onClick={() => setEditDemographics(true)}
@@ -259,7 +208,6 @@ export default function DemographicsFlat({
                     {renderField("Preferred Name", "preferredName")}
                     {renderField("Date of Birth", "dateOfBirth", "date", undefined, true)}
                     {renderField("Sex at Birth", "sexAtBirth", "text", ["Male", "Female"], true)}
-
                     {/* Assigned Provider */}
                     <div className="col-span-2">
                         <Label text="Assigned Provider" required />
@@ -347,9 +295,10 @@ export default function DemographicsFlat({
                         )}
                     </div>
                 </div>
+
             </Section>
 
-            {/* ✅ Contact Info */}
+            {/* ✅ Contact Information */}
             <Section title="Contact Information">
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                     {renderField("Mobile Number", "mobileNumber")}
@@ -368,13 +317,18 @@ export default function DemographicsFlat({
             <Section title="Family File & Care Team">
                 <div className="grid grid-cols-2 gap-2">
                     {renderField("Head of Household", "headOfHousehold")}
-                    {renderField("Financial Responsibility", "financialResponsibility", "text", ["Self", "HOH responsible"])}
+                    {renderField("Financial Responsibility", "financialResponsibility", "text", [
+                        "Self",
+                        "HOH responsible",
+                    ])}
                     {renderField("Head of Communication", "headOfCommunication")}
                 </div>
                 <h3 className="mt-1 font-medium text-xs">Family Members</h3>
                 {patient.familyMembers?.length ? (
                     <ul className="list-disc pl-5 text-xs space-y-0.5">
-                        {patient.familyMembers.map((m, i) => <li key={i}>{m}</li>)}
+                        {patient.familyMembers.map((m, i) => (
+                            <li key={i}>{m}</li>
+                        ))}
                     </ul>
                 ) : (
                     <div className="text-xs text-gray-500">None</div>
@@ -382,7 +336,9 @@ export default function DemographicsFlat({
                 <h3 className="mt-2 font-medium text-xs">Care Team</h3>
                 {patient.careTeam?.length ? (
                     <ul className="list-disc pl-5 text-xs space-y-0.5">
-                        {patient.careTeam.map((c, i) => <li key={i}>{c}</li>)}
+                        {patient.careTeam.map((c, i) => (
+                            <li key={i}>{c}</li>
+                        ))}
                     </ul>
                 ) : (
                     <div className="text-xs text-gray-500">None</div>
@@ -393,22 +349,32 @@ export default function DemographicsFlat({
             <Section title="Communication Preferences">
                 <div className="grid grid-cols-2 gap-2">
                     {renderField("Appointment Reminders", "reminderPreference", "text", ["Yes", "No"])}
-                    {renderField("Preferred Contact Time", "preferredContactTime", "text", ["Morning", "Afternoon", "Evening"])}
+                    {renderField("Preferred Contact Time", "preferredContactTime", "text", [
+                        "Morning",
+                        "Afternoon",
+                        "Evening",
+                    ])}
                     <div>
                         <Label text="Preferred Contact Method" />
-                        {["Email", "Text", "Phone", "Voicemail"].map((method) => (
+                        {["Phone", "Email", "SMS/Text", "Voicemail"].map((method) => (
                             <label key={method} className="flex items-center gap-1 text-xs">
                                 <input
                                     type="checkbox"
                                     checked={
                                         editDemographics
-                                            ? (demoForm[`comm${method}`] as boolean) || (patient[`comm${method}`] as boolean) || false
-                                            : (patient[`comm${method}`] as boolean) || false
+                                            ? (demoForm[`comm${method.replace(/\W/g, "")}`] as boolean) ||
+                                            (patient[`comm${method.replace(/\W/g, "")}`] as boolean) ||
+                                            false
+                                            : (patient[`comm${method.replace(/\W/g, "")}`] as boolean) || false
                                     }
                                     disabled={!editDemographics}
                                     onChange={
                                         editDemographics
-                                            ? (e) => handleInputChange(`comm${method}`, e.target.checked)
+                                            ? (e) =>
+                                                handleInputChange(
+                                                    `comm${method.replace(/\W/g, "")}`,
+                                                    e.target.checked
+                                                )
                                             : undefined
                                     }
                                 />
@@ -435,7 +401,9 @@ export default function DemographicsFlat({
                                 type="checkbox"
                                 checked={
                                     editDemographics
-                                        ? (demoForm[`release${r}`] as boolean) || (patient[`release${r}`] as boolean) || false
+                                        ? (demoForm[`release${r}`] as boolean) ||
+                                        (patient[`release${r}`] as boolean) ||
+                                        false
                                         : (patient[`release${r}`] as boolean) || false
                                 }
                                 disabled={!editDemographics}
@@ -450,7 +418,11 @@ export default function DemographicsFlat({
                     ))}
                 </div>
                 <div className="grid grid-cols-2 gap-2 mt-2">
-                    {renderField("Assignment of Benefits", "assignmentRelease", "text", ["Signed", "E-Signed", "Not Signed"])}
+                    {renderField("Assignment of Benefits", "assignmentRelease", "text", [
+                        "Signed",
+                        "E-Signed",
+                        "Not Signed",
+                    ])}
                     {renderField("Photography Release", "photoRelease", "text", ["Yes", "No"])}
                     {renderField("Social Media Release", "socialRelease", "text", ["Yes", "No"])}
                     {renderField("Telehealth Consent", "telehealthConsent", "text", ["Yes", "No"])}
