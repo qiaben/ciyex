@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { fetchWithAuth } from "@/utils/fetchWithAuth";
 
 interface Code {
@@ -34,17 +34,12 @@ export default function CodesPage() {
     const [q, setQ] = useState("");
     const [selectedType, setSelectedType] = useState<string>("");
 
-    const [filterDx, setFilterDx] = useState(false);
-    const [filterServ, setFilterServ] = useState(false);
-    const [filterActive, setFilterActive] = useState(false);
-
-    // ✅ Read context from localStorage
     const orgId = typeof window !== "undefined" ? localStorage.getItem("orgId") : null;
     const patientId = typeof window !== "undefined" ? localStorage.getItem("patientId") : null;
     const encounterId = typeof window !== "undefined" ? localStorage.getItem("encounterId") : null;
 
-    // ✅ Fetch codes
-    const loadCodes = async () => {
+    // ✅ Memoized loader
+    const loadCodes = useCallback(async () => {
         if (!orgId || !patientId || !encounterId) {
             console.warn("Missing orgId/patientId/encounterId in localStorage");
             return;
@@ -65,33 +60,29 @@ export default function CodesPage() {
         } catch (err) {
             console.error("Error loading codes:", err);
         }
-    };
+    }, [orgId, patientId, encounterId, q, selectedType]);
 
-    // ✅ Add or Update
+    // ✅ Save
     const saveCode = async () => {
         if (!orgId || !patientId || !encounterId) return;
 
         if (form.id) {
-            // update
             const res = await fetchWithAuth(`${API_URL}/${patientId}/${encounterId}/${form.id}`, {
                 method: "PUT",
                 body: JSON.stringify(form),
             });
             if (res.ok) {
                 const json = await res.json();
-                const updated = json.data;
-                setCodes((prev) => prev.map((c) => (c.id === form.id ? updated : c)));
+                setCodes((prev) => prev.map((c) => (c.id === form.id ? json.data : c)));
             }
         } else {
-            // create
             const res = await fetchWithAuth(`${API_URL}/${patientId}/${encounterId}`, {
                 method: "POST",
                 body: JSON.stringify(form),
             });
             if (res.ok) {
                 const json = await res.json();
-                const created = json.data;
-                setCodes((prev) => [created, ...prev]);
+                setCodes((prev) => [json.data, ...prev]);
             }
         }
         setForm({});
@@ -100,7 +91,6 @@ export default function CodesPage() {
     // ✅ Delete
     const deleteCode = async (id: number) => {
         if (!orgId || !patientId || !encounterId) return;
-
         const res = await fetchWithAuth(`${API_URL}/${patientId}/${encounterId}/${id}`, {
             method: "DELETE",
         });
@@ -109,20 +99,18 @@ export default function CodesPage() {
         }
     };
 
-    // ✅ Load codes initially + on search/filter change
+    // ✅ Load on change
     useEffect(() => {
         loadCodes();
-    }, [q, selectedType, filterDx, filterServ, filterActive]);
+    }, [loadCodes]);
 
     return (
         <div className="p-6 space-y-6">
             <h2 className="text-xl font-semibold">Code Management</h2>
 
-            {/* Add / Update Form */}
+            {/* Form */}
             <div className="border rounded-lg p-4 bg-white shadow-sm space-y-4">
                 <h3 className="font-medium">{form.id ? "Update Code" : "Add New Code"}</h3>
-
-                {/* Row 1 */}
                 <div className="grid grid-cols-5 gap-4">
                     <select
                         value={form.codeType || ""}
@@ -158,7 +146,6 @@ export default function CodesPage() {
                     </label>
                 </div>
 
-                {/* Row 2 */}
                 <div className="grid grid-cols-3 gap-4">
                     <input
                         value={form.description || ""}
@@ -174,7 +161,6 @@ export default function CodesPage() {
                     />
                 </div>
 
-                {/* Row 3 */}
                 <div className="grid grid-cols-4 gap-4">
                     <input
                         value={form.category || ""}
@@ -200,7 +186,6 @@ export default function CodesPage() {
                     </label>
                 </div>
 
-                {/* Row 4 */}
                 <div className="grid grid-cols-2 gap-4">
                     <input
                         value={form.relateTo || ""}
@@ -217,7 +202,6 @@ export default function CodesPage() {
                     />
                 </div>
 
-                {/* Save / Cancel */}
                 <div className="flex justify-end gap-2 mt-4">
                     {form.id && (
                         <button onClick={() => setForm({})} className="bg-gray-400 text-white px-4 py-2 rounded">
@@ -230,7 +214,7 @@ export default function CodesPage() {
                 </div>
             </div>
 
-            {/* Search Row */}
+            {/* Search */}
             <div className="flex items-center gap-4">
                 <select
                     value={selectedType}
@@ -302,7 +286,10 @@ export default function CodesPage() {
                                     <button onClick={() => setForm(c)} className="px-2 py-1 bg-yellow-400 rounded">
                                         Edit
                                     </button>
-                                    <button onClick={() => deleteCode(c.id)} className="px-2 py-1 bg-red-500 text-white rounded">
+                                    <button
+                                        onClick={() => deleteCode(c.id)}
+                                        className="px-2 py-1 bg-red-500 text-white rounded"
+                                    >
                                         Del
                                     </button>
                                 </td>

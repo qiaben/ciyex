@@ -74,10 +74,7 @@ export default function LabOrderPage({ className = "" }) {
         setDraft(null);
     }
 
-    function onDraftChange<K extends keyof LabOrderDto>(
-        key: K,
-        value: LabOrderDto[K]
-    ) {
+    function onDraftChange<K extends keyof LabOrderDto>(key: K, value: LabOrderDto[K]) {
         if (!draft) return;
         setDraft({ ...draft, [key]: value });
     }
@@ -92,9 +89,9 @@ export default function LabOrderPage({ className = "" }) {
         if (!query) return items;
         const q = query.toLowerCase();
         return items.filter((it) =>
-            `${it.orderNumber || ""} ${it.procedureCode || ""} ${
-                it.procedureDisplay || ""
-            } ${it.diagnosisCode || ""} ${it.status || ""} ${it.result || ""}`
+            `${it.orderNumber || ""} ${it.procedureCode || ""} ${it.procedureDisplay || ""} ${
+                it.diagnosisCode || ""
+            } ${it.status || ""} ${it.result || ""}`
                 .toLowerCase()
                 .includes(q)
         );
@@ -122,16 +119,12 @@ export default function LabOrderPage({ className = "" }) {
 
                 {/* Quick Create Form */}
                 <div className="mb-4 rounded-2xl border bg-white p-3 shadow-sm">
-                    <div className="mb-2 text-sm font-medium text-gray-700">
-                        Quick create
-                    </div>
+                    <div className="mb-2 text-sm font-medium text-gray-700">Quick create</div>
                     <div className="grid grid-cols-1 gap-2 md:grid-cols-6">
                         <Field
                             label="Order #"
                             value={creating.orderNumber || ""}
-                            onChange={(v: string) =>
-                                setCreating((c) => ({ ...c, orderNumber: v }))
-                            }
+                            onChange={(v: string) => setCreating((c) => ({ ...c, orderNumber: v }))}
                             placeholder="e.g. ORD-123"
                         />
 
@@ -139,9 +132,7 @@ export default function LabOrderPage({ className = "" }) {
                             label="Procedure code"
                             value={creating.procedureCode || ""}
                             onChange={(v: string) => {
-                                const selected = PROCEDURE_OPTIONS.find(
-                                    (opt) => opt.code === v
-                                );
+                                const selected = PROCEDURE_OPTIONS.find((opt) => opt.code === v);
                                 setCreating((c) => ({
                                     ...c,
                                     procedureCode: selected?.code,
@@ -155,9 +146,7 @@ export default function LabOrderPage({ className = "" }) {
                             label="Diagnosis code"
                             value={creating.diagnosisCode || ""}
                             onChange={(v: string) => {
-                                const selected = DIAGNOSIS_OPTIONS.find(
-                                    (opt) => opt.code === v
-                                );
+                                const selected = DIAGNOSIS_OPTIONS.find((opt) => opt.code === v);
                                 setCreating((c) => ({ ...c, diagnosisCode: selected?.code }));
                             }}
                             options={DIAGNOSIS_OPTIONS}
@@ -179,7 +168,6 @@ export default function LabOrderPage({ className = "" }) {
                             className="md:col-span-2"
                         />
 
-                        {/* ✅ Order Date with calendar + time */}
                         <Field
                             label="Order Date"
                             value={creating.orderDate || ""}
@@ -212,9 +200,7 @@ export default function LabOrderPage({ className = "" }) {
                     </div>
 
                     {filtered.length === 0 ? (
-                        <div className="px-3 py-6 text-sm text-gray-500">
-                            No lab orders found.
-                        </div>
+                        <div className="px-3 py-6 text-sm text-gray-500">No lab orders found.</div>
                     ) : (
                         <ul className="divide-y">
                             {filtered.map((item) => (
@@ -232,13 +218,9 @@ export default function LabOrderPage({ className = "" }) {
 
                                     {/* Procedure */}
                                     <div className="col-span-2 pr-2">
-                    <span className="font-medium">
-                      {item.procedureDisplay || "—"}
-                    </span>{" "}
+                                        <span className="font-medium">{item.procedureDisplay || "—"}</span>{" "}
                                         {item.procedureCode && (
-                                            <span className="text-gray-500">
-                        ({item.procedureCode})
-                      </span>
+                                            <span className="text-gray-500">({item.procedureCode})</span>
                                         )}
                                     </div>
 
@@ -280,6 +262,63 @@ export default function LabOrderPage({ className = "" }) {
                         </ul>
                     )}
                 </div>
+
+                {/* Edit Form */}
+                {editingId && draft && (
+                    <div className="mt-4 rounded-2xl border bg-white p-4 shadow-sm">
+                        <h3 className="mb-2 text-sm font-medium text-gray-700">Edit Lab Order</h3>
+                        <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
+                            <Field
+                                label="Order #"
+                                value={draft.orderNumber || ""}
+                                onChange={(v) => onDraftChange("orderNumber", v)}
+                            />
+                            <LookupField
+                                label="Procedure code"
+                                value={draft.procedureCode || ""}
+                                onChange={(v) => {
+                                    const sel = PROCEDURE_OPTIONS.find((opt) => opt.code === v);
+                                    onDraftChange("procedureCode", sel?.code || "");
+                                    onDraftChange("procedureDisplay", sel?.display || "");
+                                }}
+                                options={PROCEDURE_OPTIONS}
+                            />
+                            <LookupField
+                                label="Diagnosis code"
+                                value={draft.diagnosisCode || ""}
+                                onChange={(v) => onDraftChange("diagnosisCode", v)}
+                                options={DIAGNOSIS_OPTIONS}
+                            />
+                            <DropdownField
+                                label="Status"
+                                value={draft.status || "NEW"}
+                                onChange={(v) => onDraftChange("status", v)}
+                                options={STATUS_OPTIONS}
+                            />
+                        </div>
+                        <Field
+                            label="Result"
+                            value={draft.result || ""}
+                            onChange={(v) => onDraftChange("result", v)}
+                            textarea
+                            className="mt-2"
+                        />
+                        <div className="mt-3 flex gap-2">
+                            <button
+                                onClick={saveEdit}
+                                className="rounded bg-green-600 px-4 py-2 text-sm text-white"
+                            >
+                                Save
+                            </button>
+                            <button
+                                onClick={cancelEdit}
+                                className="rounded bg-gray-400 px-4 py-2 text-sm text-white"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
         </AdminLayout>
     );
