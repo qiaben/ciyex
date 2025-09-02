@@ -121,6 +121,7 @@ const navItems: NavItem[] = [
             { name: "404 Error", path: "/error-404", pro: false },
         ],
     },
+
 ];
 
 const othersItems: NavItem[] = [
