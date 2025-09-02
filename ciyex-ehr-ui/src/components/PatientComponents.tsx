@@ -128,7 +128,7 @@ export const AppointmentsFlat: React.FC<{
 // ---------------- BILLING ----------------
 export const BillingFlat: React.FC<{ billing: Billing | null }> = ({ billing }) => (
     <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-        <h4 className="font-semibold text-lg mb-4 text-gray-800"></h4>
+        <h4 className="font-semibold text-lg mb-4 text-gray-800">Billing</h4>
         {billing ? (
             <div className="overflow-x-auto">
                 <table className="w-full border text-sm">
@@ -168,7 +168,7 @@ export const MedicationsFlat: React.FC<{
     <div className="space-y-4">
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
             <div className="flex justify-between items-center mb-4">
-                <h4 className="font-semibold text-lg text-gray-800"></h4>
+                <h4 className="font-semibold text-lg text-gray-800">Medications</h4>
                 <button className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg shadow-sm">
                     Prescribe New
                 </button>
@@ -228,7 +228,7 @@ export const AllergiesFlat: React.FC<{
     <div className="space-y-4">
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
             <div className="flex justify-between items-center mb-4">
-                <h4 className="font-semibold text-lg text-gray-800"></h4>
+                <h4 className="font-semibold text-lg text-gray-800">Allergies</h4>
                 <button className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg shadow-sm">
                     Add Allergy
                 </button>
