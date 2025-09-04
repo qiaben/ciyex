@@ -217,6 +217,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({ pageTitle }) => {
                         }}
                         className="inline-flex items-center gap-1.5 rounded-md bg-blue-100 text-blue-700 px-3 py-1.5 text-sm font-medium hover:bg-blue-200"
                     >
+                        <span className="text-xl font-bold">+</span>
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30" className="w-5 h-5">
                             <path
                                 className="stroke-[#6C3DB7]"
@@ -224,7 +225,8 @@ const AppHeader: React.FC<AppHeaderProps> = ({ pageTitle }) => {
                             />
                             <circle className="fill-[#6EBAFF]" cx="15" cy="9" r="6" />
                         </svg>
-                        <span>Create</span>
+                        {/*<span className="text-xl font-bold">+</span>*/}
+
                     </button>
                     <ThemeToggleButton />
                     <NotificationDropdown />
@@ -265,10 +267,13 @@ const AppHeader: React.FC<AppHeaderProps> = ({ pageTitle }) => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium mb-1">Middle Name</label>
+                                <label className="block text-sm font-medium mb-1">
+                                    <span className="text-red-500">*</span> Middle Name
+                                </label>
                                 <input
                                     name="middleName"
-                                    placeholder="Middle (optional)"
+                                    required
+                                    placeholder="Middle name"
                                     value={formData.middleName}
                                     onChange={handleInputChange}
                                     className="w-full p-2 border rounded"
@@ -291,9 +296,12 @@ const AppHeader: React.FC<AppHeaderProps> = ({ pageTitle }) => {
 
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-medium mb-1">Phone Number</label>
+                                <label className="block text-sm font-medium mb-1">
+                                    <span className="text-red-500">*</span> Phone Number
+                                </label>
                                 <input
                                     name="phoneNumber"
+                                    required
                                     placeholder="(555) 123-4567"
                                     value={formData.phoneNumber}
                                     onChange={handleInputChange}
@@ -304,9 +312,12 @@ const AppHeader: React.FC<AppHeaderProps> = ({ pageTitle }) => {
                                 </p>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium mb-1">Gender</label>
+                                <label className="block text-sm font-medium mb-1">
+                                    <span className="text-red-500">*</span> Gender
+                                </label>
                                 <select
                                     name="gender"
+                                    required
                                     value={formData.gender}
                                     onChange={handleInputChange}
                                     className="w-full p-2 border rounded"
@@ -320,10 +331,13 @@ const AppHeader: React.FC<AppHeaderProps> = ({ pageTitle }) => {
 
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-medium mb-1">Date of Birth</label>
+                                <label className="block text-sm font-medium mb-1">
+                                    <span className="text-red-500">*</span> Date of Birth
+                                </label>
                                 <input
                                     type="date"
                                     name="dateOfBirth"
+                                    required
                                     value={formData.dateOfBirth}
                                     onChange={handleInputChange}
                                     className="w-full p-2 border rounded"
