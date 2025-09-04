@@ -332,6 +332,7 @@ import { useEffect, useState, MouseEvent } from "react";
 import { useRouter } from "next/navigation";
 import { fetchWithOrg } from "@/utils/fetchWithOrg";
 
+
 type Encounter = {
     id: number;
     encounterDate?: string; // ISO

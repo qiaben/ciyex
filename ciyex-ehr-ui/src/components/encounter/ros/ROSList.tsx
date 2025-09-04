@@ -21,10 +21,28 @@ export default function ROSList({ patientId, encounterId }: Props) {
         setLoading(true);
         setError(null);
         try {
-            // GET /api/review-of-systems/{patientId}/{encounterId}
-            const res = await fetchWithOrg(`/api/review-of-systems/${patientId}/${encounterId}`);
-            const json = (await res.json()) as ApiResponse<RosDto[]>;
-            if (!res.ok || !json.success) throw new Error(json.message || "Load failed");
+            // POST /api/reviewofsystems/{patientId}/{encounterId}
+            const res = await fetchWithOrg(
+                `/api/reviewofsystems/${patientId}/${encounterId}`,
+                {
+                    method: "POST",
+                    // If your controller doesn't expect a body, you can remove `body`.
+                    body: JSON.stringify({ patientId, encounterId }),
+                }
+            );
+
+            // Safer JSON parsing (prevents "Unexpected end of JSON input")
+            let json: ApiResponse<RosDto[]> | null = null;
+            try {
+                json = (await res.json()) as ApiResponse<RosDto[]>;
+            } catch {
+                throw new Error(`Server returned ${res.status} with no JSON body`);
+            }
+
+            if (!res.ok || !json?.success) {
+                throw new Error(json?.message || `Load failed (${res.status})`);
+            }
+
             setItems(json.data || []);
         } catch (e: unknown) {
             setError(e instanceof Error ? e.message : "Something went wrong");
@@ -32,6 +50,7 @@ export default function ROSList({ patientId, encounterId }: Props) {
             setLoading(false);
         }
     }
+
 
     useEffect(() => { load(); /* eslint-disable-line react-hooks/exhaustive-deps */ }, [patientId, encounterId]);
 
@@ -52,7 +71,7 @@ export default function ROSList({ patientId, encounterId }: Props) {
     async function remove(id: number) {
         if (!confirm("Delete this ROS entry?")) return;
         try {
-            const res = await fetchWithOrg(`/api/review-of-systems/${patientId}/${encounterId}/${id}`, { method: "DELETE" });
+            const res = await fetchWithOrg(`/api/reviewofsystems/${patientId}/${encounterId}/${id}`, { method: "DELETE" });
             const json = (await res.json()) as ApiResponse<void>;
             if (!res.ok || !json.success) throw new Error(json.message || "Delete failed");
             setItems((p) => p.filter((x) => x.id !== id));
