@@ -162,7 +162,6 @@ const providerPalette = [
     "#DC3545", // Red
     "#17A2B8", // Cyan
     "#FFC107", // Yellow
-    "#343A40", // Dark Gray
 ];
 
 
@@ -311,6 +310,17 @@ const Calendar: React.FC = () => {
         title: string;
         message: string;
     } | null>(null);
+
+    // Auto-dismiss alerts after 4 seconds
+    useEffect(() => {
+        if (alertData) {
+            const timer = setTimeout(() => {
+                setAlertData(null);
+            }, 4000); // auto-hide after 4s
+            return () => clearTimeout(timer);
+        }
+    }, [alertData]);
+
 
     // Removed Title — auto-generate from Visit Type + Patient
     const [visitType, setVisitType] = useState<string>('Consultation');
@@ -481,14 +491,10 @@ const Calendar: React.FC = () => {
         })();
     }, [apiUrl]);
 
-// Memoize loadAppointments function using useCallback
     const loadAppointments = useCallback(async () => {
-        // Avoid reloading appointments if they already exist (cached state check)
-        if (events.length > 0) return; // Skip if appointments are already loaded
-
         try {
             let page = 0;
-            const size = 50; // adjust as needed
+            const size = 50;
             let allEvents: CalendarEvent[] = [];
             let lastPage = false;
 
@@ -499,51 +505,66 @@ const Calendar: React.FC = () => {
                 const json = await res.json();
 
                 if (json.success && json.data?.content) {
-                    const loaded: CalendarEvent[] = json.data.content.map((a: AppointmentDTO) => ({
-                        id: String(a.id),
-                        title: a.patientName
-                            ? `${a.visitType} — ${a.patientName}`
-                            : a.visitType,
-                        start: `${a.appointmentStartDate}T${a.appointmentStartTime}`,
-                        end: `${a.appointmentEndDate}T${a.appointmentEndTime}`,
-                        allDay: false,
-                        color: getProviderColor(a.providerId), // 👈 apply provider color
-                        extendedProps: {
-                            visitType: a.visitType,
-                            providerId: String(a.providerId),
-                            locationId: a.locationId ? String(a.locationId) : undefined, // ✅ use locationId
-                            status: a.status,
-                            notes: a.reason,
-                            patientId: String(a.patientId),
-                            patientName: a.patientName,
-                            priority: a.priority,
-                        },
-                    }));
+                    const events: CalendarEvent[] = await Promise.all(
+                        json.data.content.map(async (a: AppointmentDTO) => {
+                            let name = a.patientName;
 
-                    // Append the newly fetched events to the allEvents array
-                    allEvents = [...allEvents, ...loaded];
+                            // 🔑 If patientName missing, fetch patient record
+                            if (!name && a.patientId) {
+                                try {
+                                    const pres = await fetchWithAuth(
+                                        `${apiUrl}/api/patients/${a.patientId}`
+                                    );
+                                    const pjson = await pres.json();
+                                    if (pjson.success && pjson.data) {
+                                        name = getPatientFullName(pjson.data);
+                                    }
+                                } catch (err) {
+                                    console.error("Failed to fetch patient name", err);
+                                }
+                            }
 
-                    // If this is the last page, stop fetching
+                            return {
+                                id: String(a.id),
+                                // main title → patient’s name
+                                title: name || `Patient #${a.id}`,
+                                start: `${a.appointmentStartDate}T${a.appointmentStartTime}`,
+                                end: `${a.appointmentEndDate}T${a.appointmentEndTime}`,
+                                allDay: false,
+                                color: getProviderColor(a.providerId),
+                                extendedProps: {
+                                    visitType: a.visitType,
+                                    providerId: String(a.providerId),
+                                    locationId: a.locationId ? String(a.locationId) : undefined,
+                                    status: a.status,
+                                    notes: a.reason,
+                                    patientId: String(a.patientId),
+                                    patientName: name,
+                                    priority: a.priority,
+                                    startTime: a.appointmentStartTime, // ✅ keep start time
+                                },
+                            };
+                        })
+                    );
+
+                    allEvents = [...allEvents, ...events];
                     lastPage = json.data.last;
                     page++;
                 } else {
-                    // If no data is returned, stop the loop
                     lastPage = true;
                 }
             }
 
-            // Update the events state with the loaded appointments
             setEvents(allEvents);
         } catch (err) {
             console.error("Failed to load appointments", err);
-            // You can show an error message to the user here if necessary
         }
-    }, [events, apiUrl]);
+    }, [apiUrl]);
 
-// Trigger loadAppointments when apiUrl changes
+// Trigger loadAppointments when component is mounted
     useEffect(() => {
         loadAppointments();
-    }, [loadAppointments]); // Add loadAppointments as a dependency
+    }, [loadAppointments]);
 
 
 
@@ -861,11 +882,42 @@ const Calendar: React.FC = () => {
             });
             return;
         }
+
         if (new Date(combinedEnd).getTime() <= new Date(combinedStart).getTime()) {
             setAlertData({
                 variant: "error",
                 title: "Invalid Time Range",
                 message: "End time must be after start time.",
+            });
+            return;
+        }
+
+        // 🔴 NEW: Check provider schedule
+        try {
+            const res = await fetchWithAuth(
+                `${apiUrl}/api/schedules?status=active&providerId=${appointmentProviderId}`
+            );
+            const json = await res.json();
+            const schedules: Schedule[] = Array.isArray(json?.data) ? json.data : [];
+
+            const covers = schedules.some(s =>
+                hasOccurrenceCoveringSlot(s, combinedStart, combinedEnd)
+            );
+
+            if (!covers) {
+                setAlertData({
+                    variant: "error",
+                    title: "No Schedule Found",
+                    message: "This provider has no schedule for the selected time. Please add the schedule first.",
+                });
+                return;
+            }
+        } catch (err) {
+            console.error("Failed to validate provider schedule", err);
+            setAlertData({
+                variant: "error",
+                title: "Schedule Validation Failed",
+                message: "Could not verify the provider's schedule. Please try again.",
             });
             return;
         }
@@ -902,7 +954,7 @@ const Calendar: React.FC = () => {
         try {
             let res;
             if (selectedEvent) {
-                // Update existing
+                // Update existing appointment
                 res = await fetchWithAuth(
                     `${apiUrl}/api/appointments/${selectedEvent.id}`,
                     {
@@ -912,7 +964,7 @@ const Calendar: React.FC = () => {
                     }
                 );
             } else {
-                // Create new
+                // Create new appointment
                 res = await fetchWithAuth(`${apiUrl}/api/appointments`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -951,7 +1003,6 @@ const Calendar: React.FC = () => {
             });
         }
     };
-
     const resetModalFields = () => {
         setVisitType('Consultation');
         setPatientQuery('');
@@ -977,37 +1028,22 @@ const Calendar: React.FC = () => {
     const renderEventContent = useCallback(
         (eventInfo: EventContentArg) => {
             const xp = eventInfo.event.extendedProps as {
-                visitType?: string;
-                status?: AppointmentStatus;
-                locationId?: string;
+                patientName?: string;
             };
-            const vType = xp?.visitType;
-            const status = xp?.status;
-            const locId = xp?.locationId;
-            const locLabel =
-                locId && locations.find((l) => l.value === String(locId))?.label;
+
+            const patientName = xp?.patientName || eventInfo.event.title;
 
             return (
-                <div className="event-fc-color flex fc-event-main items-center gap-1 rounded-sm p-1">
-                    <div className="fc-daygrid-event-dot"></div>
-                    <div className="fc-event-time">{eventInfo.timeText}</div>
-                    <div className="fc-event-title">{eventInfo.event.title}</div>
-                    {vType ? <span className="ml-2 text-xs opacity-70">• {vType}</span> : null}
-                    {status ? (
-                        <span className="ml-2 rounded px-1.5 text-[10px] opacity-80 border border-gray-300">
-              {status}
-            </span>
-                    ) : null}
-                    {locLabel ? (
-                        <span className="ml-2 text-[10px] opacity-80 border border-gray-300 rounded px-1.5">
-              @{locLabel}
-            </span>
-                    ) : null}
+                <div className="event-fc-color fc-event-main rounded-sm p-1 text-xs">
+                    <span className="font-semibold text-white">{patientName}</span>
                 </div>
             );
         },
-        [locations]
+        []
     );
+
+
+
 
     /* =========================
      * Render
@@ -1165,7 +1201,9 @@ const Calendar: React.FC = () => {
                                     events={[]} // no events, just headers
                                     selectable={false}
                                     editable={false}
-                                    height="auto"
+                                    height="700px"
+                                    slotMinTime={provider === "all" ? "06:00:00" : "00:00:00"}
+                                    scrollTime="06:00:00"
                                     dayHeaderFormat={{ weekday: "short", month: "numeric", day: "numeric" }}
                                     views={{
                                         dayGridMonth: { titleFormat: { year: "numeric", month: "long" } },
@@ -1184,38 +1222,39 @@ const Calendar: React.FC = () => {
                         )}
 
                         {activeView === "timeGridDay" ? (
-                            // === All Providers + Day View → Columns side by side
-                            <div
-                                className="grid gap-1 h-full overflow-y-auto"
-                                style={{
-                                    gridTemplateColumns: `repeat(${Math.max(
-                                        providers.length - 1,
-                                        1
-                                    )}, minmax(0, 1fr))`,
-                                }}
-                            >
-                                {providers
-                                    .filter((p) => p.value !== "all")
-                                    .map((p) => (
-                                        <div
-                                            key={`day-${p.value}`}
-                                            className="provider-col flex flex-col h-full border rounded-md overflow-hidden"
-                                        >
-                                            <div className="flex items-center justify-between bg-blue-500 text-white px-2 py-1 text-sm font-semibold">
-                                                <span>{p.label}</span>
-                                                <button
-                                                    onClick={() =>
-                                                        setProviders((prev) =>
-                                                            prev.filter((prov) => prov.value !== p.value)
-                                                        )
-                                                    }
-                                                    className="ml-2 text-xs hover:text-gray-200"
-                                                >
-                                                    ✕
-                                                </button>
-                                            </div>
+                            // === All Providers + Day View → Columns side by side with one shared scrollbar
+                            <div className="h-[700px] overflow-y-auto">
+                                <div
+                                    className="grid gap-1"
+                                    style={{
+                                        gridTemplateColumns: `repeat(${Math.max(
+                                            providers.length - 1,
+                                            1
+                                        )}, minmax(0, 1fr))`,
+                                    }}
+                                >
+                                    {providers
+                                        .filter((p) => p.value !== "all")
+                                        .map((p) => (
+                                            <div
+                                                key={`day-${p.value}`}
+                                                className="provider-col flex flex-col border rounded-md"
+                                            >
+                                                <div className="flex items-center justify-between bg-blue-500 text-white px-2 py-1 text-sm font-semibold">
+                                                    <span>{p.label}</span>
+                                                    <button
+                                                        onClick={() =>
+                                                            setProviders((prev) =>
+                                                                prev.filter((prov) => prov.value !== p.value)
+                                                            )
+                                                        }
+                                                        className="ml-2 text-xs hover:text-gray-200"
+                                                    >
+                                                        ✕
+                                                    </button>
+                                                </div>
 
-                                            <div className="flex-1 overflow-hidden">
+                                                {/* Calendar */}
                                                 <FullCalendar
                                                     key={`day-${p.value}-${activeView}`}
                                                     ref={(el) => {
@@ -1224,12 +1263,11 @@ const Calendar: React.FC = () => {
                                                     plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
                                                     initialView="timeGridDay"
                                                     headerToolbar={false}
-                                                    slotMinTime="08:00:00"
-                                                    slotMaxTime="20:00:00"
                                                     allDaySlot={false}
-                                                    expandRows={true}
-                                                    height="100%"
-                                                    contentHeight="100%"
+                                                    height="700px"
+                                                    slotMinTime={provider === "all" ? "06:00:00" : "00:00:00"}
+                                                    scrollTime="06:00:00"
+                                                    contentHeight="auto"
                                                     views={{
                                                         dayGridMonth: { titleFormat: { year: "numeric", month: "long" } },
                                                         timeGridWeek: { titleFormat: { month: "short", day: "numeric" } },
@@ -1243,10 +1281,9 @@ const Calendar: React.FC = () => {
                                                         },
                                                     }}
                                                     datesSet={(arg) => {
-                                                        setCalendarTitle(arg.view.title);  // Keep the calendar title
-                                                        setActiveView(arg.view.type as ViewType);  // Update active view
+                                                        setCalendarTitle(arg.view.title);
+                                                        setActiveView(arg.view.type as ViewType);
                                                     }}
-
                                                     events={events.filter(
                                                         (e) => e.extendedProps.providerId === p.value
                                                     )}
@@ -1256,12 +1293,12 @@ const Calendar: React.FC = () => {
                                                     eventContent={renderEventContent}
                                                 />
                                             </div>
-                                        </div>
-                                    ))}
+                                        ))}
+                                </div>
                             </div>
                         ) : (
-                            // === All Providers + Week/Month View → Stacked vertically
-                            <div className="flex flex-col gap-6">
+                            // === All Providers + Week/Month View → Stacked vertically with one shared scrollbar
+                            <div className="h-[700px] overflow-y-auto flex flex-col gap-6">
                                 {providers
                                     .filter((p) => p.value !== "all")
                                     .map((p) => (
@@ -1275,12 +1312,10 @@ const Calendar: React.FC = () => {
                                                 plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
                                                 initialView={activeView}
                                                 headerToolbar={false}
-                                                slotMinTime="00:00:00" // Start at 12 AM (midnight)
-                                                slotMaxTime="24:00:00" // End at 12 AM (next day)
                                                 allDaySlot={false}
-                                                expandRows={true}
-                                                height="auto" // Ensure the calendar height is flexible for scroll
-                                                contentHeight="auto" // Allow content height to adjust with the scroll
+                                                height="700px"
+                                                slotMinTime={provider === "all" ? "06:00:00" : "00:00:00"}
+                                                scrollTime="06:00:00"
                                                 views={{
                                                     dayGridMonth: { titleFormat: { year: "numeric", month: "long" } },
                                                     timeGridWeek: { titleFormat: { month: "short", day: "numeric" } },
@@ -1294,17 +1329,16 @@ const Calendar: React.FC = () => {
                                                     },
                                                 }}
                                                 datesSet={(arg) => {
-                                                    setCalendarTitle(arg.view.title);  // Keep the calendar title
-                                                    setActiveView(arg.view.type as ViewType);  // Update active view
+                                                    setCalendarTitle(arg.view.title);
+                                                    setActiveView(arg.view.type as ViewType);
                                                 }}
                                                 events={events.filter((e) => {
-                                                    const matchesProvider = provider && provider !== "all"
-                                                        ? e.extendedProps.providerId === provider
-                                                        : true;
-
+                                                    const matchesProvider =
+                                                        provider && provider !== "all"
+                                                            ? e.extendedProps.providerId === provider
+                                                            : true;
                                                     const matchesLocation =
                                                         location === "all" || e.extendedProps.locationId === location;
-
                                                     return matchesProvider && matchesLocation;
                                                 })}
                                                 selectable
@@ -1333,12 +1367,10 @@ const Calendar: React.FC = () => {
                             plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
                             initialView={activeView}
                             headerToolbar={false}
-                            slotMinTime="08:00:00"
-                            slotMaxTime="20:00:00"
                             allDaySlot={false}
-                            expandRows={true}
-                            height="100%"
-                            contentHeight="auto"
+                            height="700px"
+                            slotMinTime={provider === "all" ? "06:00:00" : "00:00:00"}
+                            scrollTime="06:00:00"
                             views={{
                                 dayGridMonth: { titleFormat: { year: "numeric", month: "long" } },
                                 timeGridWeek: { titleFormat: { month: "short", day: "numeric", year: "numeric" } },
@@ -1352,18 +1384,16 @@ const Calendar: React.FC = () => {
                                 },
                             }}
                             datesSet={(arg) => {
-                                setCalendarTitle(arg.view.title);  // Keep the calendar title
-                                setActiveView(arg.view.type as ViewType);  // Update active view
+                                setCalendarTitle(arg.view.title);
+                                setActiveView(arg.view.type as ViewType);
                             }}
                             events={events.filter((e) => {
                                 const matchesProvider =
                                     provider && provider !== "all"
                                         ? e.extendedProps.providerId === provider
                                         : true;
-
                                 const matchesLocation =
                                     location === "all" || e.extendedProps.locationId === location;
-
                                 return matchesProvider && matchesLocation;
                             })}
                             selectable
@@ -1376,6 +1406,14 @@ const Calendar: React.FC = () => {
                     </div>
                 )}
             </div>
+
+
+
+
+
+
+
+
 
 
             {/* Inline "modal" panel — no blur, rendered inside this card */}
