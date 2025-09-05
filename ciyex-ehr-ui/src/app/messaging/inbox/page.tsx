@@ -3,7 +3,6 @@ import AdminLayout from "@/app/(admin)/layout";
 import React, { useMemo, useState, useRef, useEffect } from "react";
 import { fetchWithAuth } from "@/utils/fetchWithAuth";
 import TemplateManagement from "../Template/TemplateManagement";
-import { ArrowDownToLine, ArrowUpToLine } from "lucide-react";
 
 /* ------------ Types ------------ */
 type ApiResponse<T> = {
@@ -545,8 +544,9 @@ export default function MessagingPage() {
                                                         className="text-green-600 hover:text-green-800"
                                                         title="Restore"
                                                     >
-                                                        <ArrowUpToLine className="w-5 h-5"/>
+                                                        ↑
                                                     </button>
+
                                                 ) : (
                                                     <div className="flex gap-3 justify-end items-center">
                                                         <button
@@ -565,8 +565,9 @@ export default function MessagingPage() {
                                                             className="text-red-600 hover:text-red-800"
                                                             title="Archive"
                                                         >
-                                                            <ArrowDownToLine className="w-5 h-5"/>
+                                                            ↓
                                                         </button>
+
                                                     </div>
                                                 )}
                                             </td>
