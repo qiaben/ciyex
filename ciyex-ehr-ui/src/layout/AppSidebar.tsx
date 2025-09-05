@@ -19,6 +19,7 @@ import {
     RecallIcon,
 
     AppointmentIcon,
+
 } from "../icons/index";
 
 // ===== Types (nested) =====
@@ -138,6 +139,24 @@ const navItems: NavItem[] = [
             { name: "404 Error", path: "/error-404", pro: false },
         ],
     },
+    {
+        name: "Codes",
+        icon: <BoxCubeIcon />,
+        path: "/codes",
+    },
+    {
+        name: "Labs",
+        icon: <BoxCubeIcon />,
+        subItems: [
+            {
+                name: "Lab Orders",
+                path: "/labs/orders",
+                pro: false,
+            },
+        ],
+    },
+
+
 ];
 
 const othersItems: NavItem[] = [

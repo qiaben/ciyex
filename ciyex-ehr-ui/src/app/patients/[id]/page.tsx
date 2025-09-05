@@ -7,7 +7,6 @@ import AdminLayout from "@/app/(admin)/layout";
 
 import Link from "next/link";
 import DemographicsFlat from "@/components/DemographicsFlat";
-
 import HistoryFlat from "@/components/HistoryFlat";
 import InsuranceFlat from "@/components/InsuranceFlat";
 import {
@@ -19,6 +18,46 @@ import {
     DocumentsFlat,
     LabsFlat,
 } from "@/components/PatientComponents";
+
+type InsuranceLevel = "primary" | "secondary" | "tertiary";
+
+interface InsurancePolicy {
+    providerId: number | null;
+    planName: string;
+    effectiveDate: string;
+    effectiveDateEnd: string;
+    policyNumber: string;
+    groupNumber: string;
+
+    subscriberEmployer: string;
+    seAddress1: string;
+    seAddress2: string;
+    seCity: string;
+    seState: string;
+    seZip: string;
+    seCountry: string;
+
+    relationship: string;
+    subscriberFirstName: string;
+    subscriberMiddleName: string;
+    subscriberLastName: string;
+    subscriberDob: string;
+    sex: "Male" | "Female" | "Other" | "";
+    ssn: string;
+    subAddress1: string;
+    subAddress2: string;
+    subCity: string;
+    subState: string;
+    subZip: string;
+    subCountry: string;
+    subscriberPhone: string;
+
+    copay: string;
+    acceptAssignment: "YES" | "NO";
+    secondaryMedicareType: "N/A" | "Part A" | "Part B";
+}
+
+type InsuranceForm = Record<InsuranceLevel, InsurancePolicy>;
 
 interface Patient {
     id: string;
@@ -52,31 +91,52 @@ interface Patient {
     lastVisitDate?: string;
     familyMembers?: string[];
     careTeam?: string[];
-    // ✅ Allow safe extension (string keys can map to different primitive types)
     [key: string]: string | number | boolean | string[] | undefined;
 }
 
-type InsuranceLevel = "primary" | "secondary" | "tertiary";
+type ExamStatus = "N/A" | "Normal" | "Abnormal" | "";
 
-interface InsurancePolicy {
-    provider?: string;
-    planName?: string;
-    effectiveStart?: string;
-    effectiveEnd?: string;
-    policyNumber?: string;
-    groupNumber?: string;
-    subscriberEmployer?: string;
-    subscriber?: string;
-    subscriberDob?: string;
-    subscriberSex?: "Unassigned" | "Male" | "Female";
-    ssn?: string;
-    subscriberAddress?: string;
-    copay?: string;
-    acceptsAssignment?: "Yes" | "No";
-    secondaryMedicareType?: string;
+interface HistoryForm {
+    general: {
+        riskFactors: Record<string, boolean | string>;
+        examsTests: Record<string, { status: ExamStatus; notes: string }>;
+    };
+    family: {
+        father: string;
+        mother: string;
+        siblings: string;
+        spouse: string;
+        offspring: string;
+        diagFather: string;
+        diagMother: string;
+        diagSiblings: string;
+        diagSpouse: string;
+        diagOffspring: string;
+    };
+    relatives: {
+        cancer: string;
+        diabetes: string;
+        heartProblems: string;
+        epilepsy: string;
+        suicide: string;
+        tuberculosis: string;
+        hbp: string;
+        stroke: string;
+        mentalIllness: string;
+    };
+    lifestyle: {
+        tobacco: { value: string; status: string };
+        coffee: { value: string; status: string };
+        alcohol: { value: string; status: string };
+        drugs: { value: string; status: string };
+        counseling: { value: string; status: string };
+        exercise: { value: string; status: string };
+        hazardous: { value: string; status: string };
+        sleep: string;
+        seatbelt: string;
+    };
+    other: { nameValue1: string; nameValue2: string; additionalHistory: string };
 }
-
-type InsuranceForm = Record<InsuranceLevel, InsurancePolicy>;
 
 interface EncounterFormData {
     visitCategory: string;
@@ -102,50 +162,10 @@ interface Allergy {
     notes?: string;
 }
 
-interface HistoryForm {
-    general: { riskFactors: string; examsTests: string };
-    family: {
-        father: string;
-        mother: string;
-        siblings: string;
-        spouse: string;
-        offspring: string;
-        diagFather: string;
-        diagMother: string;
-        diagSiblings: string;
-        diagSpouse: string;
-        diagOffspring: string;
-    };
-    relatives: {
-        cancer: string;
-        diabetes: string;
-        heartProblems: string;
-        epilepsy: string;
-        suicide: string;
-        tuberculosis: string;
-        hbp: string;
-        stroke: string;
-        mentalIllness: string;
-    };
-    lifestyle: {
-        tobacco: string;
-        coffee: string;
-        alcohol: string;
-        drugs: string;
-        counseling: string;
-        exercise: string;
-        hazardous: string;
-        sleep: string;
-        seatbelt: string;
-    };
-    other: { nameValue: string; additionalHistory: string };
-}
-
 interface EncounterFormProps {
     onCancel: () => void | Promise<void>;
     onSave: (form: EncounterFormData) => void | Promise<void>;
 }
-
 
 interface Appointment {
     id: string;
@@ -165,7 +185,6 @@ interface Medication {
     status: "Active" | "Inactive" | "Completed";
     instructions?: string;
 }
-
 
 interface XmlResponse {
     success?: boolean;
@@ -196,7 +215,6 @@ function parseXmlResponse(xmlText: string): Promise<XmlResponse> {
             if ("success" in response && typeof response.success === "string") {
                 response.success = response.success === "true";
             }
-
             resolve(response);
         } catch {
             reject(new Error("Failed to parse XML response"));
@@ -210,7 +228,7 @@ export default function PatientDashboardPage() {
     const id = params?.id as string;
 
     const [historyForm, setHistoryForm] = useState<HistoryForm>({
-        general: {riskFactors: "", examsTests: ""},
+        general: { riskFactors: {}, examsTests: {} },
         family: {
             father: "",
             mother: "",
@@ -235,17 +253,17 @@ export default function PatientDashboardPage() {
             mentalIllness: "",
         },
         lifestyle: {
-            tobacco: "",
-            coffee: "",
-            alcohol: "",
-            drugs: "",
-            counseling: "",
-            exercise: "",
-            hazardous: "",
+            tobacco: { value: "", status: "" },
+            coffee: { value: "", status: "" },
+            alcohol: { value: "", status: "" },
+            drugs: { value: "", status: "" },
+            counseling: { value: "", status: "" },
+            exercise: { value: "", status: "" },
+            hazardous: { value: "", status: "" },
             sleep: "",
             seatbelt: "",
         },
-        other: {nameValue: "", additionalHistory: ""},
+        other: { nameValue1: "", nameValue2: "", additionalHistory: "" },
     });
 
     const [activeHistoryTab, setActiveHistoryTab] = useState<keyof HistoryForm>("general");
@@ -262,7 +280,6 @@ export default function PatientDashboardPage() {
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [medications, setMedications] = useState<Medication[]>([]);
     const [allergies, setAllergies] = useState<Allergy[]>([]);
-    // const [searchTerm, setSearchTerm] = useState("");
     const [viewMode, setViewMode] = useState<string>("dashboard");
     const [highlightedTab, setHighlightedTab] = useState<string>("dashboard");
     const [selectedDoc, setSelectedDoc] = useState<string | null>(null);
@@ -285,17 +302,45 @@ export default function PatientDashboardPage() {
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
     const [editInsurance, setEditInsurance] = useState(false);
-    const [insuranceSubTab, setInsuranceSubTab] = useState<"primary" | "secondary" | "tertiary">("primary");
+    const [insuranceSubTab, setInsuranceSubTab] = useState<InsuranceLevel>("primary");
     const [editDemographics, setEditDemographics] = useState(false);
     const [demoForm, setDemoForm] = useState<Partial<Patient>>({});
     const emptyPolicy: InsurancePolicy = {
-        acceptsAssignment: "Yes",
-        subscriberSex: "Unassigned",
+        providerId: null,
+        planName: "",
+        effectiveDate: "",
+        effectiveDateEnd: "",
+        policyNumber: "",
+        groupNumber: "",
+        subscriberEmployer: "",
+        seAddress1: "",
+        seAddress2: "",
+        seCity: "",
+        seState: "",
+        seZip: "",
+        seCountry: "",
+        relationship: "",
+        subscriberFirstName: "",
+        subscriberMiddleName: "",
+        subscriberLastName: "",
+        subscriberDob: "",
+        sex: "",
+        ssn: "",
+        subAddress1: "",
+        subAddress2: "",
+        subCity: "",
+        subState: "",
+        subZip: "",
+        subCountry: "",
+        subscriberPhone: "",
+        copay: "",
+        acceptAssignment: "YES",
+        secondaryMedicareType: "N/A",
     };
     const [insuranceForm, setInsuranceForm] = useState<InsuranceForm>({
-        primary: {...emptyPolicy, provider: patient?.insuranceProvider},
-        secondary: {...emptyPolicy},
-        tertiary: {...emptyPolicy},
+        primary: { ...emptyPolicy, providerId: patient?.insuranceProvider ? 1 : null },
+        secondary: { ...emptyPolicy },
+        tertiary: { ...emptyPolicy },
     });
 
     const setPolicyField = <K extends keyof InsurancePolicy>(
@@ -315,12 +360,9 @@ export default function PatientDashboardPage() {
     const [reportFilters, setReportFilters] = useState<string[]>([]);
     const toggleFilter = (filter: string) => {
         setReportFilters((prev) =>
-            prev.includes(filter)
-                ? prev.filter((f) => f !== filter)
-                : [...prev, filter]
+            prev.includes(filter) ? prev.filter((f) => f !== filter) : [...prev, filter]
         );
     };
-
     const generateReport = async (type: string, filters?: string[]) => {
         try {
             const res = await fetchWithAuth(`/api/reports/generate?type=${type}`, {
@@ -560,33 +602,33 @@ export default function PatientDashboardPage() {
         setHistoryForm(data.data);
     }
 
-    async function saveInsurance() {
-        if (!patient) throw new Error("No patient loaded");
-
-        const payload = {policies: insuranceForm};
-        const res = await fetchWithAuth(
-            `${process.env.NEXT_PUBLIC_API_URL}/api/patients/${patient.id}/insurance`,
-            {
-                method: "PUT",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify(payload),
-            }
-        );
-
-        const text = await res.text();
-        const data =
-            res.headers.get("content-type")?.includes("application/xml") || text.startsWith("<")
-                ? await parseXmlResponse(text)
-                : JSON.parse(text);
-
-        if (!res.ok || !data.success) {
-            throw new Error(data.message || "Failed to save insurance");
-        }
-
-        if (data.data?.policies) {
-            setInsuranceForm(data.data.policies as InsuranceForm);
-        }
-    }
+    // async function saveInsurance() {
+    //     if (!patient) throw new Error("No patient loaded");
+    //
+    //     const payload = {policies: insuranceForm};
+    //     const res = await fetchWithAuth(
+    //         `${process.env.NEXT_PUBLIC_API_URL}/api/patients/${patient.id}/insurance`,
+    //         {
+    //             method: "PUT",
+    //             headers: {"Content-Type": "application/json"},
+    //             body: JSON.stringify(payload),
+    //         }
+    //     );
+    //
+    //     const text = await res.text();
+    //     const data =
+    //         res.headers.get("content-type")?.includes("application/xml") || text.startsWith("<")
+    //             ? await parseXmlResponse(text)
+    //             : JSON.parse(text);
+    //
+    //     if (!res.ok || !data.success) {
+    //         throw new Error(data.message || "Failed to save insurance");
+    //     }
+    //
+    //     if (data.data?.policies) {
+    //         setInsuranceForm(data.data.policies as InsuranceForm);
+    //     }
+    // }
 
     async function saveEncounter() {
         if (!patient) throw new Error("No patient loaded");
@@ -811,7 +853,9 @@ export default function PatientDashboardPage() {
                         {/* ✅ Insurance */}
                         <div
                             id="insurance"
-                            ref={(el) => { tabContentRefs.current["insurance"] = el }}
+                            ref={(el) => {
+                                tabContentRefs.current["insurance"] = el;
+                            }}
                             style={{ scrollMarginTop: headerH + 12 }}
                         >
                             <InsuranceFlat
@@ -822,7 +866,6 @@ export default function PatientDashboardPage() {
                                 setEditInsurance={setEditInsurance}
                                 insuranceSubTab={insuranceSubTab}
                                 setInsuranceSubTab={setInsuranceSubTab}
-                                saveInsurance={saveInsurance}
                                 setPolicyField={setPolicyField}
                                 setViewMode={setViewMode}
                                 setHighlightedTab={setHighlightedTab}
@@ -832,7 +875,9 @@ export default function PatientDashboardPage() {
                         {/* ✅ History */}
                         <div
                             id="history"
-                            ref={(el) => { tabContentRefs.current["history"] = el }}
+                            ref={(el) => {
+                                tabContentRefs.current["history"] = el;
+                            }}
                             style={{ scrollMarginTop: headerH + 12 }}
                         >
                             <HistoryFlat
@@ -1031,8 +1076,9 @@ export default function PatientDashboardPage() {
             <div className="pageScroll bg-gray-50">
                 <div
                     ref={tabsHeaderRef}
-                    className="sticky top-0 z-50 border-b border-gray-200 bg-white/95 backdrop-blur px-3 py-1.5"
+                    className="z-50 border-b border-gray-200 bg-white/95 backdrop-blur px-3 py-1.5"
                 >
+
                     <div className="flex items-center justify-between gap-3 min-w-0">
                         <div className="flex items-center gap-3 min-w-0">
                             <Link

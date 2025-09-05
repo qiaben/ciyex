@@ -4,11 +4,20 @@ import { useRouter } from "next/navigation";
 import { fetchWithAuth } from "@/utils/fetchWithAuth";
 import AdminLayout from "@/app/(admin)/layout";
 import Link from "next/link";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogFooter,
+    DialogTitle,
+    DialogDescription,
+} from "@/components/ui/dialog";
 
 interface Patient {
     id: number;
     firstName: string;
     lastName: string;
+    middleName: string;
     email: string;
     phoneNumber: string;
     dateOfBirth: string;
@@ -54,6 +63,7 @@ export default function PatientListPage() {
     const [totalItems, setTotalItems] = useState<number>(0);
 
     const [search, setSearch] = useState("");
+    const [editPatient, setEditPatient] = useState<Patient | null>(null);
 
     useEffect(() => {
         const recent = JSON.parse(localStorage.getItem("recentPatients") || "[]");
@@ -136,8 +146,7 @@ export default function PatientListPage() {
     const handlePrevious = () => setCurrentPage((p) => Math.max(1, p - 1));
     const handleNext = () => setCurrentPage((p) => Math.min(totalPages, p + 1));
 
-    const handleEdit = (patient: Patient) =>
-        window.dispatchEvent(new CustomEvent("openPatientModal", { detail: patient }));
+    const handleEdit = (patient: Patient) => setEditPatient(patient);
 
     const handleDelete = async (patient: Patient) => {
         if (!confirm(`Delete patient ${patient.firstName} ${patient.lastName}?`)) return;
@@ -147,11 +156,24 @@ export default function PatientListPage() {
         fetchPatients(currentPage, patientsPerPage, search);
     };
 
-    // ✅ Loading / Error
+    const handleSaveEdit = async (updatedPatient: Patient) => {
+        if (!updatedPatient) return;
+        await fetchWithAuth(
+            `${process.env.NEXT_PUBLIC_API_URL}/api/patients/${updatedPatient.id}`,
+            {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(updatedPatient),
+            }
+        );
+        fetchPatients(currentPage, patientsPerPage, search);
+        setEditPatient(null);
+    };
+
     if (loading) {
         return (
             <AdminLayout>
-                <div className="p-4 text-gray-500 text-sm">Loading patients...</div>
+                <div className="p-4 text-gray-500 text-base">Loading patients...</div>
             </AdminLayout>
         );
     }
@@ -159,36 +181,36 @@ export default function PatientListPage() {
     if (error) {
         return (
             <AdminLayout>
-                <div className="p-4 text-red-500 text-sm">{error}</div>
+                <div className="p-4 text-red-500 text-base">{error}</div>
             </AdminLayout>
         );
     }
 
     return (
         <AdminLayout>
-            <div className="flex flex-col min-h-[calc(100vh-56px)] bg-[#f8fafb]">
+            <div className="flex flex-col h-[calc(100vh-56px)] bg-[#f8fafb]">
                 {/* Recent patients + search */}
-                <div className="flex flex-wrap justify-between gap-2 px-2 py-1 items-start mb-4">
+                <div className="flex flex-wrap justify-between gap-2 px-3 py-2 items-start mb-4">
                     <div>
                         {recentPatients.length > 0 && (
                             <>
-                                <div className="text-xs text-gray-700 mb-1">Recent patients</div>
-                                <div className="flex flex-wrap gap-1">
+                                <div className="text-base text-gray-700 mb-1">Recent patients</div>
+                                <div className="flex flex-wrap gap-2">
                                     {recentPatients.slice(0, 5).map((patient) => (
                                         <Link
                                             key={patient.id}
                                             href={`/patients/${patient.id}/`}
                                             onClick={() => handlePatientClick(patient)}
-                                            className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border text-xs hover:bg-gray-50"
+                                            className="flex items-center gap-2 px-3 py-1 rounded-full bg-white border text-base hover:bg-gray-50"
                                         >
                                             <div
-                                                className={`flex items-center justify-center h-6 w-6 rounded-full text-[11px] font-semibold ${getBadgeColor(
+                                                className={`flex items-center justify-center h-8 w-8 rounded-full text-sm font-semibold ${getBadgeColor(
                                                     patient.id
                                                 )}`}
                                             >
                                                 {getInitials(patient.firstName, patient.lastName)}
                                             </div>
-                                            <span className="text-xs font-medium">
+                                            <span className="text-base font-medium">
                         {patient.firstName} {patient.lastName}
                       </span>
                                         </Link>
@@ -198,11 +220,10 @@ export default function PatientListPage() {
                         )}
                     </div>
 
-                    {/* Search */}
-                    <form onSubmit={(e) => e.preventDefault()} className="relative w-52 sm:w-60 mt-6">
+                    <form onSubmit={(e) => e.preventDefault()} className="relative w-60 mt-6">
             <span className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
               <svg
-                  className="w-4 h-4 text-gray-400"
+                  className="w-5 h-5 text-gray-400"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="2"
@@ -219,57 +240,64 @@ export default function PatientListPage() {
                                 setSearch(e.target.value);
                                 setCurrentPage(1);
                             }}
-                            className="w-full pl-9 pr-3 py-1 text-xs border rounded-md focus:ring-2 focus:ring-blue-500"
+                            className="w-full pl-10 pr-3 py-2 text-base border rounded-md focus:ring-2 focus:ring-blue-500"
                         />
                     </form>
                 </div>
 
-                {/* Table */}
-                <div className="bg-white border-t border-gray-100">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-[12px]">
-                            <thead className="bg-gray-50">
+                {/* Table with scroll and sticky pagination */}
+                <div className="flex flex-col flex-1 bg-white border-t border-gray-100">
+                    <div className="overflow-x-auto flex-1">
+                        <table className="w-full text-base">
+
+                        <thead className="bg-gray-50 sticky top-0 z-10">
                             <tr>
-                                <th className="px-2 py-1 text-left text-[11px] text-gray-500 uppercase">Name</th>
-                                <th className="px-2 py-1 text-left text-[11px] text-gray-500 uppercase">MRN</th>
-                                <th className="px-2 py-1 text-left text-[11px] text-gray-500 uppercase">Email</th>
-                                <th className="px-2 py-1 text-left text-[11px] text-gray-500 uppercase">Phone</th>
-                                <th className="px-2 py-1 text-left text-[11px] text-gray-500 uppercase">DOB</th>
-                                <th className="px-2 py-1 text-left text-[11px] text-gray-500 uppercase">Gender</th>
-                                <th className="px-2 py-1 text-left text-[11px] text-gray-500 uppercase">Status</th>
-                                <th className="px-2 py-1 text-center text-[11px] text-gray-500 uppercase">Actions</th>
+                                <th className="px-3 py-2 text-left text-base text-gray-600 uppercase">Name</th>
+                                <th className="px-3 py-2 text-left text-base text-gray-600 uppercase">MRN</th>
+                                <th className="px-3 py-2 text-left text-base text-gray-600 uppercase">Email</th>
+                                <th className="px-3 py-2 text-left text-base text-gray-600 uppercase">Phone</th>
+                                <th className="px-3 py-2 text-left text-base text-gray-600 uppercase">DOB</th>
+                                <th className="px-3 py-2 text-left text-base text-gray-600 uppercase">Gender</th>
+                                <th className="px-3 py-2 text-left text-base text-gray-600 uppercase">Status</th>
+                                <th className="px-3 py-2 text-center text-base text-gray-600 uppercase">Actions</th>
                             </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                             {patients.map((patient) => (
                                 <tr key={patient.id} className="hover:bg-gray-50">
+                                    {/* Name with initials */}
                                     <td
-                                        className="px-2 py-1 flex items-center gap-2 cursor-pointer"
+                                        className="px-3 py-2 flex items-center gap-2 cursor-pointer"
                                         onClick={() => goToPatient(patient)}
                                     >
                                         <div
-                                            className={`h-6 w-6 flex items-center justify-center rounded-full text-[11px] font-semibold ${getBadgeColor(
+                                            className={`h-7 w-7 flex items-center justify-center rounded-full text-xs font-semibold ${getBadgeColor(
                                                 patient.id
                                             )}`}
                                         >
                                             {getInitials(patient.firstName, patient.lastName)}
                                         </div>
-                                        <span className="font-medium text-gray-700">
-                        {patient.firstName} {patient.lastName}
-                      </span>
+                                        <span className="font-medium text-gray-700 text-sm">
+            {patient.firstName} {patient.lastName}
+          </span>
                                     </td>
-                                    <td className="px-2 py-1 text-gray-600">{patient.id}</td>
-                                    <td className="px-2 py-1 text-gray-600">{patient.email || "N/A"}</td>
-                                    <td className="px-2 py-1 text-gray-600">{patient.phoneNumber || "N/A"}</td>
-                                    <td className="px-2 py-1 text-gray-600">{formatDate(patient.dateOfBirth)}</td>
-                                    <td className="px-2 py-1 text-gray-600">{patient.gender || "N/A"}</td>
-                                    <td className="px-2 py-1">
-                      <span className="inline-block bg-green-100 text-green-700 text-[10px] px-2 py-0.5 rounded-full font-semibold">
-                        {patient.status || "Active"}
-                      </span>
+
+                                    <td className="px-3 py-2 text-gray-600">{patient.id}</td>
+                                    <td className="px-3 py-2 text-gray-600">{patient.email || "N/A"}</td>
+                                    <td className="px-3 py-2 text-gray-600">{patient.phoneNumber || "N/A"}</td>
+                                    <td className="px-3 py-2 text-gray-600">{formatDate(patient.dateOfBirth)}</td>
+                                    <td className="px-3 py-2 text-gray-600">{patient.gender || "N/A"}</td>
+
+                                    {/* Status Badge */}
+                                    <td className="px-3 py-2">
+          <span className="inline-block bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-semibold">
+            {patient.status || "Active"}
+          </span>
                                     </td>
-                                    <td className="px-2 py-1 text-center">
-                                        <div className="flex justify-center gap-2">
+
+                                    {/* Actions */}
+                                    <td className="px-3 py-2 text-center">
+                                        <div className="flex justify-center gap-3">
                                             {/* Edit */}
                                             <button
                                                 onClick={() => handleEdit(patient)}
@@ -277,19 +305,35 @@ export default function PatientListPage() {
                                             >
                                                 <svg
                                                     xmlns="http://www.w3.org/2000/svg"
-                                                    className="w-4 h-4"
-                                                    fill="none"
+                                                    className="w-5 h-5"
                                                     viewBox="0 0 24 24"
+                                                    fill="none"
                                                     stroke="currentColor"
-                                                    strokeWidth={2}
+                                                    strokeWidth={1.5}
                                                 >
+                                                    {/* Pencil in a square */}
                                                     <path
                                                         strokeLinecap="round"
                                                         strokeLinejoin="round"
-                                                        d="M16.862 4.487l2.651 2.65M6.75 14.6l-1.5 4.5 4.5-1.5L19.512 7.137"
+                                                        d="M16.862 3.487a2.25 2.25 0 0 1 3.182 3.182l-9.193 9.193a4.5 4.5 0 0 1-1.591 1.05l-3.18 1.06 1.06-3.18a4.5 4.5 0 0 1 1.05-1.591l9.193-9.193z"
+                                                    />
+                                                    <path
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        d="M19.5 7.5L16.5 4.5"
+                                                    />
+                                                    <rect
+                                                        x="2.75"
+                                                        y="2.75"
+                                                        width="18.5"
+                                                        height="18.5"
+                                                        rx="2"
+                                                        ry="2"
+                                                        stroke="currentColor"
                                                     />
                                                 </svg>
                                             </button>
+
                                             {/* Delete */}
                                             <button
                                                 onClick={() => handleDelete(patient)}
@@ -297,59 +341,64 @@ export default function PatientListPage() {
                                             >
                                                 <svg
                                                     xmlns="http://www.w3.org/2000/svg"
-                                                    className="w-4 h-4"
-                                                    fill="none"
+                                                    className="w-5 h-5"
                                                     viewBox="0 0 24 24"
+                                                    fill="none"
                                                     stroke="currentColor"
-                                                    strokeWidth={2}
+                                                    strokeWidth={1.5}
                                                 >
+                                                    {/* Sleek modern trash bin */}
                                                     <path
                                                         strokeLinecap="round"
                                                         strokeLinejoin="round"
-                                                        d="M6 7h12M9 11v6m6-6v6M4 7h16l-1 12H6L4 7zm3-3h10v2H7V4z"
+                                                        d="M9 3h6l1 2h4a1 1 0 010 2h-1v12a2 2 0 01-2 2H7a2 2 0 01-2-2V7H4a1 1 0 010-2h4l1-2z"
+                                                    />
+                                                    <path
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        d="M10 11v6M14 11v6"
                                                     />
                                                 </svg>
                                             </button>
+
                                         </div>
                                     </td>
                                 </tr>
                             ))}
                             </tbody>
                         </table>
+
+
                     </div>
 
-                    {/* Pagination */}
-                    <div className="mt-3 flex items-center justify-between px-2 py-1 border-t bg-white text-[11px]">
+                    {/* Sticky pagination */}
+                    <div className="sticky bottom-0 flex items-center justify-between px-3 py-3 border-t bg-white text-base">
                         <div className="flex items-center gap-2">
                             <button
                                 disabled={currentPage === 1}
                                 onClick={handlePrevious}
-                                className="px-2 py-0.5 border rounded disabled:opacity-50"
+                                className="px-4 py-2 border rounded disabled:opacity-50 hover:bg-gray-100"
                             >
                                 Prev
                             </button>
-                            <div>
-                                Page {currentPage} of {totalPages}
-                            </div>
+                            <div>Page {currentPage} of {totalPages}</div>
                             <button
                                 disabled={currentPage === totalPages}
                                 onClick={handleNext}
-                                className="px-2 py-0.5 border rounded disabled:opacity-50"
+                                className="px-4 py-2 border rounded disabled:opacity-50 hover:bg-gray-100"
                             >
                                 Next
                             </button>
                         </div>
                         <div className="flex items-center gap-3">
-                            <div>
-                                Showing {patients.length} of {totalItems}
-                            </div>
+                            <div>Showing {patients.length} of {totalItems}</div>
                             <select
                                 value={patientsPerPage}
                                 onChange={(e) => {
                                     setPatientsPerPage(Number(e.target.value));
                                     setCurrentPage(1);
                                 }}
-                                className="border rounded px-2 py-0.5 bg-white text-[11px]"
+                                className="border rounded px-2 py-1 bg-white text-base"
                             >
                                 <option value={5}>5</option>
                                 <option value={10}>10</option>
@@ -360,6 +409,111 @@ export default function PatientListPage() {
                     </div>
                 </div>
             </div>
+
+            {/* Edit Patient Modal */}
+            {editPatient && (
+                <Dialog open={true} onOpenChange={() => setEditPatient(null)}>
+                    <DialogContent className="max-w-2xl" onClose={() => setEditPatient(null)}>
+                        <DialogHeader>
+                            <DialogTitle className="text-lg font-semibold">Edit Patient</DialogTitle>
+                            <DialogDescription className="text-base">Update the patient details</DialogDescription>
+                        </DialogHeader>
+                        <form
+                            onSubmit={(e) => {
+                                e.preventDefault();
+                                handleSaveEdit(editPatient);
+                            }}
+                            className="space-y-6"
+                        >
+                            <div className="grid grid-cols-3 gap-4">
+                                <div>
+                                    <label className="block text-base font-medium mb-1 text-red-500">First Name *</label>
+                                    <input
+                                        name="firstName"
+                                        required
+                                        placeholder="First name"
+                                        value={editPatient.firstName}
+                                        onChange={(e) =>
+                                            setEditPatient({ ...editPatient, firstName: e.target.value })
+                                        }
+                                        className="w-full p-2 border rounded text-base"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-base font-medium mb-1">Middle Name</label>
+                                    <input
+                                        name="middleName"
+                                        placeholder="Middle (optional)"
+                                        value={editPatient.middleName}
+                                        onChange={(e) =>
+                                            setEditPatient({ ...editPatient, middleName: e.target.value })
+                                        }
+                                        className="w-full p-2 border rounded text-base"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-base font-medium mb-1 text-red-500">Last Name *</label>
+                                    <input
+                                        name="lastName"
+                                        required
+                                        placeholder="Last name"
+                                        value={editPatient.lastName}
+                                        onChange={(e) =>
+                                            setEditPatient({ ...editPatient, lastName: e.target.value })
+                                        }
+                                        className="w-full p-2 border rounded text-base"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-base font-medium mb-1">Phone Number</label>
+                                    <input
+                                        name="phoneNumber"
+                                        value={editPatient.phoneNumber}
+                                        onChange={(e) =>
+                                            setEditPatient({ ...editPatient, phoneNumber: e.target.value })
+                                        }
+                                        className="w-full p-2 border rounded text-base"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-base font-medium mb-1">Gender</label>
+                                    <select
+                                        name="gender"
+                                        value={editPatient.gender}
+                                        onChange={(e) =>
+                                            setEditPatient({ ...editPatient, gender: e.target.value })
+                                        }
+                                        className="w-full p-2 border rounded text-base"
+                                    >
+                                        <option value="">Select gender</option>
+                                        <option value="male">Male</option>
+                                        <option value="female">Female</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <DialogFooter>
+                                <button
+                                    type="button"
+                                    onClick={() => setEditPatient(null)}
+                                    className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 text-base"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-base"
+                                >
+                                    Save
+                                </button>
+                            </DialogFooter>
+                        </form>
+                    </DialogContent>
+                </Dialog>
+            )}
         </AdminLayout>
     );
 }

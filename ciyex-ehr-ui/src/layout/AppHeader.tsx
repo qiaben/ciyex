@@ -3,11 +3,9 @@ import { ThemeToggleButton } from "@/components/common/ThemeToggleButton";
 import NotificationDropdown from "@/components/header/NotificationDropdown";
 import UserDropdown from "@/components/header/UserDropdown";
 import { useSidebar } from "@/context/SidebarContext";
-
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { fetchWithAuth } from "@/utils/fetchWithAuth";
-
 import {
     Dialog,
     DialogContent,
@@ -36,7 +34,9 @@ const AppHeader: React.FC<AppHeaderProps> = ({ pageTitle }) => {
         dateOfBirth: "",
         phoneNumber: "",
         email: "",
-        smsConsent: false,
+        smsConsent: true,  // SMS consent is checked by default
+        emailConsent: true, // Email consent is checked by default
+        voicemailConsent: true, // Voicemail consent is checked by default
     });
 
     const [errorMessage, setErrorMessage] = useState("");
@@ -51,7 +51,9 @@ const AppHeader: React.FC<AppHeaderProps> = ({ pageTitle }) => {
             dateOfBirth: "",
             phoneNumber: "",
             email: "",
-            smsConsent: false,
+            smsConsent: true,
+            emailConsent: true,
+            voicemailConsent: true,
         });
         setEditingPatientId(null);
         setErrorMessage("");
@@ -127,12 +129,11 @@ const AppHeader: React.FC<AppHeaderProps> = ({ pageTitle }) => {
         }
     };
 
-    // 🔍 Run search when Enter pressed or ⌘K button clicked
     const runSearch = useCallback(() => {
         if (searchTerm.trim()) {
             router.push(`/patients?search=${encodeURIComponent(searchTerm.trim())}`);
         }
-    }, [searchTerm, router]);  // Added dependencies for searchTerm and router
+    }, [searchTerm, router]);
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
@@ -151,12 +152,11 @@ const AppHeader: React.FC<AppHeaderProps> = ({ pageTitle }) => {
         return () => {
             document.removeEventListener("keydown", handleKeyDown);
         };
-    }, [runSearch, searchTerm]);  // Include runSearch in the dependency array
+    }, [runSearch, searchTerm]);
 
     return (
         <header className="sticky top-0 flex w-full bg-white border-b border-gray-200 z-50 dark:bg-gray-900">
             <div className="flex items-center justify-between w-full px-4 py-2">
-                {/* Left: Sidebar + Title */}
                 <div className="flex items-center gap-3">
                     <button
                         onClick={toggleSidebar}
@@ -175,7 +175,6 @@ const AppHeader: React.FC<AppHeaderProps> = ({ pageTitle }) => {
                     {pageTitle && <h1 className="text-lg font-semibold">{pageTitle}</h1>}
                 </div>
 
-                {/* Center: Search */}
                 <div className="flex-1 max-w-md mx-8">
                     <div className="relative">
                         <span className="absolute inset-y-0 left-3 flex items-center">
@@ -210,7 +209,6 @@ const AppHeader: React.FC<AppHeaderProps> = ({ pageTitle }) => {
                     </div>
                 </div>
 
-                {/* Right: Controls */}
                 <div className="flex items-center gap-3">
                     <button
                         onClick={() => {
@@ -219,7 +217,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({ pageTitle }) => {
                         }}
                         className="inline-flex items-center gap-1.5 rounded-md bg-blue-100 text-blue-700 px-3 py-1.5 text-sm font-medium hover:bg-blue-200"
                     >
-                        {/* Avatar icon */}
+                        <span className="text-xl font-bold">+</span>
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30" className="w-5 h-5">
                             <path
                                 className="stroke-[#6C3DB7]"
@@ -227,7 +225,8 @@ const AppHeader: React.FC<AppHeaderProps> = ({ pageTitle }) => {
                             />
                             <circle className="fill-[#6EBAFF]" cx="15" cy="9" r="6" />
                         </svg>
-                        <span>Create</span>
+                        {/*<span className="text-xl font-bold">+</span>*/}
+
                     </button>
                     <ThemeToggleButton />
                     <NotificationDropdown />
@@ -235,7 +234,6 @@ const AppHeader: React.FC<AppHeaderProps> = ({ pageTitle }) => {
                 </div>
             </div>
 
-            {/* Patient Modal */}
             <Dialog open={isModalOpen} onOpenChange={setModalOpen}>
                 <DialogContent
                     className="max-w-2xl"
@@ -256,7 +254,9 @@ const AppHeader: React.FC<AppHeaderProps> = ({ pageTitle }) => {
                     <form className="space-y-6">
                         <div className="grid grid-cols-3 gap-4">
                             <div>
-                                <label className="block text-sm font-medium mb-1">First Name *</label>
+                                <label className="block text-sm font-medium mb-1">
+                                    <span className="text-red-500">*</span> First Name
+                                </label>
                                 <input
                                     name="firstName"
                                     required
@@ -267,17 +267,22 @@ const AppHeader: React.FC<AppHeaderProps> = ({ pageTitle }) => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium mb-1">Middle Name</label>
+                                <label className="block text-sm font-medium mb-1">
+                                    <span className="text-red-500">*</span> Middle Name
+                                </label>
                                 <input
                                     name="middleName"
-                                    placeholder="Middle (optional)"
+                                    required
+                                    placeholder="Middle name"
                                     value={formData.middleName}
                                     onChange={handleInputChange}
                                     className="w-full p-2 border rounded"
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium mb-1">Last Name *</label>
+                                <label className="block text-sm font-medium mb-1">
+                                    <span className="text-red-500">*</span> Last Name
+                                </label>
                                 <input
                                     name="lastName"
                                     required
@@ -291,7 +296,9 @@ const AppHeader: React.FC<AppHeaderProps> = ({ pageTitle }) => {
 
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-medium mb-1">Phone Number *</label>
+                                <label className="block text-sm font-medium mb-1">
+                                    <span className="text-red-500">*</span> Phone Number
+                                </label>
                                 <input
                                     name="phoneNumber"
                                     required
@@ -305,7 +312,9 @@ const AppHeader: React.FC<AppHeaderProps> = ({ pageTitle }) => {
                                 </p>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium mb-1">Gender *</label>
+                                <label className="block text-sm font-medium mb-1">
+                                    <span className="text-red-500">*</span> Gender
+                                </label>
                                 <select
                                     name="gender"
                                     required
@@ -322,7 +331,9 @@ const AppHeader: React.FC<AppHeaderProps> = ({ pageTitle }) => {
 
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-medium mb-1">Date of Birth *</label>
+                                <label className="block text-sm font-medium mb-1">
+                                    <span className="text-red-500">*</span> Date of Birth
+                                </label>
                                 <input
                                     type="date"
                                     name="dateOfBirth"
@@ -333,11 +344,10 @@ const AppHeader: React.FC<AppHeaderProps> = ({ pageTitle }) => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium mb-1">Email *</label>
+                                <label className="block text-sm font-medium mb-1">Email</label>
                                 <input
                                     type="email"
                                     name="email"
-                                    required
                                     placeholder="name@example.com"
                                     value={formData.email}
                                     onChange={handleInputChange}
@@ -345,27 +355,50 @@ const AppHeader: React.FC<AppHeaderProps> = ({ pageTitle }) => {
                                 />
                             </div>
                         </div>
+
+                        <div>
+                            <label className="block text-sm font-medium mb-1">Consent to receive notifications</label>
+                            <div className="flex items-center gap-4">
+                                <div>
+                                    <input
+                                        type="checkbox"
+                                        id="emailConsent"
+                                        name="emailConsent"
+                                        checked={formData.emailConsent}
+                                        onChange={handleInputChange}
+                                    />
+                                    <label htmlFor="emailConsent" className="ml-2">Email</label>
+                                </div>
+                                <div>
+                                    <input
+                                        type="checkbox"
+                                        id="smsConsent"
+                                        name="smsConsent"
+                                        checked={formData.smsConsent}
+                                        onChange={handleInputChange}
+                                    />
+                                    <label htmlFor="smsConsent" className="ml-2">SMS/Text</label>
+                                </div>
+                                <div>
+                                    <input
+                                        type="checkbox"
+                                        id="voicemailConsent"
+                                        name="voicemailConsent"
+                                        checked={formData.voicemailConsent}
+                                        onChange={handleInputChange}
+                                    />
+                                    <label htmlFor="voicemailConsent" className="ml-2">Voicemail</label>
+                                </div>
+                            </div>
+                        </div>
                     </form>
+
 
                     {errorMessage && (
                         <p className="text-red-600 text-sm mt-3">{errorMessage}</p>
                     )}
 
                     <DialogFooter className="flex justify-between items-center mt-6">
-                        {/* Consent Checkbox */}
-                        <div className="flex items-center gap-2">
-                            <input
-                                type="checkbox"
-                                id="smsConsent"
-                                name="smsConsent"
-                                checked={formData.smsConsent}
-                                onChange={handleInputChange}
-                            />
-                            <label htmlFor="smsConsent" className="text-sm text-gray-700">
-                                Allow to receive SMS notifications
-                            </label>
-                        </div>
-
                         <div className="flex gap-2">
                             {editingPatientId && (
                                 <button
@@ -397,5 +430,6 @@ const AppHeader: React.FC<AppHeaderProps> = ({ pageTitle }) => {
         </header>
     );
 };
+
 
 export default AppHeader;
