@@ -16,7 +16,7 @@ import {
     PlugInIcon,
     SettingsIcon, // ensure this exists in ../icons/index
     TableIcon,
-    AppointmentIcon
+    AppointmentIcon, MessagingIcon
 
 } from "../icons/index";
 
@@ -101,7 +101,12 @@ const navItems: NavItem[] = [
         ],
     },
 
-
+    {
+        name:"Messaging",
+        icon:<MessagingIcon/>,
+        subItems: [
+            { name: "Inbox", path: "/messaging/inbox" },]
+    },
 
 
     {
