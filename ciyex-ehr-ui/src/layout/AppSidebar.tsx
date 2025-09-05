@@ -17,8 +17,8 @@ import {
     SettingsIcon, // ensure this exists in ../icons/index
     TableIcon,
     RecallIcon,
+    AppointmentIcon, MessagingIcon,
 
-    AppointmentIcon,
 
 } from "../icons/index";
 
@@ -86,7 +86,12 @@ const navItems: NavItem[] = [
 
     // Settings with nested Forms -> Lists
 
-
+    {
+        icon:<MessagingIcon/>,
+        name:"Messaging",
+        subItems: [
+            { name: "Inbox", path: "/messaging/inbox" },],
+    },
 
 
 
@@ -117,9 +122,6 @@ const navItems: NavItem[] = [
 
         ],
     },
-
-
-
 
     {
         name: "Forms",
