@@ -16,7 +16,9 @@ import {
     PlugInIcon,
     SettingsIcon, // ensure this exists in ../icons/index
     TableIcon,
-    AppointmentIcon
+    RecallIcon,
+
+    AppointmentIcon,
 
 } from "../icons/index";
 
@@ -79,10 +81,25 @@ const navItems: NavItem[] = [
     {
         icon: <AppointmentIcon />,
         name: "Appointments",
-        path: "/appointments", // ✅ top-level now
+        path: "/appointments", //  top-level now
     },
 
     // Settings with nested Forms -> Lists
+
+
+
+
+
+
+
+
+
+    {
+        icon: <RecallIcon />,
+        name: "Recall",
+        path: "/recall",
+    },
+
     {
         icon: <SettingsIcon />,
         name: "Settings",
