@@ -113,4 +113,5 @@ export {
     RecallIcon,
     SettingsIcon,
     AppointmentIcon,
+    MessagingIcon,
 };
