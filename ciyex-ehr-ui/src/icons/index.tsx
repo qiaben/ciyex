@@ -53,6 +53,7 @@ import MoreDotIcon from "./more-dot.svg";
 import BellIcon from "./bell.svg";
 import MessagingIcon from "./MessagingIcon.svg"
 import SettingsIcon from "./settings.svg";
+import RecallIcon from "./Reacll.svg"
 import AppointmentIcon from "./appointments.svg";
 
 export {
@@ -109,7 +110,7 @@ export {
   HorizontaLDots,
   ChevronUpIcon,
   ChatIcon,
-    MessagingIcon,
+    RecallIcon,
     SettingsIcon,
     AppointmentIcon,
 };

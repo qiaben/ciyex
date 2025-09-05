@@ -23,6 +23,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         "/settings/insurance": "Insurance Companies", // ✅ added
         "/settings": "Settings",
         "/appointments": "Appointments",
+        "/recall":"Recall"
     };
 
     const pageTitle =
