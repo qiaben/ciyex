@@ -26,7 +26,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         "/settings/insurance": "Insurance Companies",
         "/settings/codes": "Codes",
         "/settings": "Settings",
-        "/appointments": "Appointments",
         "/recall":"Recall"
     };
 
