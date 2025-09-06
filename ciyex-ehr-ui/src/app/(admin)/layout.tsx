@@ -26,6 +26,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         "/settings/insurance": "Insurance Companies",
         "/settings/codes": "Codes",
         "/settings": "Settings",
+        "/appointments": "Appointments",
+        "/recall":"Recall"
     };
 
     // Pick the longest matching key (so /settings/codes wins over /settings)
