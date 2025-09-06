@@ -86,7 +86,7 @@ export default function DemographicsFlat({
     };
 
     const Label = ({ text, required }: { text: string; required?: boolean }) => (
-        <label className="block text-xs text-gray-600 mb-0.5 flex items-center gap-1">
+        <label className="block text-xs text-gray-600 mb-0.5  flex items-center gap-1">
             {text}
             {required && <span className="text-red-500" title="Required">*</span>}
         </label>
