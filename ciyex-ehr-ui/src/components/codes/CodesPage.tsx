@@ -77,7 +77,7 @@ export default function CodesPage() {
         } catch (err) {
             console.error("Error loading codes:", err);
         }
-    }, [orgId, searchText, filter]);
+    }, [orgId, searchText, filter, headers]); // added headers
 
     // Load once on mount
     useEffect(() => {
