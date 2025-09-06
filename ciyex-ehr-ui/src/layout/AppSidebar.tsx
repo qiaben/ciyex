@@ -89,6 +89,10 @@ const navItems: NavItem[] = [
         subItems: [
             { name: "Providers", path: "/settings/providers" },
             {name:"Insurance companies", path:"/settings/insurance"},
+            {
+                name: "Codes",
+                path: "settings/codes",
+            },
 
             {
                 name: "Forms",
@@ -97,6 +101,7 @@ const navItems: NavItem[] = [
                     { name: "Form Admin", path: "/settings/forms/admin" },
                 ],
             },
+
 
         ],
     },
@@ -122,11 +127,7 @@ const navItems: NavItem[] = [
             { name: "404 Error", path: "/error-404", pro: false },
         ],
     },
-    {
-        name: "Codes",
-        icon: <BoxCubeIcon />,
-        path: "/codes",
-    },
+
     {
         name: "Labs",
         icon: <BoxCubeIcon />,
