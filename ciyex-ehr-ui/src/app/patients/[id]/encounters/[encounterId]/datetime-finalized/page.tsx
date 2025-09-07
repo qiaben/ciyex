@@ -1,4 +1,4 @@
-import DateTimeFinalizedCard from "@/components/datetimefinalized/DateTimeFinalizedCard";
+import DateTimeFinalizedCard from "@/components/encounter/datetimefinalized/DateTimeFinalizedCard";
 
 type Props = { params: Promise<{ patientId: string; encounterId: string }> };
 

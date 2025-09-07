@@ -1,4 +1,4 @@
-import HPIList from "@/components/hpi/HPIList";
+import HPIList from "@/components/encounter/hpi/HPIList";
 
 export const metadata = { title: "History of Present Illness (HPI)" };
 

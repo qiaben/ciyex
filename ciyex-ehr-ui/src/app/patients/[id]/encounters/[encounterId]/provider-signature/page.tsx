@@ -1,4 +1,4 @@
-import ProviderSignatureCard from "@/components/providersignature/ProviderSignatureCard";
+import ProviderSignatureCard from "@/components/encounter/providersignature/ProviderSignatureCard";
 
 // Align with generated PageProps: params is a Promise
 type Props = { params: Promise<{ patientId: string; encounterId: string }> };

@@ -2,25 +2,28 @@
 //
 // import { useEffect, useMemo, useState } from "react";
 // import { fetchWithOrg } from "@/utils/fetchWithOrg";
-// import type { ApiResponse, CodeDto } from "@/utils/types";
-// import CodeForm from "./CodeForm";
+// import type { ApiResponse, HpiDto } from "@/utils/types";
+// import HPIForm from "./HPIForm";
 //
-// type Props = { patientId: number; encounterId: number };
+// type Props = {
+//     patientId: number;
+//     encounterId: number;
+// };
 //
-// export default function CodeList({ patientId, encounterId }: Props) {
-//     const [items, setItems] = useState<CodeDto[]>([]);
+// export default function HPIList({ patientId, encounterId }: Props) {
+//     const [items, setItems] = useState<HpiDto[]>([]);
 //     const [loading, setLoading] = useState(true);
 //     const [error, setError] = useState<string | null>(null);
 //     const [showForm, setShowForm] = useState(false);
-//     const [editing, setEditing] = useState<CodeDto | null>(null);
+//     const [editing, setEditing] = useState<HpiDto | null>(null);
 //
 //     async function load() {
 //         setLoading(true);
 //         setError(null);
 //         try {
-//             // GET /api/codes/{patientId}/{encounterId}
-//             const res = await fetchWithOrg(`/api/codes/${patientId}/${encounterId}`);
-//             const json = (await res.json()) as ApiResponse<CodeDto[]>;
+//             // GET /api/history-of-present-illness/{patientId}/{encounterId}
+//             const res = await fetchWithOrg(`/api/history-of-present-illness/${patientId}/${encounterId}`);
+//             const json = (await res.json()) as ApiResponse<HpiDto[]>;
 //             if (!res.ok || !json.success) throw new Error(json.message || "Load failed");
 //             setItems(json.data || []);
 //         } catch (e: unknown) {
@@ -32,20 +35,24 @@
 //
 //     useEffect(() => { load(); /* eslint-disable-line react-hooks/exhaustive-deps */ }, [patientId, encounterId]);
 //
-//     function onSaved(saved: CodeDto) {
+//     function onSaved(saved: HpiDto) {
 //         setShowForm(false);
 //         setEditing(null);
 //         setItems((prev) => {
 //             const i = prev.findIndex((x) => x.id === saved.id);
-//             if (i >= 0) { const copy = [...prev]; copy[i] = saved; return copy; }
+//             if (i >= 0) {
+//                 const copy = [...prev];
+//                 copy[i] = saved;
+//                 return copy;
+//             }
 //             return [saved, ...prev];
 //         });
 //     }
 //
 //     async function remove(id: number) {
-//         if (!confirm("Delete this code?")) return;
+//         if (!confirm("Delete this HPI entry?")) return;
 //         try {
-//             const res = await fetchWithOrg(`/api/codes/${patientId}/${encounterId}/${id}`, { method: "DELETE" });
+//             const res = await fetchWithOrg(`/api/history-of-present-illness/${patientId}/${encounterId}/${id}`, { method: "DELETE" });
 //             const json = (await res.json()) as ApiResponse<void>;
 //             if (!res.ok || !json.success) throw new Error(json.message || "Delete failed");
 //             setItems((p) => p.filter((x) => x.id !== id));
@@ -62,27 +69,20 @@
 //         });
 //     }, [items]);
 //
-//     const totalCharge = useMemo(() => {
-//         return items.reduce((sum, i) => sum + (typeof i.amount === "number" ? i.amount : 0), 0);
-//     }, [items]);
-//
 //     return (
 //         <div className="space-y-4">
 //             <div className="flex items-center justify-between">
-//                 <h2 className="text-xl font-semibold">Billing & Coding</h2>
-//                 <div className="flex items-center gap-3">
-//                     <div className="text-sm text-gray-700">Total: ₹{totalCharge.toFixed(2)}</div>
-//                     <button
-//                         onClick={() => { setEditing(null); setShowForm((s) => !s); }}
-//                         className="rounded-xl bg-indigo-600 text-white px-4 py-2 hover:bg-indigo-700"
-//                     >
-//                         {showForm ? "Close" : "Add Code"}
-//                     </button>
-//                 </div>
+//                 <h2 className="text-xl font-semibold">History of Present Illness (HPI)</h2>
+//                 <button
+//                     onClick={() => { setEditing(null); setShowForm((s) => !s); }}
+//                     className="rounded-xl bg-indigo-600 text-white px-4 py-2 hover:bg-indigo-700"
+//                 >
+//                     {showForm ? "Close" : "Add HPI"}
+//                 </button>
 //             </div>
 //
 //             {showForm && (
-//                 <CodeForm
+//                 <HPIForm
 //                     patientId={patientId}
 //                     encounterId={encounterId}
 //                     editing={editing}
@@ -94,40 +94,41 @@
 //             {loading && <div className="text-gray-600">Loading...</div>}
 //             {error && <div className="text-red-600">{error}</div>}
 //             {!loading && !error && sorted.length === 0 && (
-//                 <div className="rounded-xl border p-4 text-gray-600">No codes yet.</div>
+//                 <div className="rounded-xl border p-4 text-gray-600">No HPI entries yet.</div>
 //             )}
 //
 //             <ul className="space-y-3">
-//                 {sorted.map((c) => (
-//                     <li key={c.id} className="rounded-2xl border p-4 bg-white shadow-sm">
+//                 {sorted.map((hpi) => (
+//                     <li key={hpi.id} className="rounded-2xl border p-4 bg-white shadow-sm">
 //                         <div className="flex items-start justify-between gap-4">
 //                             <div className="space-y-1">
-//                                 <p className="font-medium text-gray-900">
-//                                     {c.codeType} · {c.code}
-//                                     {c.units ? ` · x${c.units}` : ""}
-//                                     {typeof c.amount === "number" ? ` · ₹${c.amount.toFixed(2)}` : ""}
-//                                     {c.status ? ` · ${c.status}` : ""}
-//                                 </p>
-//                                 {c.description && <p className="text-gray-900">{c.description}</p>}
-//                                 <p className="text-sm text-gray-700">
-//                                     {c.modifiers ? `Modifiers: ${c.modifiers}` : ""}
-//                                     {c.diagnosisPointers ? ` ${c.modifiers ? "·" : ""} Dx Ptr: ${c.diagnosisPointers}` : ""}
-//                                 </p>
-//                                 {c.notes && <p className="text-gray-800 whitespace-pre-wrap">{c.notes}</p>}
+//                                 <p className="text-gray-900 whitespace-pre-wrap">{hpi.narrative}</p>
 //                                 <p className="text-xs text-gray-500">
-//                                     {c.audit?.createdDate && <>Created: {c.audit.createdDate}</>}
-//                                     {c.audit?.lastModifiedDate && <> · Updated: {c.audit.lastModifiedDate}</>}
+//                                     {hpi.audit?.createdDate && <>Created: {hpi.audit.createdDate}</>}
+//                                     {hpi.audit?.lastModifiedDate && <> · Updated: {hpi.audit.lastModifiedDate}</>}
 //                                 </p>
+//                                 {/* Show structured fields if available */}
+//                                 <div className="text-xs text-gray-600 space-x-2">
+//                                     {hpi.onset && <span><b>Onset:</b> {hpi.onset}</span>}
+//                                     {hpi.duration && <span><b>Duration:</b> {hpi.duration}</span>}
+//                                     {hpi.severity && <span><b>Severity:</b> {hpi.severity}</span>}
+//                                     {hpi.location && <span><b>Location:</b> {hpi.location}</span>}
+//                                     {hpi.character && <span><b>Character:</b> {hpi.character}</span>}
+//                                     {hpi.timing && <span><b>Timing:</b> {hpi.timing}</span>}
+//                                     {hpi.aggravatingFactors && <span><b>Aggravating:</b> {hpi.aggravatingFactors}</span>}
+//                                     {hpi.alleviatingFactors && <span><b>Alleviating:</b> {hpi.alleviatingFactors}</span>}
+//                                     {hpi.associatedSymptoms && <span><b>Assoc.:</b> {hpi.associatedSymptoms}</span>}
+//                                 </div>
 //                             </div>
 //                             <div className="flex gap-2">
 //                                 <button
-//                                     onClick={() => { setEditing(c); setShowForm(true); }}
+//                                     onClick={() => { setEditing(hpi); setShowForm(true); }}
 //                                     className="rounded-lg border px-3 py-1.5 hover:bg-gray-50"
 //                                 >
 //                                     Edit
 //                                 </button>
 //                                 <button
-//                                     onClick={() => remove(c.id!)}
+//                                     onClick={() => remove(hpi.id!)}
 //                                     className="rounded-lg border px-3 py-1.5 hover:bg-gray-50"
 //                                 >
 //                                     Delete
@@ -141,29 +142,32 @@
 //     );
 // }
 
+
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { fetchWithOrg } from "@/utils/fetchWithOrg";
-import type { ApiResponse, CodeDto } from "@/utils/types";
-import CodeForm from "./CodeForm";
+import type { ApiResponse, HpiDto } from "@/utils/types";
+import HPIForm from "./HPIForm";
 
-type Props = { patientId: number; encounterId: number };
+type Props = {
+    patientId: number;
+    encounterId: number;
+};
 
-export default function CodeList({ patientId, encounterId }: Props) {
-    const [items, setItems] = useState<CodeDto[]>([]);
+export default function HPIList({ patientId, encounterId }: Props) {
+    const [items, setItems] = useState<HpiDto[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [showForm, setShowForm] = useState(false);
-    const [editing, setEditing] = useState<CodeDto | null>(null);
+    const [editing, setEditing] = useState<HpiDto | null>(null);
 
     async function load() {
         setLoading(true);
         setError(null);
         try {
-            // GET /api/codes/{patientId}/{encounterId}
-            const res = await fetchWithOrg(`/api/codes/${patientId}/${encounterId}`);
-            const json = (await res.json()) as ApiResponse<CodeDto[]>;
+            const res = await fetchWithOrg(`/api/history-of-present-illness/${patientId}/${encounterId}`);
+            const json = (await res.json()) as ApiResponse<HpiDto[]>;
             if (!res.ok || !json.success) throw new Error(json.message || "Load failed");
             setItems(json.data || []);
         } catch (e: unknown) {
@@ -175,20 +179,27 @@ export default function CodeList({ patientId, encounterId }: Props) {
 
     useEffect(() => { load(); /* eslint-disable-line react-hooks/exhaustive-deps */ }, [patientId, encounterId]);
 
-    function onSaved(saved: CodeDto) {
+    function onSaved(saved: HpiDto) {
         setShowForm(false);
         setEditing(null);
         setItems((prev) => {
             const i = prev.findIndex((x) => x.id === saved.id);
-            if (i >= 0) { const copy = [...prev]; copy[i] = saved; return copy; }
+            if (i >= 0) {
+                const copy = [...prev];
+                copy[i] = saved;
+                return copy;
+            }
             return [saved, ...prev];
         });
     }
 
     async function remove(id: number) {
-        if (!confirm("Delete this code?")) return;
+        if (!confirm("Delete this HPI entry?")) return;
         try {
-            const res = await fetchWithOrg(`/api/codes/${patientId}/${encounterId}/${id}`, { method: "DELETE" });
+            const res = await fetchWithOrg(
+                `/api/history-of-present-illness/${patientId}/${encounterId}/${id}`,
+                { method: "DELETE" }
+            );
             const json = (await res.json()) as ApiResponse<void>;
             if (!res.ok || !json.success) throw new Error(json.message || "Delete failed");
             setItems((p) => p.filter((x) => x.id !== id));
@@ -205,27 +216,20 @@ export default function CodeList({ patientId, encounterId }: Props) {
         });
     }, [items]);
 
-    const totalFee = useMemo(() => {
-        return items.reduce((sum, i) => sum + (typeof i.feeStandard === "number" ? i.feeStandard : 0), 0);
-    }, [items]);
-
     return (
         <div className="space-y-4">
             <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold">Codes</h2>
-                <div className="flex items-center gap-3">
-                    <div className="text-sm text-gray-700">Total Fee: ₹{totalFee.toFixed(2)}</div>
-                    <button
-                        onClick={() => { setEditing(null); setShowForm((s) => !s); }}
-                        className="rounded-xl bg-indigo-600 text-white px-4 py-2 hover:bg-indigo-700"
-                    >
-                        {showForm ? "Close" : "Add Code"}
-                    </button>
-                </div>
+                <h2 className="text-xl font-semibold">History of Present Illness (HPI)</h2>
+                <button
+                    onClick={() => { setEditing(null); setShowForm((s) => !s); }}
+                    className="rounded-xl bg-indigo-600 text-white px-4 py-2 hover:bg-indigo-700"
+                >
+                    {showForm ? "Close" : "Add HPI"}
+                </button>
             </div>
 
             {showForm && (
-                <CodeForm
+                <HPIForm
                     patientId={patientId}
                     encounterId={encounterId}
                     editing={editing}
@@ -237,48 +241,29 @@ export default function CodeList({ patientId, encounterId }: Props) {
             {loading && <div className="text-gray-600">Loading...</div>}
             {error && <div className="text-red-600">{error}</div>}
             {!loading && !error && sorted.length === 0 && (
-                <div className="rounded-xl border p-4 text-gray-600">No codes yet.</div>
+                <div className="rounded-xl border p-4 text-gray-600">No HPI entries yet.</div>
             )}
 
             <ul className="space-y-3">
-                {sorted.map((c) => (
-                    <li key={c.id} className="rounded-2xl border p-4 bg-white shadow-sm">
+                {sorted.map((hpi) => (
+                    <li key={hpi.id} className="rounded-2xl border p-4 bg-white shadow-sm">
                         <div className="flex items-start justify-between gap-4">
                             <div className="space-y-1">
-                                <p className="font-medium text-gray-900">
-                                    {c.codeType} · {c.code}
-                                    {c.modifier ? `-${c.modifier}` : ""}
-                                    {c.active ? " · Active" : " · Inactive"}
-                                    {typeof c.feeStandard === "number" ? ` · ₹${c.feeStandard.toFixed(2)}` : ""}
-                                </p>
-
-                                {c.shortDescription && <p className="text-gray-900">{c.shortDescription}</p>}
-                                {c.description && <p className="text-gray-700 whitespace-pre-wrap">{c.description}</p>}
-
-                                <p className="text-sm text-gray-700">
-                                    {c.category ? `Category: ${c.category}` : ""}
-                                    {(c.category && (c.relateTo || c.diagnosisReporting || c.serviceReporting)) ? " · " : ""}
-                                    {c.relateTo ? `Relate To: ${c.relateTo}` : ""}
-                                    {(c.relateTo && (c.diagnosisReporting || c.serviceReporting)) ? " · " : ""}
-                                    {c.diagnosisReporting ? "Dx Reporting" : ""}
-                                    {c.diagnosisReporting && c.serviceReporting ? " · " : ""}
-                                    {c.serviceReporting ? "Svc Reporting" : ""}
-                                </p>
-
+                                <p className="text-gray-900 whitespace-pre-wrap">{hpi.description}</p>
                                 <p className="text-xs text-gray-500">
-                                    {c.audit?.createdDate && <>Created: {c.audit.createdDate}</>}
-                                    {c.audit?.lastModifiedDate && <> · Updated: {c.audit.lastModifiedDate}</>}
+                                    {hpi.audit?.createdDate && <>Created: {hpi.audit.createdDate}</>}
+                                    {hpi.audit?.lastModifiedDate && <> · Updated: {hpi.audit.lastModifiedDate}</>}
                                 </p>
                             </div>
                             <div className="flex gap-2">
                                 <button
-                                    onClick={() => { setEditing(c); setShowForm(true); }}
+                                    onClick={() => { setEditing(hpi); setShowForm(true); }}
                                     className="rounded-lg border px-3 py-1.5 hover:bg-gray-50"
                                 >
                                     Edit
                                 </button>
                                 <button
-                                    onClick={() => remove(c.id!)}
+                                    onClick={() => remove(hpi.id!)}
                                     className="rounded-lg border px-3 py-1.5 hover:bg-gray-50"
                                 >
                                     Delete

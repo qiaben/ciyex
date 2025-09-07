@@ -1,4 +1,4 @@
-import AssessmentList from "@/components/assessment/AssessmentList";
+import AssessmentList from "@/components/encounter/assessment/AssessmentList";
 
 type Props = { params: Promise<{ patientId: string; encounterId: string }> };
 

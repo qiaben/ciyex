@@ -1,4 +1,4 @@
-import ProcedureList from "@/components/procedure/ProcedureList";
+import ProcedureList from "@/components/encounter/procedure/ProcedureList";
 
 type Props = { params: Promise<{ patientId: string; encounterId: string }> };
 

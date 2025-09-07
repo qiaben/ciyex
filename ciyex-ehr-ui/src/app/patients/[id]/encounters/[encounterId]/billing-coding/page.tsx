@@ -1,4 +1,4 @@
-import CodeList from "@/components/coding/CodeList";
+import CodeList from "@/components/encounter/coding/CodeList";
 
 // Note: align with your build's PageProps where params is a Promise
 type Props = { params: Promise<{ patientId: string; encounterId: string }> };

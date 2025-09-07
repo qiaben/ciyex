@@ -1,4 +1,4 @@
-import FHList from "@/components/familyhistory/FHList";
+import FHList from "@/components/encounter/familyhistory/FHList";
 
 type Props = { params: Promise<{ patientId: string; encounterId: string }> };
 

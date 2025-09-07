@@ -1,4 +1,4 @@
-import ChiefComplaintList from "@/components/cc/ChiefComplaintList";
+import ChiefComplaintList from "@/components/encounter/cc/ChiefComplaintList";
 
 export const metadata = { title: "Chief Complaint" };
 

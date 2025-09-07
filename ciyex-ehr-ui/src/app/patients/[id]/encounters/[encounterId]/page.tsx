@@ -1,373 +1,707 @@
-'use client';
+// "use client";
+//
+// import { useParams, useRouter } from "next/navigation";
+// import Link from "next/link";
+//
+// // Encounter sections (adjust paths if needed)
+// import ChiefComplaintList from "@/components/encounter/cc/ChiefComplaintList";
+//
+//
+// // Optional: your admin layout wrapper if you use it globally
+// import AdminLayout from "@/app/(admin)/layout";
+// import HPIList from "@/components/encounter/hpi/HPIList";
+// import PMHList from "@/components/encounter/pmh/PMHList";
+// import FHList from "@/components/encounter/familyhistory/FHList";
+// import PEList from "@/components/encounter/physicalexam/PEList";
+// import ROSList from "@/components/encounter/ros/ROSList";
+// import ProcedureList from "@/components/encounter/procedure/ProcedureList";
+// import CodeList from "@/components/encounter/coding/CodeList";
+// import PlanList from "@/components/encounter/plan/PlanList";
+// import ProviderNoteList from "@/components/encounter/providernote/ProviderNoteList";
+// import ProviderSignatureCard from "@/components/encounter/providersignature/ProviderSignatureCard";
+// import SignoffCard from "@/components/encounter/signoff/SignoffCard";
+// import FeeScheduleCard from "@/components/encounter/fees/FeeScheduleCard";
+//
+// export default function EncounterTabsPage() {
+//     const params = useParams();
+//     const router = useRouter();
+//
+//     const patientId = Number(params?.id);
+//     const encounterId = Number(params?.encounterId);
+//
+//     if (!patientId || !encounterId) {
+//         return (
+//             <AdminLayout>
+//                 <div className="p-6 text-center text-red-600">
+//                     Missing patient or encounter id.
+//                     <div className="mt-3">
+//                         <button
+//                             onClick={() => router.push("/patients")}
+//                             className="px-3 py-1.5 rounded bg-blue-600 text-white"
+//                         >
+//                             Back to Patients
+//                         </button>
+//                     </div>
+//                 </div>
+//             </AdminLayout>
+//         );
+//     }
+//
+//     const toc = [
+//         { id: "chief-complaint", label: "cc" },
+//         { id: "hpi", label: "HPI" },
+//         { id: "pmh", label: "Past Medical Hx" },
+//         { id: "fh", label: "Family History" },
+//         { id: "pe", label: "Physical Exam" },
+//         { id: "ros", label: "ROS" },
+//         { id: "procedures", label: "Procedures" },
+//         { id: "codes", label: "Codes" },
+//         { id: "plan", label: "Plan" },
+//         { id: "notes", label: "Provider Notes" },
+//         { id: "signature", label: "Provider Signature" },
+//         { id: "signoff", label: "Sign-off / Finalize" },
+//         { id: "fees", label: "Fee Schedule" },
+//     ];
+//
+//     return (
+//         <AdminLayout>
+//             <div className="border-b bg-white sticky top-0 z-40">
+//                 <div className="max-w-screen-2xl mx-auto px-3 py-2 flex items-center justify-between gap-2">
+//                     <div className="flex items-center gap-2">
+//                         <Link
+//                             href={`/patients/${patientId}`}
+//                             className="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 border border-gray-300 text-xs font-medium text-gray-700"
+//                         >
+//                             ← Patient
+//                         </Link>
+//                         <div className="text-xs text-gray-600">
+//                             Encounter <span className="font-semibold">#{encounterId}</span>
+//                         </div>
+//                     </div>
+//                     <div className="hidden md:flex flex-wrap gap-1">
+//                         {toc.map((t) => (
+//                             <a
+//                                 key={t.id}
+//                                 href={`#${t.id}`}
+//                                 className="px-2 py-1 rounded-md text-xs border bg-white hover:bg-gray-50 text-gray-700"
+//                             >
+//                                 {t.label}
+//                             </a>
+//                         ))}
+//                     </div>
+//                 </div>
+//             </div>
+//
+//             <div className="w-full max-w-screen-2xl mx-auto p-4 grid grid-cols-1 lg:grid-cols-[minmax(0,17fr)_minmax(0,5fr)] gap-4">
+//                 {/* Main */}
+//                 <main className="min-w-0 space-y-4">
+//                     <section id="chief-complaint" className="scroll-mt-24">
+//                         <div className="bg-white rounded-2xl border p-4 shadow-sm">
+//                             <h2 className="text-lg font-semibold mb-2">Chief Complaint</h2>
+//                             <ChiefComplaintList patientId={patientId} encounterId={encounterId} />
+//                         </div>
+//                     </section>
+//
+//                     <section id="hpi" className="scroll-mt-24">
+//                         <div className="bg-white rounded-2xl border p-4 shadow-sm">
+//                             <h2 className="text-lg font-semibold mb-2">History of Present Illness (HPI)</h2>
+//                             <HPIList patientId={patientId} encounterId={encounterId} />
+//                         </div>
+//                     </section>
+//
+//                     <section id="pmh" className="scroll-mt-24">
+//                         <div className="bg-white rounded-2xl border p-4 shadow-sm">
+//                             <h2 className="text-lg font-semibold mb-2">Past Medical History</h2>
+//                             <PMHList patientId={patientId} encounterId={encounterId} />
+//                         </div>
+//                     </section>
+//
+//                     <section id="fh" className="scroll-mt-24">
+//                         <div className="bg-white rounded-2xl border p-4 shadow-sm">
+//                             <h2 className="text-lg font-semibold mb-2">Family History</h2>
+//                             <FHList patientId={patientId} encounterId={encounterId} />
+//                         </div>
+//                     </section>
+//
+//                     <section id="pe" className="scroll-mt-24">
+//                         <div className="bg-white rounded-2xl border p-4 shadow-sm">
+//                             <h2 className="text-lg font-semibold mb-2">Physical Exam</h2>
+//                             <PEList patientId={patientId} encounterId={encounterId} />
+//                         </div>
+//                     </section>
+//
+//                     <section id="ros" className="scroll-mt-24">
+//                         <div className="bg-white rounded-2xl border p-4 shadow-sm">
+//                             <h2 className="text-lg font-semibold mb-2">Review of Systems</h2>
+//                             <ROSList patientId={patientId} encounterId={encounterId} />
+//                         </div>
+//                     </section>
+//
+//                     <section id="procedures" className="scroll-mt-24">
+//                         <div className="bg-white rounded-2xl border p-4 shadow-sm">
+//                             <h2 className="text-lg font-semibold mb-2">Procedures</h2>
+//                             <ProcedureList patientId={patientId} encounterId={encounterId} />
+//                         </div>
+//                     </section>
+//
+//                     <section id="codes" className="scroll-mt-24">
+//                         <div className="bg-white rounded-2xl border p-4 shadow-sm">
+//                             <h2 className="text-lg font-semibold mb-2">Codes</h2>
+//                             <CodeList patientId={patientId} encounterId={encounterId} />
+//                         </div>
+//                     </section>
+//
+//                     <section id="plan" className="scroll-mt-24">
+//                         <div className="bg-white rounded-2xl border p-4 shadow-sm">
+//                             <h2 className="text-lg font-semibold mb-2">Plan</h2>
+//                             <PlanList patientId={patientId} encounterId={encounterId} />
+//                         </div>
+//                     </section>
+//
+//                     <section id="notes" className="scroll-mt-24">
+//                         <div className="bg-white rounded-2xl border p-4 shadow-sm">
+//                             <h2 className="text-lg font-semibold mb-2">Provider Notes</h2>
+//                             <ProviderNoteList patientId={patientId} encounterId={encounterId} />
+//                         </div>
+//                     </section>
+//
+//                     <section id="signature" className="scroll-mt-24">
+//                         <div className="bg-white rounded-2xl border p-4 shadow-sm">
+//                             <h2 className="text-lg font-semibold mb-2">Provider Signature</h2>
+//                             <ProviderSignatureCard patientId={patientId} encounterId={encounterId} />
+//                         </div>
+//                     </section>
+//
+//                     <section id="signoff" className="scroll-mt-24">
+//                         <div className="bg-white rounded-2xl border p-4 shadow-sm">
+//                             <h2 className="text-lg font-semibold mb-2">Sign-off / Finalization</h2>
+//                             <SignoffCard patientId={patientId} encounterId={encounterId} />
+//                         </div>
+//                     </section>
+//
+//                     <section id="fees" className="scroll-mt-24">
+//                         <div className="bg-white rounded-2xl border p-4 shadow-sm">
+//                             <h2 className="text-lg font-semibold mb-2">Fee Schedule</h2>
+//                             <FeeScheduleCard patientId={patientId} encounterId={encounterId} />
+//                         </div>
+//                     </section>
+//                 </main>
+//
+//                 {/* Side TOC */}
+//                 <aside className="min-w-0">
+//                     <div className="sticky top-24 bg-white rounded-2xl border p-4 shadow-sm">
+//                         <div className="text-sm font-semibold text-gray-800 mb-2">Sections</div>
+//                         <div className="grid gap-1">
+//                             {toc.map((t) => (
+//                                 <a
+//                                     key={t.id}
+//                                     href={`#${t.id}`}
+//                                     className="px-2 py-1 rounded-md text-xs bg-gray-50 hover:bg-gray-100 border text-gray-700"
+//                                 >
+//                                     {t.label}
+//                                 </a>
+//                             ))}
+//                         </div>
+//                     </div>
+//                 </aside>
+//             </div>
+//         </AdminLayout>
+//     );
+// }
 
-import React, { useMemo, useState, useEffect, useRef } from 'react';
-import type { InputHTMLAttributes, TextareaHTMLAttributes } from 'react';
-import Link from 'next/link';
 
-// If you already use lucide-react, uncomment this import and icons below
-// import { Stethoscope, ClipboardList, FileText, Activity, CheckCircle2 } from "lucide-react";
+// "use client";
+//
+// import { useParams, useRouter } from "next/navigation";
+// import Link from "next/link";
+//
+// // Layout
+// import AdminLayout from "@/app/(admin)/layout";
+//
+// // Encounter sections (paths per your structure)
+// import ChiefComplaintList from "@/components/encounter/cc/ChiefComplaintList";
+// import HPIList from "@/components/encounter/hpi/HPIList";
+// import PMHList from "@/components/encounter/pmh/PMHList";
+// import FHList from "@/components/encounter/familyhistory/FHList";
+// import PEList from "@/components/encounter/physicalexam/PEList";
+// import ROSList from "@/components/encounter/ros/ROSList";
+// import SHList from "@/components/encounter/socialhistory/SHList"; // NEW: Social History
+// import ProcedureList from "@/components/encounter/procedure/ProcedureList";
+// import CodeList from "@/components/encounter/coding/CodeList";
+// import AssessmentList from "@/components/encounter/assessment/AssessmentList"; // NEW
+// import PlanList from "@/components/encounter/plan/PlanList";
+// import AssignedProviderList from "@/components/encounter/assigned/AssignedProviderList"; // NEW
+// import ProviderNoteList from "@/components/encounter/providernote/ProviderNoteList";
+// import ProviderSignatureCard from "@/components/encounter/providersignature/ProviderSignatureCard";
+// import SignoffCard from "@/components/encounter/signoff/SignoffCard";
+// import FeeScheduleCard from "@/components/encounter/fees/FeeScheduleCard";
+//
+// export default function EncounterTabsPage() {
+//     const params = useParams();
+//     const router = useRouter();
+//
+//     const patientId = Number(params?.id);
+//     const encounterId = Number(params?.encounterId);
+//
+//     if (!patientId || !encounterId) {
+//         return (
+//             <AdminLayout>
+//                 <div className="p-6 text-center text-red-600">
+//                     Missing patient or encounter id.
+//                     <div className="mt-3">
+//                         <button
+//                             onClick={() => router.push("/patients")}
+//                             className="px-3 py-1.5 rounded bg-blue-600 text-white"
+//                         >
+//                             Back to Patients
+//                         </button>
+//                     </div>
+//                 </div>
+//             </AdminLayout>
+//         );
+//     }
+//
+//     const toc = [
+//         { id: "assigned-providers", label: "Assigned Providers" }, // NEW
+//         { id: "chief-complaint", label: "CC" },
+//         { id: "hpi", label: "HPI" },
+//         { id: "pmh", label: "Past Medical Hx" },
+//         { id: "fh", label: "Family History" },
+//         { id: "sh", label: "Social History" }, // NEW
+//         { id: "pe", label: "Physical Exam" },
+//         { id: "ros", label: "ROS" },
+//         { id: "procedures", label: "Procedures" },
+//         { id: "codes", label: "Codes" },
+//         { id: "assessment", label: "Assessment" }, // NEW
+//         { id: "plan", label: "Plan" },
+//         { id: "notes", label: "Provider Notes" },
+//         { id: "signature", label: "Provider Signature" },
+//         { id: "signoff", label: "Sign-off / Finalize" },
+//         { id: "fees", label: "Fee Schedule" },
+//     ] as const;
+//
+//     return (
+//         <AdminLayout>
+//             {/* Sticky header with quick anchors */}
+//             <div className="border-b bg-white sticky top-0 z-40">
+//                 <div className="max-w-screen-2xl mx-auto px-3 py-2 flex items-center justify-between gap-2">
+//                     <div className="flex items-center gap-2">
+//                         <Link
+//                             href={`/patients/${patientId}`}
+//                             className="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 border border-gray-300 text-xs font-medium text-gray-700"
+//                         >
+//                             ← Patient
+//                         </Link>
+//                         <div className="text-xs text-gray-600">
+//                             Encounter <span className="font-semibold">#{encounterId}</span>
+//                         </div>
+//                     </div>
+//                     <div className="hidden md:flex flex-wrap gap-1">
+//                         {toc.map((t) => (
+//                             <a
+//                                 key={t.id}
+//                                 href={`#${t.id}`}
+//                                 className="px-2 py-1 rounded-md text-xs border bg-white hover:bg-gray-50 text-gray-700"
+//                             >
+//                                 {t.label}
+//                             </a>
+//                         ))}
+//                     </div>
+//                 </div>
+//             </div>
+//
+//             <div className="w-full max-w-screen-2xl mx-auto p-4 grid grid-cols-1 lg:grid-cols-[minmax(0,17fr)_minmax(0,5fr)] gap-4">
+//                 {/* Main column */}
+//                 <main className="min-w-0 space-y-4">
+//                     {/* NEW: Assigned Providers up top so roles/attending are set early */}
+//                     <section id="assigned-providers" className="scroll-mt-24">
+//                         <div className="bg-white rounded-2xl border p-4 shadow-sm">
+//                             <h2 className="text-lg font-semibold mb-2"> </h2>
+//                             <AssignedProviderList patientId={patientId} encounterId={encounterId} />
+//                         </div>
+//                     </section>
+//
+//                     <section id="chief-complaint" className="scroll-mt-24">
+//                         <div className="bg-white rounded-2xl border p-4 shadow-sm">
+//                             <h2 className="text-lg font-semibold mb-2"> </h2>
+//                             <ChiefComplaintList patientId={patientId} encounterId={encounterId} />
+//                         </div>
+//                     </section>
+//
+//                     <section id="hpi" className="scroll-mt-24">
+//                         <div className="bg-white rounded-2xl border p-4 shadow-sm">
+//                             <h2 className="text-lg font-semibold mb-2"> </h2>
+//                             <HPIList patientId={patientId} encounterId={encounterId} />
+//                         </div>
+//                     </section>
+//
+//                     <section id="pmh" className="scroll-mt-24">
+//                         <div className="bg-white rounded-2xl border p-4 shadow-sm">
+//                             <h2 className="text-lg font-semibold mb-2"> </h2>
+//                             <PMHList patientId={patientId} encounterId={encounterId} />
+//                         </div>
+//                     </section>
+//
+//                     <section id="fh" className="scroll-mt-24">
+//                         <div className="bg-white rounded-2xl border p-4 shadow-sm">
+//                             <h2 className="text-lg font-semibold mb-2"> </h2>
+//                             <FHList patientId={patientId} encounterId={encounterId} />
+//                         </div>
+//                     </section>
+//
+//                     {/* NEW: Social History */}
+//                     <section id="sh" className="scroll-mt-24">
+//                         <div className="bg-white rounded-2xl border p-4 shadow-sm">
+//                             <h2 className="text-lg font-semibold mb-2"> </h2>
+//                             <SHList patientId={patientId} encounterId={encounterId} />
+//                         </div>
+//                     </section>
+//
+//                     <section id="pe" className="scroll-mt-24">
+//                         <div className="bg-white rounded-2xl border p-4 shadow-sm">
+//                             <h2 className="text-lg font-semibold mb-2"> </h2>
+//                             <PEList patientId={patientId} encounterId={encounterId} />
+//                         </div>
+//                     </section>
+//
+//                     <section id="ros" className="scroll-mt-24">
+//                         <div className="bg-white rounded-2xl border p-4 shadow-sm">
+//                             <h2 className="text-lg font-semibold mb-2"> </h2>
+//                             <ROSList patientId={patientId} encounterId={encounterId} />
+//                         </div>
+//                     </section>
+//
+//                     <section id="procedures" className="scroll-mt-24">
+//                         <div className="bg-white rounded-2xl border p-4 shadow-sm">
+//                             <h2 className="text-lg font-semibold mb-2"> </h2>
+//                             <ProcedureList patientId={patientId} encounterId={encounterId} />
+//                         </div>
+//                     </section>
+//
+//                     <section id="codes" className="scroll-mt-24">
+//                         <div className="bg-white rounded-2xl border p-4 shadow-sm">
+//                             <h2 className="text-lg font-semibold mb-2"> </h2>
+//                             <CodeList patientId={patientId} encounterId={encounterId} />
+//                         </div>
+//                     </section>
+//
+//                     {/* NEW: Assessment between Codes and Plan */}
+//                     <section id="assessment" className="scroll-mt-24">
+//                         <div className="bg-white rounded-2xl border p-4 shadow-sm">
+//                             <h2 className="text-lg font-semibold mb-2"> </h2>
+//                             <AssessmentList patientId={patientId} encounterId={encounterId} />
+//                         </div>
+//                     </section>
+//
+//                     <section id="plan" className="scroll-mt-24">
+//                         <div className="bg-white rounded-2xl border p-4 shadow-sm">
+//                             <h2 className="text-lg font-semibold mb-2"> </h2>
+//                             <PlanList patientId={patientId} encounterId={encounterId} />
+//                         </div>
+//                     </section>
+//
+//                     <section id="notes" className="scroll-mt-24">
+//                         <div className="bg-white rounded-2xl border p-4 shadow-sm">
+//                             <h2 className="text-lg font-semibold mb-2"> </h2>
+//                             <ProviderNoteList patientId={patientId} encounterId={encounterId} />
+//                         </div>
+//                     </section>
+//
+//                     <section id="signature" className="scroll-mt-24">
+//                         <div className="bg-white rounded-2xl border p-4 shadow-sm">
+//                             <h2 className="text-lg font-semibold mb-2"> </h2>
+//                             <ProviderSignatureCard patientId={patientId} encounterId={encounterId} />
+//                         </div>
+//                     </section>
+//
+//                     <section id="signoff" className="scroll-mt-24">
+//                         <div className="bg-white rounded-2xl border p-4 shadow-sm">
+//                             <h2 className="text-lg font-semibold mb-2"> </h2>
+//                             <SignoffCard patientId={patientId} encounterId={encounterId} />
+//                         </div>
+//                     </section>
+//
+//                     <section id="fees" className="scroll-mt-24">
+//                         <div className="bg-white rounded-2xl border p-4 shadow-sm">
+//                             <h2 className="text-lg font-semibold mb-2"> </h2>
+//                             <FeeScheduleCard patientId={patientId} encounterId={encounterId} />
+//                         </div>
+//                     </section>
+//                 </main>
+//
+//                 {/* Side table of contents */}
+//                 <aside className="min-w-0">
+//                     <div className="sticky top-24 bg-white rounded-2xl border p-4 shadow-sm">
+//                         <div className="text-sm font-semibold text-gray-800 mb-2">Sections</div>
+//                         <div className="grid gap-1">
+//                             {toc.map((t) => (
+//                                 <a
+//                                     key={t.id}
+//                                     href={`#${t.id}`}
+//                                     className="px-2 py-1 rounded-md text-xs bg-gray-50 hover:bg-gray-100 border text-gray-700"
+//                                 >
+//                                     {t.label}
+//                                 </a>
+//                             ))}
+//                         </div>
+//                     </div>
+//                 </aside>
+//             </div>
+//         </AdminLayout>
+//     );
+// }
 
-type Params = { patientId: string; encounterId: string };
 
-// Match generated PageProps in your build: params is a Promise
-type Props = { params: Promise<Params> };
 
-type SectionKey =
-    | 'cc' | 'hpi' | 'ros' | 'pmh' | 'fh' | 'sh' | 'pe'
-    | 'assessment' | 'plan' | 'providerNote' | 'procedure'
-    | 'billing' | 'signoff' | 'signature' | 'finalizedAt'
-    | 'assignedProviders' | 'feeSchedule';
+"use client";
 
-export default function EncounterPage({ params }: Props) {
-    // Resolve promised params in a client component (unconditional hook usage)
-    const [ids, setIds] = useState<Params | null>(null);
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+
+import AdminLayout from "@/app/(admin)/layout";
+
+// Encounter sections (each of these renders its own title)
+import AssignedProviderList from "@/components/encounter/assigned/AssignedProviderList";
+import ChiefComplaintList from "@/components/encounter/cc/ChiefComplaintList";
+import HPIList from "@/components/encounter/hpi/HPIList";
+import PMHList from "@/components/encounter/pmh/PMHList";
+import FHList from "@/components/encounter/familyhistory/FHList";
+import SHList from "@/components/encounter/socialhistory/SHList";
+import PEList from "@/components/encounter/physicalexam/PEList";
+import ROSList from "@/components/encounter/ros/ROSList";
+import ProcedureList from "@/components/encounter/procedure/ProcedureList";
+import CodeList from "@/components/encounter/coding/CodeList";
+import AssessmentList from "@/components/encounter/assessment/AssessmentList";
+import PlanList from "@/components/encounter/plan/PlanList";
+import ProviderNoteList from "@/components/encounter/providernote/ProviderNoteList";
+import ProviderSignatureCard from "@/components/encounter/providersignature/ProviderSignatureCard";
+import SignoffCard from "@/components/encounter/signoff/SignoffCard";
+import FeeScheduleCard from "@/components/encounter/fees/FeeScheduleCard";
+import DateTimeFinalizedCard from "@/components/encounter/datetimefinalized/DateTimeFinalizedCard";
+
+export default function EncounterTabsPage() {
+    const params = useParams();
+    const router = useRouter();
+
+    const patientId = Number(params?.id);
+    const encounterId = Number(params?.encounterId);
+
+    const [activeSection, setActiveSection] = useState<string>("");
+
+    if (!patientId || !encounterId) {
+        return (
+            <AdminLayout>
+                <div className="p-6 text-center text-red-600">
+                    Missing patient or encounter id.
+                    <div className="mt-3">
+                        <button
+                            onClick={() => router.push("/patients")}
+                            className="px-3 py-1.5 rounded bg-blue-600 text-white"
+                        >
+                            Back to Patients
+                        </button>
+                    </div>
+                </div>
+            </AdminLayout>
+        );
+    }
+
+    const toc = [
+        { id: "assigned-providers", label: "Assigned Providers" },
+        { id: "chief-complaint", label: "Chief Complaint" },
+        { id: "hpi", label: "History of Present Illness" },
+        { id: "pmh", label: "Past Medical Hx" },
+        { id: "fh", label: "Family History" },
+        { id: "sh", label: "Social History" },
+        { id: "pe", label: "Physical Exam" },
+        { id: "ros", label: "Review of Systems" },
+        { id: "procedures", label: "Procedures" },
+        { id: "codes", label: "Codes" },
+        { id: "assessment", label: "Assessment" },
+        { id: "plan", label: "Plan" },
+        { id: "notes", label: "Provider Notes" },
+        { id: "signature", label: "Provider Signature" },
+        { id: "signoff", label: "Sign-off / Finalize" },
+        { id: "fees", label: "Fee Schedule" },
+        { id: "datetime", label: "date time finalized" },
+    ];
+
+    // Highlight active section on scroll
     useEffect(() => {
-        let ok = true;
-        Promise.resolve(params).then((p) => ok && setIds(p));
-        return () => {
-            ok = false;
-        };
-    }, [params]);
+        const observer = new IntersectionObserver(
+            (entries) => {
+                const visible = entries.find((e) => e.isIntersecting);
+                if (visible?.target.id) setActiveSection(visible.target.id);
+            },
+            { rootMargin: "-30% 0px -60% 0px", threshold: 0.2 }
+        );
 
-    // Hooks must be called unconditionally
-    const sections = useMemo(
-        () =>
-            ([
-                { key: 'cc', label: 'Chief Complaint (CC)' },
-                { key: 'hpi', label: 'History of Present Illness (HPI)' },
-                { key: 'ros', label: 'Review of Systems (ROS)' },
-                { key: 'pmh', label: 'Past Medical History (PMH)' },
-                { key: 'fh', label: 'Family History (FH)' },
-                { key: 'sh', label: 'Social History (SH)' },
-                { key: 'pe', label: 'Physical Examination' },
-                { key: 'assessment', label: 'Assessment' },
-                { key: 'plan', label: 'Plan' },
-                { key: 'providerNote', label: 'Provider Note' },
-                { key: 'procedure', label: 'Procedure / Orders' },
-                { key: 'billing', label: 'Billing & Coding' },
-                { key: 'signoff', label: 'Sign-off / Finalization' },
-                { key: 'signature', label: 'Provider Signature' },
-                { key: 'finalizedAt', label: 'Date/Time Finalized' },
-                { key: 'assignedProviders', label: 'Assigned Provider(s)' },
-                { key: 'feeSchedule', label: 'Fee Schedule' },
-            ] as { key: SectionKey; label: string }[]),
-        []
-    );
+        toc.forEach((t) => {
+            const el = document.getElementById(t.id);
+            if (el) observer.observe(el);
+        });
 
-    const [active, setActive] = useState<SectionKey>('cc');
-
-    // For sticky tab shadow on scroll
-    const headerRef = useRef<HTMLDivElement>(null);
-    const [elevated, setElevated] = useState(false);
-    useEffect(() => {
-        const onScroll = () => {
-            const top = headerRef.current?.getBoundingClientRect().top ?? 0;
-            setElevated(top <= 0);
-        };
-        window.addEventListener('scroll', onScroll, { passive: true });
-        return () => window.removeEventListener('scroll', onScroll);
+        return () => observer.disconnect();
     }, []);
 
-    // Safely derive ids even before they resolve
-    const patientId = ids?.patientId ?? '';
-    const encounterId = ids?.encounterId ?? '';
-    const loading = !ids;
-
     return (
-        <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950">
-            {/* Top bar / breadcrumb */}
-            <div className="border-b border-neutral-200 dark:border-neutral-800 bg-white/70 dark:bg-neutral-900/70 backdrop-blur supports-[backdrop-filter]:bg-white/60 sticky top-0 z-40">
-                <div className="mx-auto max-w-7xl px-4 py-3 flex items-center gap-2 text-sm">
-                    <Link
-                        href="/dashboard"
-                        className="text-neutral-600 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-white"
-                    >
-                        Dashboard
-                    </Link>
-                    <span className="text-neutral-400">/</span>
-                    <Link
-                        href={patientId ? `/patients/${patientId}` : '#'}
-                        className="text-neutral-600 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-white pointer-events-auto"
-                    >
-                        {patientId ? `Patient ${patientId}` : 'Patient …'}
-                    </Link>
-                    <span className="text-neutral-400">/</span>
-                    <span className="font-medium text-neutral-900 dark:text-white">
-            {encounterId ? `Encounter ${encounterId}` : 'Encounter …'}
-          </span>
-
-                    <div className="ml-auto flex items-center gap-2">
-                        <button
-                            className="px-3 py-1.5 rounded-xl border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-sm"
-                            onClick={() => alert('Saved draft')}
-                            disabled={loading}
+        <AdminLayout>
+            {/* Header */}
+            <div className="border-b bg-white sticky top-0 z-50 shadow-sm">
+                <div className="max-w-screen-2xl mx-auto px-3 py-2 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                        <Link
+                            href={`/patients/${patientId}`}
+                            className="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 border text-xs font-medium text-gray-700"
                         >
-                            Save Draft
-                        </button>
-                        <button
-                            className="px-3 py-1.5 rounded-xl bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 hover:opacity-90 text-sm"
-                            onClick={() => alert('Finalized')}
-                            disabled={loading}
-                        >
-                            Finalize
-                        </button>
+                            ← Patient
+                        </Link>
+                        <div className="text-sm text-gray-600">
+                            Encounter <span className="font-semibold">#{encounterId}</span>
+                        </div>
                     </div>
                 </div>
 
-                {/* Tabs */}
-                <div
-                    ref={headerRef}
-                    className={[
-                        'border-t border-neutral-200 dark:border-neutral-800 overflow-x-auto',
-                        elevated ? 'shadow-sm' : 'shadow-none',
-                    ].join(' ')}
-                >
-                    <div className="mx-auto max-w-7xl px-2">
-                        <nav className="flex gap-1 py-2">
-                            {sections.map((s) => (
-                                <button
-                                    key={s.key}
-                                    onClick={() => setActive(s.key)}
-                                    className={[
-                                        'whitespace-nowrap rounded-xl px-3 py-1.5 text-sm transition',
-                                        active === s.key
-                                            ? 'bg-neutral-900 text-white dark:bg:white dark:text-neutral-900'
-                                            : 'text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800',
-                                    ].join(' ')}
+                {/* Sticky tabs row */}
+                <div className="bg-white border-t border-b sticky top-[38px] z-40">
+                    <div className="max-w-screen-2xl mx-auto px-3 py-2 flex flex-wrap gap-1 overflow-x-auto">
+                        {toc.map((t) => (
+                            <a
+                                key={t.id}
+                                href={`#${t.id}`}
+                                className={`px-3 py-1.5 rounded-md text-xs font-medium border whitespace-nowrap transition ${
+                                    activeSection === t.id
+                                        ? "bg-blue-600 text-white"
+                                        : "bg-white hover:bg-gray-50 text-gray-700"
+                                }`}
+                            >
+                                {t.label}
+                            </a>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            <div className="w-full max-w-screen-2xl mx-auto p-4 grid grid-cols-1 lg:grid-cols-[minmax(0,17fr)_minmax(0,5fr)] gap-6 scroll-smooth">
+                {/* Main content */}
+                <main className="min-w-0 space-y-6">
+                    {toc.map((t, index) => (
+                        <section
+                            key={t.id}
+                            id={t.id}
+                            aria-label={t.label}
+                            className={`scroll-mt-40 rounded-2xl border shadow-sm p-6 ${
+                                index % 2 === 0 ? "bg-gray-50" : "bg-white"
+                            }`}
+                        >
+                            {/* NOTE: removed outer <h2> so titles don't duplicate.
+                  Each inner component renders its own header. */}
+                            {t.id === "assigned-providers" && (
+                                <AssignedProviderList
+                                    patientId={patientId}
+                                    encounterId={encounterId}
+                                />
+                            )}
+                            {t.id === "chief-complaint" && (
+                                <ChiefComplaintList
+                                    patientId={patientId}
+                                    encounterId={encounterId}
+                                />
+                            )}
+                            {t.id === "hpi" && (
+                                <HPIList patientId={patientId} encounterId={encounterId} />
+                            )}
+                            {t.id === "pmh" && (
+                                <PMHList patientId={patientId} encounterId={encounterId} />
+                            )}
+                            {t.id === "fh" && (
+                                // page.tsx (parent)
+                                <FHList patientId={Number(params.id)} encounterId={Number(params.encounterId)} />
+
+                            )}
+                            {t.id === "sh" && (
+                                <SHList patientId={patientId} encounterId={encounterId} />
+                            )}
+                            {t.id === "pe" && (
+                                <PEList patientId={patientId} encounterId={encounterId} />
+                            )}
+                            {t.id === "ros" && (
+                                <ROSList patientId={patientId} encounterId={encounterId} />
+                            )}
+                            {t.id === "procedures" && (
+                                <ProcedureList
+                                    patientId={patientId}
+                                    encounterId={encounterId}
+                                />
+                            )}
+                            {t.id === "codes" && (
+                                <CodeList patientId={patientId} encounterId={encounterId} />
+                            )}
+                            {t.id === "assessment" && (
+                                <AssessmentList
+                                    patientId={patientId}
+                                    encounterId={encounterId}
+                                />
+                            )}
+                            {t.id === "plan" && (
+                                <PlanList patientId={patientId} encounterId={encounterId} />
+                            )}
+                            {t.id === "notes" && (
+                                <ProviderNoteList
+                                    patientId={patientId}
+                                    encounterId={encounterId}
+                                />
+                            )}
+                            {t.id === "signature" && (
+                                <ProviderSignatureCard
+                                    patientId={patientId}
+                                    encounterId={encounterId}
+                                />
+                            )}
+                            {t.id === "signoff" && (
+                                <SignoffCard patientId={patientId} encounterId={encounterId} />
+                            )}
+                            {t.id === "fees" && (
+                                <FeeScheduleCard
+                                    patientId={patientId}
+                                    encounterId={encounterId}
+                                />
+                            )}
+                            {t.id === "datetime" && (
+                                <DateTimeFinalizedCard
+                                    patientId={patientId}
+                                    encounterId={encounterId}
+                                />
+                            )}
+                        </section>
+                    ))}
+                </main>
+
+                {/* Side TOC */}
+                <aside className="hidden lg:block min-w-0">
+                    <div className="sticky top-40 bg-white rounded-2xl border p-4 shadow-md">
+                        <div className="text-sm font-semibold text-gray-800 mb-2">
+                            Sections
+                        </div>
+                        <div className="grid gap-1">
+                            {toc.map((t) => (
+                                <a
+                                    key={t.id}
+                                    href={`#${t.id}`}
+                                    className={`px-2 py-1 rounded-md text-xs border transition ${
+                                        activeSection === t.id
+                                            ? "bg-blue-600 text-white"
+                                            : "bg-gray-50 hover:bg-gray-100 text-gray-700"
+                                    }`}
                                 >
-                                    {s.label}
-                                </button>
+                                    {t.label}
+                                </a>
                             ))}
-                        </nav>
+                        </div>
                     </div>
-                </div>
+                </aside>
             </div>
-
-            {/* Content */}
-            <div className="mx-auto max-w-7xl px-4 py-6">
-                {loading ? (
-                    <div className="text-sm text-neutral-500">Loading encounter…</div>
-                ) : (
-                    <Card title={sectionLabel(sections, active)}>
-                        {renderSection(active)}
-                    </Card>
-                )}
-            </div>
-        </div>
+        </AdminLayout>
     );
-}
-
-function Card({
-                  title,
-                  children,
-              }: {
-    title: string;
-    children: React.ReactNode;
-}) {
-    return (
-        <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5 shadow-sm">
-            <div className="mb-4">
-                <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">
-                    {title}
-                </h2>
-                <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                    Fill out the fields below. All changes are saved when you click “Save
-                    Draft”.
-                </p>
-            </div>
-            {children}
-        </div>
-    );
-}
-
-function sectionLabel(
-    list: { key: SectionKey; label: string }[],
-    key: SectionKey
-) {
-    return list.find((s) => s.key === key)?.label ?? '';
-}
-
-/* ---- Section Renderers (simple, editable stubs) ---- */
-
-function Input({
-                   label,
-                   placeholder,
-                   as = 'input',
-                   rows = 5,
-               }: {
-    label: string;
-    placeholder?: string;
-    as?: 'input' | 'textarea';
-    rows?: number;
-}) {
-    const Base =
-        as === 'textarea'
-            ? (props: TextareaHTMLAttributes<HTMLTextAreaElement>) => (
-                <textarea rows={rows} {...props} />
-            )
-            : (props: InputHTMLAttributes<HTMLInputElement>) => <input {...props} />;
-
-    return (
-        <label className="grid gap-1">
-      <span className="text-sm text-neutral-700 dark:text-neutral-300">
-        {label}
-      </span>
-            <Base
-                className="w-full rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 px-3 py-2 outline-none focus:ring-2 focus:ring-neutral-400/40"
-                placeholder={placeholder}
-            />
-        </label>
-    );
-}
-
-function TwoCol({ children }: { children: React.ReactNode }) {
-    return <div className="grid gap-4 md:grid-cols-2">{children}</div>;
-}
-
-function renderSection(key: SectionKey) {
-    switch (key) {
-        case 'cc':
-            return (
-                <TwoCol>
-                    <Input label="Chief Complaint" placeholder="e.g., tooth pain" />
-                    <Input label="Onset" placeholder="e.g., 3 days ago" />
-                    <Input label="Severity" placeholder="e.g., 7/10" />
-                    <Input label="Associated Symptoms" placeholder="e.g., fever, swelling" />
-                </TwoCol>
-            );
-        case 'hpi':
-            return (
-                <Input
-                    label="History of Present Illness"
-                    as="textarea"
-                    rows={10}
-                    placeholder="Narrative description of symptom progression, modifiers, treatments tried, etc."
-                />
-            );
-        case 'ros':
-            return (
-                <Input
-                    label="Review of Systems"
-                    as="textarea"
-                    rows={10}
-                    placeholder="Denies fever/chills… Endorses… System-by-system review."
-                />
-            );
-        case 'pmh':
-            return (
-                <TwoCol>
-                    <Input label="Past Medical History" as="textarea" rows={6} />
-                    <Input label="Medications" as="textarea" rows={6} />
-                    <Input label="Allergies" as="textarea" rows={6} />
-                    <Input label="Surgeries" as="textarea" rows={6} />
-                </TwoCol>
-            );
-        case 'fh':
-            return (
-                <Input
-                    label="Family History"
-                    as="textarea"
-                    rows={8}
-                    placeholder="Relevant familial conditions (e.g., DM, HTN)…"
-                />
-            );
-        case 'sh':
-            return (
-                <TwoCol>
-                    <Input label="Occupation" placeholder="e.g., teacher" />
-                    <Input label="Tobacco/Alcohol/Drugs" placeholder="Use, frequency, duration" />
-                    <Input label="Living Situation" placeholder="e.g., with family" />
-                    <Input label="Other Social Factors" placeholder="Diet, exercise, etc." />
-                </TwoCol>
-            );
-        case 'pe':
-            return (
-                <TwoCol>
-                    <Input label="Vitals" placeholder="BP, HR, RR, Temp, SpO2" />
-                    <Input label="General" placeholder="NAD, alert & oriented…" />
-                    <Input label="HEENT/Oral" as="textarea" rows={6} />
-                    <Input label="Other Systems" as="textarea" rows={6} />
-                </TwoCol>
-            );
-        case 'assessment':
-            return (
-                <Input
-                    label="Assessment"
-                    as="textarea"
-                    rows={8}
-                    placeholder="Primary and differential diagnoses, ICD codes if desired."
-                />
-            );
-        case 'plan':
-            return (
-                <Input
-                    label="Plan"
-                    as="textarea"
-                    rows={8}
-                    placeholder="Treatment plan, medications, labs, imaging, referrals, patient education."
-                />
-            );
-        case 'providerNote':
-            return (
-                <Input
-                    label="Provider Note"
-                    as="textarea"
-                    rows={10}
-                    placeholder="Free-text provider narrative."
-                />
-            );
-        case 'procedure':
-            return (
-                <TwoCol>
-                    <Input label="Procedure / Order" placeholder="e.g., D4341 – SRP" />
-                    <Input label="Details" as="textarea" rows={6} />
-                </TwoCol>
-            );
-        case 'billing':
-            return (
-                <TwoCol>
-                    <Input label="CPT/HCPCS/ADA Codes" placeholder="List codes" />
-                    <Input label="Modifiers & Units" placeholder="e.g., -59, 2 units" />
-                    <Input label="Diagnosis (ICD)" placeholder="e.g., K02.9" />
-                    <Input label="Notes" as="textarea" rows={6} />
-                </TwoCol>
-            );
-        case 'signoff':
-            return (
-                <TwoCol>
-                    <Input label="Ready to Finalize?" placeholder="Yes / No / Pending" />
-                    <Input label="Comments" as="textarea" rows={6} />
-                </TwoCol>
-            );
-        case 'signature':
-            return (
-                <TwoCol>
-                    <Input label="Provider Name" placeholder="e.g., Dr. Smith" />
-                    <Input label="Digital Signature" placeholder="Type name to sign" />
-                </TwoCol>
-            );
-        case 'finalizedAt':
-            return (
-                <TwoCol>
-                    <Input label="Finalized Date" placeholder="YYYY-MM-DD" />
-                    <Input label="Finalized Time" placeholder="HH:mm" />
-                </TwoCol>
-            );
-        case 'assignedProviders':
-            return (
-                <TwoCol>
-                    <Input label="Primary Provider" placeholder="e.g., NPI / Name" />
-                    <Input label="Assist / Scribe" placeholder="Name(s)" />
-                </TwoCol>
-            );
-        case 'feeSchedule':
-            return (
-                <TwoCol>
-                    <Input label="Fee Schedule Name" placeholder="e.g., Standard 2025" />
-                    <Input label="Overrides / Discounts" as="textarea" rows={6} />
-                </TwoCol>
-            );
-        default:
-            return null;
-    }
 }

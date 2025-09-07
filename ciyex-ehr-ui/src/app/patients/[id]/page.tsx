@@ -7,6 +7,7 @@ import AdminLayout from "@/app/(admin)/layout";
 
 import Link from "next/link";
 import DemographicsFlat from "@/components/DemographicsFlat";
+
 import HistoryFlat from "@/components/HistoryFlat";
 import InsuranceFlat from "@/components/InsuranceFlat";
 import {
@@ -18,46 +19,7 @@ import {
     DocumentsFlat,
     LabsFlat,
 } from "@/components/PatientComponents";
-
-type InsuranceLevel = "primary" | "secondary" | "tertiary";
-
-interface InsurancePolicy {
-    providerId: number | null;
-    planName: string;
-    effectiveDate: string;
-    effectiveDateEnd: string;
-    policyNumber: string;
-    groupNumber: string;
-
-    subscriberEmployer: string;
-    seAddress1: string;
-    seAddress2: string;
-    seCity: string;
-    seState: string;
-    seZip: string;
-    seCountry: string;
-
-    relationship: string;
-    subscriberFirstName: string;
-    subscriberMiddleName: string;
-    subscriberLastName: string;
-    subscriberDob: string;
-    sex: "Male" | "Female" | "Other" | "";
-    ssn: string;
-    subAddress1: string;
-    subAddress2: string;
-    subCity: string;
-    subState: string;
-    subZip: string;
-    subCountry: string;
-    subscriberPhone: string;
-
-    copay: string;
-    acceptAssignment: "YES" | "NO";
-    secondaryMedicareType: "N/A" | "Part A" | "Part B";
-}
-
-type InsuranceForm = Record<InsuranceLevel, InsurancePolicy>;
+import EncounterTableExpandable from "@/components/encounter/EncounterTableExpandable";
 
 interface Patient {
     id: string;
@@ -91,16 +53,43 @@ interface Patient {
     lastVisitDate?: string;
     familyMembers?: string[];
     careTeam?: string[];
+    // ✅ Allow safe extension (string keys can map to different primitive types)
     [key: string]: string | number | boolean | string[] | undefined;
 }
 
-type ExamStatus = "N/A" | "Normal" | "Abnormal" | "";
+type InsuranceLevel = "primary" | "secondary" | "tertiary";
+
+interface InsurancePolicy {
+    provider?: string;
+    planName?: string;
+    effectiveStart?: string;
+    effectiveEnd?: string;
+    policyNumber?: string;
+    groupNumber?: string;
+    subscriberEmployer?: string;
+    subscriber?: string;
+    subscriberDob?: string;
+    subscriberSex?: "Unassigned" | "Male" | "Female";
+    ssn?: string;
+    subscriberAddress?: string;
+    copay?: string;
+    acceptsAssignment?: "Yes" | "No";
+    secondaryMedicareType?: string;
+}
+
+type InsuranceForm = Record<InsuranceLevel, InsurancePolicy>;
+
+interface Allergy {
+    id: string;
+    substance: string;
+    reaction?: string;
+    severity?: string;
+    status: "Active" | "Inactive" | string;
+    notes?: string;
+}
 
 interface HistoryForm {
-    general: {
-        riskFactors: Record<string, boolean | string>;
-        examsTests: Record<string, { status: ExamStatus; notes: string }>;
-    };
+    general: { riskFactors: string; examsTests: string };
     family: {
         father: string;
         mother: string;
@@ -125,46 +114,17 @@ interface HistoryForm {
         mentalIllness: string;
     };
     lifestyle: {
-        tobacco: { value: string; status: string };
-        coffee: { value: string; status: string };
-        alcohol: { value: string; status: string };
-        drugs: { value: string; status: string };
-        counseling: { value: string; status: string };
-        exercise: { value: string; status: string };
-        hazardous: { value: string; status: string };
+        tobacco: string;
+        coffee: string;
+        alcohol: string;
+        drugs: string;
+        counseling: string;
+        exercise: string;
+        hazardous: string;
         sleep: string;
         seatbelt: string;
     };
-    other: { nameValue1: string; nameValue2: string; additionalHistory: string };
-}
-
-interface EncounterFormData {
-    visitCategory: string;
-    encounterClass: string;
-    encounterType: string;
-    sensitivity: string;
-    encounterProvider: string;
-    referringProvider: string;
-    facility: string;
-    billingFacility: string;
-    inCollection: string;
-    dischargeDisposition: string;
-    reasonForVisit: string;
-    issues: string[];
-}
-
-interface Allergy {
-    id: string;
-    substance: string;
-    reaction?: string;
-    severity?: string;
-    status: "Active" | "Inactive" | string;
-    notes?: string;
-}
-
-interface EncounterFormProps {
-    onCancel: () => void | Promise<void>;
-    onSave: (form: EncounterFormData) => void | Promise<void>;
+    other: { nameValue: string; additionalHistory: string };
 }
 
 interface Appointment {
@@ -213,8 +173,9 @@ function parseXmlResponse(xmlText: string): Promise<XmlResponse> {
                 }
             });
             if ("success" in response && typeof response.success === "string") {
-                response.success = response.success === "true";
+                response.success = (response.success as unknown as string) === "true";
             }
+
             resolve(response);
         } catch {
             reject(new Error("Failed to parse XML response"));
@@ -228,7 +189,7 @@ export default function PatientDashboardPage() {
     const id = params?.id as string;
 
     const [historyForm, setHistoryForm] = useState<HistoryForm>({
-        general: { riskFactors: {}, examsTests: {} },
+        general: { riskFactors: "", examsTests: "" },
         family: {
             father: "",
             mother: "",
@@ -253,17 +214,17 @@ export default function PatientDashboardPage() {
             mentalIllness: "",
         },
         lifestyle: {
-            tobacco: { value: "", status: "" },
-            coffee: { value: "", status: "" },
-            alcohol: { value: "", status: "" },
-            drugs: { value: "", status: "" },
-            counseling: { value: "", status: "" },
-            exercise: { value: "", status: "" },
-            hazardous: { value: "", status: "" },
+            tobacco: "",
+            coffee: "",
+            alcohol: "",
+            drugs: "",
+            counseling: "",
+            exercise: "",
+            hazardous: "",
             sleep: "",
             seatbelt: "",
         },
-        other: { nameValue1: "", nameValue2: "", additionalHistory: "" },
+        other: { nameValue: "", additionalHistory: "" },
     });
 
     const [activeHistoryTab, setActiveHistoryTab] = useState<keyof HistoryForm>("general");
@@ -283,62 +244,21 @@ export default function PatientDashboardPage() {
     const [viewMode, setViewMode] = useState<string>("dashboard");
     const [highlightedTab, setHighlightedTab] = useState<string>("dashboard");
     const [selectedDoc, setSelectedDoc] = useState<string | null>(null);
-    const [showEncounterForm, setShowEncounterForm] = useState(false);
-    const [encounterForm, setEncounterForm] = useState<EncounterFormData>({
-        visitCategory: "",
-        encounterClass: "Outpatient",
-        encounterType: "",
-        sensitivity: "Normal",
-        encounterProvider: "",
-        referringProvider: "",
-        facility: "",
-        billingFacility: "",
-        inCollection: "No",
-        dischargeDisposition: "",
-        reasonForVisit: "",
-        issues: [],
-    });
     const [useDateRange, setUseDateRange] = useState(false);
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
     const [editInsurance, setEditInsurance] = useState(false);
-    const [insuranceSubTab, setInsuranceSubTab] = useState<InsuranceLevel>("primary");
+    const [insuranceSubTab, setInsuranceSubTab] = useState<
+        "primary" | "secondary" | "tertiary"
+    >("primary");
     const [editDemographics, setEditDemographics] = useState(false);
     const [demoForm, setDemoForm] = useState<Partial<Patient>>({});
     const emptyPolicy: InsurancePolicy = {
-        providerId: null,
-        planName: "",
-        effectiveDate: "",
-        effectiveDateEnd: "",
-        policyNumber: "",
-        groupNumber: "",
-        subscriberEmployer: "",
-        seAddress1: "",
-        seAddress2: "",
-        seCity: "",
-        seState: "",
-        seZip: "",
-        seCountry: "",
-        relationship: "",
-        subscriberFirstName: "",
-        subscriberMiddleName: "",
-        subscriberLastName: "",
-        subscriberDob: "",
-        sex: "",
-        ssn: "",
-        subAddress1: "",
-        subAddress2: "",
-        subCity: "",
-        subState: "",
-        subZip: "",
-        subCountry: "",
-        subscriberPhone: "",
-        copay: "",
-        acceptAssignment: "YES",
-        secondaryMedicareType: "N/A",
+        acceptsAssignment: "Yes",
+        subscriberSex: "Unassigned",
     };
     const [insuranceForm, setInsuranceForm] = useState<InsuranceForm>({
-        primary: { ...emptyPolicy, providerId: patient?.insuranceProvider ? 1 : null },
+        primary: { ...emptyPolicy, provider: patient?.insuranceProvider },
         secondary: { ...emptyPolicy },
         tertiary: { ...emptyPolicy },
     });
@@ -363,12 +283,13 @@ export default function PatientDashboardPage() {
             prev.includes(filter) ? prev.filter((f) => f !== filter) : [...prev, filter]
         );
     };
+
     const generateReport = async (type: string, filters?: string[]) => {
         try {
             const res = await fetchWithAuth(`/api/reports/generate?type=${type}`, {
                 method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({filters}),
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ filters }),
             });
             const data = await res.json();
             console.log("Report generated:", data);
@@ -381,8 +302,8 @@ export default function PatientDashboardPage() {
         try {
             const res = await fetchWithAuth(`/api/reports/download?type=${type}`, {
                 method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({filters}),
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ filters }),
             });
 
             if (!res.ok) {
@@ -429,9 +350,10 @@ export default function PatientDashboardPage() {
         const root = mainContentRef.current;
         if (!root) return;
         const onScroll = () => {
-            if (ignoreInitialIntersection.current) ignoreInitialIntersection.current = false;
+            if (ignoreInitialIntersection.current)
+                ignoreInitialIntersection.current = false;
         };
-        root.addEventListener("scroll", onScroll, {passive: true});
+        root.addEventListener("scroll", onScroll, { passive: true });
         return () => root.removeEventListener("scroll", onScroll);
     }, []);
 
@@ -444,10 +366,10 @@ export default function PatientDashboardPage() {
         }
 
         const sections = Object.entries(tabContentRefs.current)
-            .map(([key, el]) => ({key, el}))
+            .map(([key, el]) => ({ key, el }))
             .filter((s): s is { key: string; el: HTMLDivElement } => !!s.el);
 
-        sections.forEach(({key, el}) => {
+        sections.forEach(({ key, el }) => {
             (el as HTMLElement).dataset.tabkey = key;
         });
 
@@ -467,9 +389,9 @@ export default function PatientDashboardPage() {
             }
         );
 
-        sections.forEach(({el}) => observer.observe(el));
+        sections.forEach(({ el }) => observer.observe(el));
         return () => observer.disconnect();
-    }, [headerH, viewMode, patient, showEncounterForm]);
+    }, [headerH, viewMode, patient]);
 
     useEffect(() => {
         const fetchPatientData = async () => {
@@ -482,18 +404,20 @@ export default function PatientDashboardPage() {
                         ? await parseXmlResponse(text)
                         : JSON.parse(text);
 
-                if (!res.ok) throw new Error(data.message || `HTTP error! status: ${res.status}`);
-                if (data.success) {
-                    const fetched = data.data as Patient;
+                if (!res.ok) throw new Error((data as any).message || `HTTP error! status: ${res.status}`);
+                if ((data as any).success) {
+                    const fetched = (data as any).data as Patient;
                     setPatient(fetched);
-                    setDemoForm({...fetched});
+                    setDemoForm({ ...fetched });
                 } else {
-                    throw new Error(data.message || "Failed to fetch patient");
+                    throw new Error((data as any).message || "Failed to fetch patient");
                 }
 
                 const fetchHistory = async () => {
                     try {
-                        const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/patients/${id}/history`);
+                        const res = await fetchWithAuth(
+                            `${process.env.NEXT_PUBLIC_API_URL}/api/patients/${id}/history`
+                        );
                         const data = await res.json();
                         if (res.ok && data.success) {
                             setHistoryForm(data.data);
@@ -505,7 +429,9 @@ export default function PatientDashboardPage() {
 
                 const fetchBilling = async () => {
                     try {
-                        const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/patients/${id}/billing`);
+                        const res = await fetchWithAuth(
+                            `${process.env.NEXT_PUBLIC_API_URL}/api/patients/${id}/billing`
+                        );
                         const data = await res.json();
                         if (res.ok && data.success) {
                             setBilling(data.data);
@@ -517,7 +443,9 @@ export default function PatientDashboardPage() {
 
                 const fetchAppointments = async () => {
                     try {
-                        const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/patients/${id}/appointments`);
+                        const res = await fetchWithAuth(
+                            `${process.env.NEXT_PUBLIC_API_URL}/api/patients/${id}/appointments`
+                        );
                         const data = await res.json();
                         if (res.ok && data.success) setAppointments(data.data);
                     } catch (e) {
@@ -527,7 +455,9 @@ export default function PatientDashboardPage() {
 
                 const fetchMedications = async () => {
                     try {
-                        const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/patients/${id}/medications`);
+                        const res = await fetchWithAuth(
+                            `${process.env.NEXT_PUBLIC_API_URL}/api/patients/${id}/medications`
+                        );
                         const data = await res.json();
                         if (res.ok && data.success) setMedications(data.data);
                     } catch (e) {
@@ -537,7 +467,9 @@ export default function PatientDashboardPage() {
 
                 const fetchAllergies = async () => {
                     try {
-                        const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/patients/${id}/allergies`);
+                        const res = await fetchWithAuth(
+                            `${process.env.NEXT_PUBLIC_API_URL}/api/patients/${id}/allergies`
+                        );
                         const data = await res.json();
                         if (res.ok && data.success) setAllergies(data.data);
                     } catch (e) {
@@ -567,10 +499,10 @@ export default function PatientDashboardPage() {
 
     async function saveDemographics() {
         if (!demoForm || !patient) return;
-        const payload = {...patient, ...demoForm};
+        const payload = { ...patient, ...demoForm };
         const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/patients/${patient.id}`, {
             method: "PUT",
-            headers: {"Content-Type": "application/json"},
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
         });
 
@@ -580,102 +512,58 @@ export default function PatientDashboardPage() {
                 ? await parseXmlResponse(text)
                 : JSON.parse(text);
 
-        if (!res.ok || !data.success) {
-            throw new Error(data.message || "Failed to save demographics");
+        if (!res.ok || !(data as any).success) {
+            throw new Error((data as any).message || "Failed to save demographics");
         }
 
-        const updated: Patient = data.data ?? payload;
+        const updated: Patient = ((data as any).data as Patient) ?? payload;
         setPatient(updated);
         setEditDemographics(false);
     }
 
     async function saveHistory() {
         if (!patient) return;
-        const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/patients/${patient.id}/history`, {
-            method: "PUT",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify(historyForm),
-        });
+        const res = await fetchWithAuth(
+            `${process.env.NEXT_PUBLIC_API_URL}/api/patients/${patient.id}/history`,
+            {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(historyForm),
+            }
+        );
         const data = await res.json();
         if (!res.ok || !data.success) throw new Error(data.message || "Failed to save history");
         setEditHistory(false);
         setHistoryForm(data.data);
     }
 
-    // async function saveInsurance() {
-    //     if (!patient) throw new Error("No patient loaded");
-    //
-    //     const payload = {policies: insuranceForm};
-    //     const res = await fetchWithAuth(
-    //         `${process.env.NEXT_PUBLIC_API_URL}/api/patients/${patient.id}/insurance`,
-    //         {
-    //             method: "PUT",
-    //             headers: {"Content-Type": "application/json"},
-    //             body: JSON.stringify(payload),
-    //         }
-    //     );
-    //
-    //     const text = await res.text();
-    //     const data =
-    //         res.headers.get("content-type")?.includes("application/xml") || text.startsWith("<")
-    //             ? await parseXmlResponse(text)
-    //             : JSON.parse(text);
-    //
-    //     if (!res.ok || !data.success) {
-    //         throw new Error(data.message || "Failed to save insurance");
-    //     }
-    //
-    //     if (data.data?.policies) {
-    //         setInsuranceForm(data.data.policies as InsuranceForm);
-    //     }
-    // }
-
-    async function saveEncounter() {
+    async function saveInsurance() {
         if (!patient) throw new Error("No patient loaded");
+
+        const payload = { policies: insuranceForm };
         const res = await fetchWithAuth(
-            `${process.env.NEXT_PUBLIC_API_URL}/api/patients/${patient.id}/encounters`,
+            `${process.env.NEXT_PUBLIC_API_URL}/api/patients/${patient.id}/insurance`,
             {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify(encounterForm),
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
             }
         );
+
         const text = await res.text();
         const data =
             res.headers.get("content-type")?.includes("application/xml") || text.startsWith("<")
                 ? await parseXmlResponse(text)
                 : JSON.parse(text);
 
-        if (!res.ok || !data.success) {
-            throw new Error(data.message || "Failed to save encounter");
+        if (!res.ok || !(data as any).success) {
+            throw new Error((data as any).message || "Failed to save insurance");
         }
 
-        setShowEncounterForm(false);
-        setEncounterForm({
-            visitCategory: "",
-            encounterClass: "Outpatient",
-            encounterType: "",
-            sensitivity: "Normal",
-            encounterProvider: "",
-            referringProvider: "",
-            facility: "",
-            billingFacility: "",
-            inCollection: "No",
-            dischargeDisposition: "",
-            reasonForVisit: "",
-            issues: [],
-        });
+        if ((data as any).data?.policies) {
+            setInsuranceForm(((data as any).data.policies as unknown) as InsuranceForm);
+        }
     }
-
-    const handleOpenEncounter = () => {
-        setShowEncounterForm(true);
-        setHighlightedTab("appointments");
-        setViewMode("appointments");
-    };
-
-    const handleCloseEncounter = () => {
-        setShowEncounterForm(false);
-    };
 
     const onQuickAction = (key: string) => {
         setViewMode(key);
@@ -688,7 +576,7 @@ export default function PatientDashboardPage() {
         }
         setViewMode(key);
         setHighlightedTab(key);
-        mainContentRef.current?.scrollTo({top: 0, behavior: "smooth"});
+        mainContentRef.current?.scrollTo({ top: 0, behavior: "smooth" });
     };
 
     const formatDateLocal = (date: string) => {
@@ -705,12 +593,6 @@ export default function PatientDashboardPage() {
     const formatDateTimeLocal = (date: string) => {
         return date ? new Date(date).toLocaleString() : "—";
     };
-
-    // const filteredAppointments = appointments.filter((appt) =>
-    //     appt.provider.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    //     appt.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    //     appt.status.toLowerCase().includes(searchTerm.toLowerCase())
-    // );
 
     if (loading) {
         return (
@@ -745,21 +627,24 @@ export default function PatientDashboardPage() {
     }
 
     const patientTabs = [
-        {key: "dashboard", label: "Dashboard"},
+        { key: "dashboard", label: "Dashboard" },
 
-        {key: "demographics", label: "Demographics"},
-        {key: "appointments", label: "Appointments"},
-        {key: "insurance", label: "Insurance"},
-        {key: "history", label: "History"},
-        {key: "documents", label: "Documents"},
-        {key: "report", label: "Report"},
-        {key: "allergies", label: "Allergies"},
-        {key: "medications", label: "Medications"},
-        {key: "labs", label: "Labs"},
-        {key: "transactions", label: "Transactions"},
-        {key: "issues", label: "Issues"},
-        {key: "vitals", label: "Vitals"},
-        {key: "messages", label: "Messages"},
+        { key: "demographics", label: "Demographics" },
+        { key: "appointments", label: "Appointments" },
+        { key: "encounters", label: "Encounters" },
+        { key: "insurance", label: "Insurance" },
+        { key: "history", label: "History" },
+        { key: "documents", label: "Documents" },
+        { key: "report", label: "Report" },
+        { key: "allergies", label: "Allergies" },
+        { key: "medications", label: "Medications" },
+        { key: "labs", label: "Labs" },
+        { key: "transactions", label: "Transactions" },
+        { key: "issues", label: "Issues" },
+        { key: "vitals", label: "Vitals" },
+        { key: "messages", label: "Messages" },
+        // ✅ New Encounters tab (placed after Messages as requested)
+
     ];
 
     const renderTabContent = (tabKey: string) => {
@@ -770,19 +655,17 @@ export default function PatientDashboardPage() {
                         {/* ✅ Recent & Upcoming in one card */}
                         <div
                             id="activity"
-                            ref={(el) => { tabContentRefs.current["activity"] = el }}
+                            ref={(el) => {
+                                tabContentRefs.current["activity"] = el;
+                            }}
                             style={{ scrollMarginTop: headerH + 12 }}
                             className="bg-white rounded-lg border border-gray-200 shadow-sm p-6"
                         >
-                            <h4 className="text-lg font-semibold text-gray-800 mb-4">
-                                Recent & Upcoming
-                            </h4>
+                            <h4 className="text-lg font-semibold text-gray-800 mb-4">Recent & Upcoming</h4>
                             <div className="grid md:grid-cols-2 gap-6">
                                 {/* Recent Activity */}
                                 <div>
-                                    <h5 className="text-sm font-medium text-blue-700 mb-2">
-                                        Recent Activity
-                                    </h5>
+                                    <h5 className="text-sm font-medium text-blue-700 mb-2">Recent Activity</h5>
                                     {appointments.length > 0 ? (
                                         <ul className="text-sm space-y-1 text-gray-600 list-disc pl-4">
                                             {appointments
@@ -801,21 +684,16 @@ export default function PatientDashboardPage() {
 
                                 {/* Upcoming Appointments */}
                                 <div>
-                                    <h5 className="text-sm font-medium text-blue-700 mb-2">
-                                        Upcoming
-                                    </h5>
+                                    <h5 className="text-sm font-medium text-blue-700 mb-2">Upcoming</h5>
                                     {appointments.find((a) => a.status === "Scheduled") ? (
                                         <p className="text-sm text-gray-600">
                                             {formatDateTimeLocal(
                                                 appointments.find((a) => a.status === "Scheduled")!.date
                                             )}{" "}
-                                            — with{" "}
-                                            {appointments.find((a) => a.status === "Scheduled")!.provider}
+                                            — with {appointments.find((a) => a.status === "Scheduled")!.provider}
                                         </p>
                                     ) : (
-                                        <p className="text-gray-500 text-sm">
-                                            No upcoming appointments
-                                        </p>
+                                        <p className="text-gray-500 text-sm">No upcoming appointments</p>
                                     )}
                                 </div>
                             </div>
@@ -824,7 +702,9 @@ export default function PatientDashboardPage() {
                         {/* ✅ Demographics */}
                         <div
                             id="demographics"
-                            ref={(el) => { tabContentRefs.current["demographics"] = el }}
+                            ref={(el) => {
+                                tabContentRefs.current["demographics"] = el;
+                            }}
                             style={{ scrollMarginTop: headerH + 12 }}
                         >
                             <DemographicsFlat
@@ -841,7 +721,9 @@ export default function PatientDashboardPage() {
                         {/* ✅ Appointments */}
                         <div
                             id="appointments"
-                            ref={(el) => { tabContentRefs.current["appointments"] = el }}
+                            ref={(el) => {
+                                tabContentRefs.current["appointments"] = el;
+                            }}
                             style={{ scrollMarginTop: headerH + 12 }}
                         >
                             <AppointmentsFlat
@@ -849,6 +731,9 @@ export default function PatientDashboardPage() {
                                 formatDateTimeLocal={formatDateTimeLocal}
                             />
                         </div>
+
+                        {/* Encounter /*}
+
 
                         {/* ✅ Insurance */}
                         <div
@@ -866,7 +751,7 @@ export default function PatientDashboardPage() {
                                 setEditInsurance={setEditInsurance}
                                 insuranceSubTab={insuranceSubTab}
                                 setInsuranceSubTab={setInsuranceSubTab}
-                                setPolicyField={setPolicyField}
+                                saveInsurance={saveInsurance}
                                 setViewMode={setViewMode}
                                 setHighlightedTab={setHighlightedTab}
                             />
@@ -894,19 +779,20 @@ export default function PatientDashboardPage() {
                         {/* ✅ Documents */}
                         <div
                             id="documents"
-                            ref={(el) => { tabContentRefs.current["documents"] = el }}
+                            ref={(el) => {
+                                tabContentRefs.current["documents"] = el;
+                            }}
                             style={{ scrollMarginTop: headerH + 12 }}
                         >
-                            <DocumentsFlat
-                                selectedDoc={selectedDoc}
-                                setSelectedDoc={setSelectedDoc}
-                            />
+                            <DocumentsFlat selectedDoc={selectedDoc} setSelectedDoc={setSelectedDoc} />
                         </div>
 
                         {/* ✅ Report */}
                         <div
                             id="report"
-                            ref={(el) => { tabContentRefs.current["report"] = el }}
+                            ref={(el) => {
+                                tabContentRefs.current["report"] = el;
+                            }}
                             style={{ scrollMarginTop: headerH + 12 }}
                         >
                             <ReportFlat
@@ -928,7 +814,9 @@ export default function PatientDashboardPage() {
                         {/* ✅ Allergies */}
                         <div
                             id="allergies"
-                            ref={(el) => { tabContentRefs.current["allergies"] = el }}
+                            ref={(el) => {
+                                tabContentRefs.current["allergies"] = el;
+                            }}
                             style={{ scrollMarginTop: headerH + 12 }}
                         >
                             <AllergiesFlat allergies={allergies} />
@@ -937,7 +825,9 @@ export default function PatientDashboardPage() {
                         {/* ✅ Medications */}
                         <div
                             id="medications"
-                            ref={(el) => { tabContentRefs.current["medications"] = el }}
+                            ref={(el) => {
+                                tabContentRefs.current["medications"] = el;
+                            }}
                             style={{ scrollMarginTop: headerH + 12 }}
                         >
                             <MedicationsFlat medications={medications} />
@@ -946,7 +836,9 @@ export default function PatientDashboardPage() {
                         {/* ✅ Labs */}
                         <div
                             id="labs"
-                            ref={(el) => { tabContentRefs.current["labs"] = el }}
+                            ref={(el) => {
+                                tabContentRefs.current["labs"] = el;
+                            }}
                             style={{ scrollMarginTop: headerH + 12 }}
                         >
                             <LabsFlat labsData={[]} />
@@ -955,7 +847,9 @@ export default function PatientDashboardPage() {
                         {/* ✅ Transactions */}
                         <div
                             id="transactions"
-                            ref={(el) => { tabContentRefs.current["transactions"] = el }}
+                            ref={(el) => {
+                                tabContentRefs.current["transactions"] = el;
+                            }}
                             style={{ scrollMarginTop: headerH + 12 }}
                         >
                             <BillingFlat billing={billing} />
@@ -964,7 +858,9 @@ export default function PatientDashboardPage() {
                         {/* ✅ Issues */}
                         <div
                             id="issues"
-                            ref={(el) => { tabContentRefs.current["issues"] = el }}
+                            ref={(el) => {
+                                tabContentRefs.current["issues"] = el;
+                            }}
                             style={{ scrollMarginTop: headerH + 12 }}
                             className="bg-white rounded-lg border border-gray-200 shadow-sm p-6"
                         >
@@ -975,7 +871,9 @@ export default function PatientDashboardPage() {
                         {/* ✅ Vitals */}
                         <div
                             id="vitals"
-                            ref={(el) => { tabContentRefs.current["vitals"] = el }}
+                            ref={(el) => {
+                                tabContentRefs.current["vitals"] = el;
+                            }}
                             style={{ scrollMarginTop: headerH + 12 }}
                             className="bg-white rounded-lg border border-gray-200 shadow-sm p-6"
                         >
@@ -986,7 +884,9 @@ export default function PatientDashboardPage() {
                         {/* ✅ Messages */}
                         <div
                             id="messages"
-                            ref={(el) => { tabContentRefs.current["messages"] = el }}
+                            ref={(el) => {
+                                tabContentRefs.current["messages"] = el;
+                            }}
                             style={{ scrollMarginTop: headerH + 12 }}
                             className="bg-white rounded-lg border border-gray-200 shadow-sm p-6"
                         >
@@ -996,19 +896,19 @@ export default function PatientDashboardPage() {
                     </div>
                 );
 
-
+            case "encounters":
+                return (
+                    <div className="min-w-0">
+                        <EncounterTableExpandable patientId={Number(patient.id)} />
+                    </div>
+                );
 
             default:
                 return (
                     <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
                         <div className="text-center py-8">
                             <div className="mx-auto w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-3">
-                                <svg
-                                    className="w-8 h-8 text-gray-400"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
+                                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path
                                         strokeLinecap="round"
                                         strokeLinejoin="round"
@@ -1018,9 +918,7 @@ export default function PatientDashboardPage() {
                                 </svg>
                             </div>
                             <h5 className="text-gray-700 font-medium">No data available</h5>
-                            <p className="text-gray-500 text-sm mt-1">
-                                This section is currently empty
-                            </p>
+                            <p className="text-gray-500 text-sm mt-1">This section is currently empty</p>
                         </div>
                     </div>
                 );
@@ -1030,47 +928,30 @@ export default function PatientDashboardPage() {
     return (
         <AdminLayout>
             <style jsx global>{`
-                html,
-                body {
-                    height: 100%;
-                    margin: 0;
-                    padding: 0;
-                    overflow-y: auto;
-                    overflow-x: hidden;
-                }
-            `}</style>
+        html,
+        body {
+          height: 100%;
+          margin: 0;
+          padding: 0;
+          overflow-y: auto;
+          overflow-x: hidden;
+        }
+      `}</style>
             <style jsx>{`
-                //.pageScroll {
-                //    min-height: 100vh;
-                //    width: 100%;
-                //    overflow-y: auto;
-                //    overflow-x: hidden;
-                //    -webkit-overflow-scrolling: touch;
-                //}
+        .patientSummary *,
+        .quickActions * {
+          overflow: visible !important;
+          height: auto !important;
+          max-height: none !important;
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
 
-                .patientSummary *,
-                .quickActions * {
-                    overflow: visible !important;
-                    height: auto !important;
-                    max-height: none !important;
-                    -ms-overflow-style: none;
-                    scrollbar-width: none;
-                }
-
-                //.hide-scrollbar {
-                //    -ms-overflow-style: none; /* IE & Edge */
-                //    scrollbar-width: none; /* Firefox */
-                //}
-
-                //.hide-scrollbar::-webkit-scrollbar {
-                //    display: none; /* Chrome, Safari, Opera */
-                //}
-
-                .patientSummary *::-webkit-scrollbar,
-                .quickActions *::-webkit-scrollbar {
-                    display: none;
-                }
-            `}</style>
+        .patientSummary *::-webkit-scrollbar,
+        .quickActions *::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
 
             {/* Light gray page background */}
             <div className="pageScroll bg-gray-50">
@@ -1078,65 +959,30 @@ export default function PatientDashboardPage() {
                     ref={tabsHeaderRef}
                     className="z-50 border-b border-gray-200 bg-white/95 backdrop-blur px-3 py-1.5"
                 >
-
                     <div className="flex items-center justify-between gap-3 min-w-0">
                         <div className="flex items-center gap-3 min-w-0">
                             <Link
                                 href="/patients"
                                 className="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 border border-gray-300 text-xs font-medium text-gray-700 flex items-center"
                             >
-                                <svg
-                                    className="w-3 h-3 mr-1"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth="2"
-                                        d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                                    />
+                                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                                 </svg>
                                 Patients
                             </Link>
                             <div className="flex items-center min-w-0">
-              <span className="text-xs text-gray-500 mr-1 shrink-0">
-                Patient:
-              </span>
-                                <div
-                                    className="px-2 py-0.5 rounded bg-blue-50 text-xs font-medium text-blue-800 truncate">
+                                <span className="text-xs text-gray-500 mr-1 shrink-0">Patient:</span>
+                                <div className="px-2 py-0.5 rounded bg-blue-50 text-xs font-medium text-blue-800 truncate">
                                     {patient.firstName} {patient.lastName}
                                 </div>
                                 {patient.mrn && (
-                                    <div
-                                        className="ml-2 px-1.5 py-0.5 rounded bg-gray-100 text-[10px] text-gray-600 shrink-0">
+                                    <div className="ml-2 px-1.5 py-0.5 rounded bg-gray-100 text-[10px] text-gray-600 shrink-0">
                                         MRN: {patient.mrn}
                                     </div>
                                 )}
                             </div>
                         </div>
-                        <div className="flex items-center gap-3 shrink-0">
-                            <button
-                                className="h-8 px-3 rounded bg-blue-600 hover:bg-blue-700 text-xs font-medium text-white shadow-sm inline-flex items-center"
-                                onClick={handleOpenEncounter}
-                            >
-                                <svg
-                                    className="w-3 h-3 mr-1"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth="2"
-                                        d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                                    />
-                                </svg>
-                                New Encounter
-                            </button>
-                        </div>
+                        {/* Removed old "New Encounter" form button — Encounters are now managed in the Encounters tab */}
                     </div>
                     <div className="mt-1.5">
                         <div className="flex flex-wrap gap-2">
@@ -1162,43 +1008,28 @@ export default function PatientDashboardPage() {
                         <main
                             ref={mainContentRef}
                             className="min-w-0 overflow-y-auto hide-scrollbar"
-                            style={{height: `calc(100vh - ${headerH}px)`}}
+                            style={{ height: `calc(100vh - ${headerH}px)` }}
                         >
-                            {showEncounterForm ? (
-                                <main className="flex-1 p-6 overflow-auto">
-                                    <EncounterForm
-                                        onCancel={handleCloseEncounter}
-                                        onSave={saveEncounter}
-                                    />
-                                </main>
+                            {viewMode === "dashboard" ? (
+                                <div
+                                    id="dashboard"
+                                    ref={(el) => void (tabContentRefs.current.dashboard = el)}
+                                    style={{ scrollMarginTop: headerH + 12 }}
+                                >
+                                    <h2 className="text-lg font-semibold mb-3"></h2>
+                                    <div className="min-w-0">{renderTabContent("dashboard")}</div>
+                                </div>
                             ) : (
-                                <>
-                                    {viewMode === "dashboard" ? (
-                                        <div
-                                            id="dashboard"
-                                            ref={(el) => void (tabContentRefs.current.dashboard = el)}
-                                            style={{scrollMarginTop: headerH + 12}}
-                                        >
-                                            <h2 className="text-lg font-semibold mb-3"></h2>
-                                            <div className="min-w-0">
-                                                {renderTabContent("dashboard")}
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div
-                                            id={viewMode}
-                                            ref={(el) => {
-                                                tabContentRefs.current[viewMode] = el;
-                                            }}
-                                            style={{scrollMarginTop: headerH + 12}}
-                                            className="min-w-0"
-                                        >
-                                            <div className="min-w-0">
-                                                {renderTabContent(viewMode)}
-                                            </div>
-                                        </div>
-                                    )}
-                                </>
+                                <div
+                                    id={viewMode}
+                                    ref={(el) => {
+                                        tabContentRefs.current[viewMode] = el;
+                                    }}
+                                    style={{ scrollMarginTop: headerH + 12 }}
+                                    className="min-w-0"
+                                >
+                                    <div className="min-w-0">{renderTabContent(viewMode)}</div>
+                                </div>
                             )}
                         </main>
 
@@ -1211,8 +1042,7 @@ export default function PatientDashboardPage() {
                                 }}
                                 className="flex flex-col gap-4"
                             >
-                                <div
-                                    className="flex-[0_0_30%] bg-gradient-to-br from-indigo-50 to-white rounded-2xl shadow-md p-4 flex flex-col">
+                                <div className="flex-[0_0_30%] bg-gradient-to-br from-indigo-50 to-white rounded-2xl shadow-md p-4 flex flex-col">
                                     <h3 className="text-sm font-semibold text-gray-800 mb-2 tracking-wide">
                                         Patient Summary
                                     </h3>
@@ -1221,17 +1051,12 @@ export default function PatientDashboardPage() {
                                             {patient.firstName} {patient.lastName}
                                         </div>
                                         <div className="text-gray-500">
-                                            {formatDateLocal(patient.dateOfBirth)} · Age{" "}
-                                            {calculateAgeLocal(patient.dateOfBirth)}
+                                            {formatDateLocal(patient.dateOfBirth)} · Age {calculateAgeLocal(patient.dateOfBirth)}
                                         </div>
-                                        <div className="text-gray-700">
-                                            {patient.phoneNumber || "—"}
-                                        </div>
+                                        <div className="text-gray-700">{patient.phoneNumber || "—"}</div>
                                         <div className="text-gray-400 text-xs italic">
                                             {appointments.length > 0
-                                                ? `Last visit: ${formatDateLocal(
-                                                    appointments[appointments.length - 1].date
-                                                )}`
+                                                ? `Last visit: ${formatDateLocal(appointments[appointments.length - 1].date)}`
                                                 : "No visits recorded"}
                                         </div>
                                     </div>
@@ -1242,34 +1067,28 @@ export default function PatientDashboardPage() {
                                     </h3>
                                     <div className="grid grid-cols-1 gap-2 flex-1">
                                         {[
-                                            {key: "appointments", label: "Appointments", color: "blue"},
-                                            {key: "billing", label: "Billing", color: "yellow"},
-                                            {key: "demographics", label: "Demographics", color: "purple"},
-                                            {key: "messages", label: "Messages", color: "green"},
-                                        ].map(({key, label, color}) => {
-                                            const colors: Record<
-                                                string,
-                                                { active: string; inactive: string }
-                                            > = {
+                                            { key: "appointments", label: "Appointments", color: "blue" },
+                                            { key: "billing", label: "Billing", color: "yellow" },
+                                            { key: "demographics", label: "Demographics", color: "purple" },
+                                            { key: "messages", label: "Messages", color: "green" },
+                                            { key: "encounters", label: "Encounters", color: "blue" },
+                                        ].map(({ key, label, color }) => {
+                                            const colors: Record<string, { active: string; inactive: string }> = {
                                                 blue: {
                                                     active: "bg-blue-600 text-white",
-                                                    inactive:
-                                                        "bg-blue-50 text-blue-700 hover:bg-blue-100",
+                                                    inactive: "bg-blue-50 text-blue-700 hover:bg-blue-100",
                                                 },
                                                 yellow: {
                                                     active: "bg-yellow-500 text-white",
-                                                    inactive:
-                                                        "bg-yellow-50 text-yellow-700 hover:bg-yellow-100",
+                                                    inactive: "bg-yellow-50 text-yellow-700 hover:bg-yellow-100",
                                                 },
                                                 purple: {
                                                     active: "bg-purple-600 text-white",
-                                                    inactive:
-                                                        "bg-purple-50 text-purple-700 hover:bg-purple-100",
+                                                    inactive: "bg-purple-50 text-purple-700 hover:bg-purple-100",
                                                 },
                                                 green: {
                                                     active: "bg-green-600 text-white",
-                                                    inactive:
-                                                        "bg-green-50 text-green-700 hover:bg-green-100",
+                                                    inactive: "bg-green-50 text-green-700 hover:bg-green-100",
                                                 },
                                             };
                                             const base =
@@ -1279,11 +1098,7 @@ export default function PatientDashboardPage() {
                                                 <button
                                                     key={key}
                                                     onClick={() => onQuickAction(key)}
-                                                    className={`${base} ${
-                                                        isActive
-                                                            ? colors[color].active
-                                                            : colors[color].inactive
-                                                    }`}
+                                                    className={`${base} ${isActive ? colors[color].active : colors[color].inactive}`}
                                                 >
                                                     {label}
                                                 </button>
@@ -1297,231 +1112,5 @@ export default function PatientDashboardPage() {
                 </div>
             </div>
         </AdminLayout>
-    );
-}
-
-function EncounterForm({ onCancel, onSave }: EncounterFormProps) {
-    const [form, setForm] = useState<EncounterFormData>({
-        visitCategory: "",
-        encounterClass: "Outpatient",
-        encounterType: "",
-        sensitivity: "Normal",
-        encounterProvider: "",
-        referringProvider: "",
-        facility: "",
-        billingFacility: "",
-        inCollection: "No",
-        dischargeDisposition: "",
-        reasonForVisit: "",
-        issues: [],
-    });
-
-    const setField = <K extends keyof EncounterFormData>(
-        field: K,
-        value: EncounterFormData[K]
-    ) => {
-        setForm((prev) => ({ ...prev, [field]: value }));
-    };
-
-    return (
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-            <h3 className="text-lg font-semibold mb-4">New Encounter</h3>
-
-            {/* --- Encounter Fields --- */}
-            <div className="grid md:grid-cols-2 gap-4 mb-6">
-                {/* Visit Category */}
-                <div>
-                    <label className="block text-sm font-medium">Visit Category</label>
-                    <select
-                        value={form.visitCategory}
-                        onChange={(e) => setField("visitCategory", e.target.value)}
-                        className="w-full border rounded px-3 py-2"
-                    >
-                        <option>-- Select One --</option>
-                        <option>Inpatient</option>
-                        <option>Outpatient</option>
-                        <option>Emergency</option>
-                        <option>Observation</option>
-                        <option>Telehealth</option>
-                        <option>Preventive Care</option>
-                        <option>Home Health</option>
-                        <option>Ambulatory Surgery</option>
-                        <option>Urgent Care</option>
-                    </select>
-                </div>
-
-                {/* Class */}
-                <div>
-                    <label className="block text-sm font-medium">Class</label>
-                    <select
-                        value={form.encounterClass}
-                        onChange={(e) => setField("encounterClass", e.target.value)}
-                        className="w-full border rounded px-3 py-2"
-                    >
-                        <option>Outpatient</option>
-                        <option>Inpatient</option>
-                        <option>Emergency</option>
-                        <option>Day Care</option>
-                        <option>Virtual</option>
-                    </select>
-                </div>
-
-                {/* Type */}
-                <div>
-                    <label className="block text-sm font-medium">Type</label>
-                    <select
-                        value={form.encounterType}
-                        onChange={(e) => setField("encounterType", e.target.value)}
-                        className="w-full border rounded px-3 py-2"
-                    >
-                        <option>-- Select One --</option>
-                        <option>Consultation</option>
-                        <option>Follow-up</option>
-                        <option>Routine Exam</option>
-                        <option>Initial Visit</option>
-                        <option>Post-Op Visit</option>
-                        <option>Telemedicine</option>
-                        <option>Walk-in</option>
-                    </select>
-                </div>
-
-                {/* Sensitivity */}
-                <div>
-                    <label className="block text-sm font-medium">Sensitivity</label>
-                    <select
-                        value={form.sensitivity}
-                        onChange={(e) => setField("sensitivity", e.target.value)}
-                        className="w-full border rounded px-3 py-2"
-                    >
-                        <option>Normal</option>
-                        <option>High</option>
-                        <option>Restricted</option>
-                    </select>
-                </div>
-
-                {/* Encounter Provider */}
-                <div>
-                    <label className="block text-sm font-medium">Encounter Provider</label>
-                    <input
-                        className="w-full border rounded px-3 py-2"
-                        value={form.encounterProvider}
-                        onChange={(e) => setField("encounterProvider", e.target.value)}
-                        placeholder="e.g. Dr. John Doe"
-                    />
-                </div>
-
-                {/* Referring Provider */}
-                <div>
-                    <label className="block text-sm font-medium">Referring Provider</label>
-                    <input
-                        className="w-full border rounded px-3 py-2"
-                        value={form.referringProvider}
-                        onChange={(e) => setField("referringProvider", e.target.value)}
-                        placeholder="e.g. Dr. Patel"
-                    />
-                </div>
-
-                {/* Facility */}
-                <div>
-                    <label className="block text-sm font-medium">Facility</label>
-                    <input
-                        className="w-full border rounded px-3 py-2"
-                        value={form.facility}
-                        onChange={(e) => setField("facility", e.target.value)}
-                        placeholder="e.g. Main Hospital"
-                    />
-                </div>
-
-                {/* Billing Facility */}
-                <div>
-                    <label className="block text-sm font-medium">Billing Facility</label>
-                    <input
-                        className="w-full border rounded px-3 py-2"
-                        value={form.billingFacility}
-                        onChange={(e) => setField("billingFacility", e.target.value)}
-                        placeholder="e.g. Qiaben Uptown"
-                    />
-                </div>
-
-                {/* In Collection */}
-                <div>
-                    <label className="block text-sm font-medium">In Collection</label>
-                    <select
-                        value={form.inCollection}
-                        onChange={(e) => setField("inCollection", e.target.value)}
-                        className="w-full border rounded px-3 py-2"
-                    >
-                        <option>No</option>
-                        <option>Yes</option>
-                        <option>Pending</option>
-                    </select>
-                </div>
-
-                {/* Discharge Disposition */}
-                <div>
-                    <label className="block text-sm font-medium">Discharge Disposition</label>
-                    <select
-                        value={form.dischargeDisposition}
-                        onChange={(e) => setField("dischargeDisposition", e.target.value)}
-                        className="w-full border rounded px-3 py-2"
-                    >
-                        <option>-- Select One --</option>
-                        <option>Home (Self-Care)</option>
-                        <option>Transfer to Another Facility</option>
-                        <option>Skilled Nursing Facility</option>
-                        <option>Expired</option>
-                        <option>Left Against Medical Advice</option>
-                        <option>Hospice</option>
-                        <option>Rehabilitation Facility</option>
-                        <option>Still Patient</option>
-                    </select>
-                </div>
-            </div>
-
-            {/* Reason & Issues */}
-            <div className="grid md:grid-cols-2 gap-4 mb-6">
-                <div>
-                    <label className="block text-sm font-medium">Reason for Visit</label>
-                    <textarea
-                        className="w-full border rounded px-3 py-2"
-                        value={form.reasonForVisit}
-                        onChange={(e) => setField("reasonForVisit", e.target.value)}
-                    />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium">Link/Add Issues</label>
-                    <div className="border rounded p-3 h-32 overflow-y-auto text-sm">
-                        <button
-                            type="button"
-                            className="bg-blue-600 text-white px-2 py-1 rounded text-xs mb-2"
-                            onClick={() => setField("issues", [...form.issues, "New Issue"])}
-                        >
-                            + Add Issue
-                        </button>
-                        <div className="mt-2 space-y-1">
-                            {form.issues.map((issue, i) => (
-                                <div key={i}>{issue}</div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex justify-end gap-2 mt-6">
-                <button
-                    onClick={onCancel}
-                    className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-                >
-                    Cancel
-                </button>
-                <button
-                    onClick={() => onSave(form)}
-                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                >
-                    Save
-                </button>
-            </div>
-        </div>
     );
 }

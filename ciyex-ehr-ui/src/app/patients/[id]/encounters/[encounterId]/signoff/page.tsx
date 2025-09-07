@@ -1,4 +1,4 @@
-import SignoffCard from "@/components/signoff/SignoffCard";
+import SignoffCard from "@/components/encounter/signoff/SignoffCard";
 
 type Props = { params: Promise<{ patientId: string; encounterId: string }> };
 

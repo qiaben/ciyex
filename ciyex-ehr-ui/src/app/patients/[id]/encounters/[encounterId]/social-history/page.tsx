@@ -1,4 +1,4 @@
-import SHList from "@/components/socialhistory/SHList";
+import SHList from "@/components/encounter/socialhistory/SHList";
 
 type Props = { params: Promise<{ patientId: string; encounterId: string }> };
 

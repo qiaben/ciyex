@@ -1,4 +1,4 @@
-import FeeScheduleCard from "@/components/fees/FeeScheduleCard";
+import FeeScheduleCard from "@/components/encounter/fees/FeeScheduleCard";
 
 type Props = { params: Promise<{ patientId: string; encounterId: string }> };
 

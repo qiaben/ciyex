@@ -1,4 +1,4 @@
-import PEList from "@/components/physicalexam/PEList";
+import PEList from "@/components/encounter/physicalexam/PEList";
 
 type Props = { params: Promise<{ patientId: string; encounterId: string }> };
 

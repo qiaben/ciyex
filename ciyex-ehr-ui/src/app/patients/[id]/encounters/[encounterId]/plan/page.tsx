@@ -1,4 +1,4 @@
-import PlanList from "@/components/plan/PlanList";
+import PlanList from "@/components/encounter/plan/PlanList";
 
 type Props = { params: Promise<{ patientId: string; encounterId: string }> };
 

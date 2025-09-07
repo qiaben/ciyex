@@ -1,4 +1,4 @@
-import ProviderNoteList from "@/components/providernote/ProviderNoteList";
+import ProviderNoteList from "@/components/encounter/providernote/ProviderNoteList";
 
 type Props = { params: Promise<{ patientId: string; encounterId: string }> };
 

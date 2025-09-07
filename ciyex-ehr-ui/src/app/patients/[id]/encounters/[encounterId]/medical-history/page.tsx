@@ -1,5 +1,5 @@
 // Server file can be minimal; it renders the client list with route params.
-import PMHList from "@/components/pmh/PMHList";
+import PMHList from "@/components/encounter/pmh/PMHList";
 
 export const metadata = {
     title: "Patient Medical History",

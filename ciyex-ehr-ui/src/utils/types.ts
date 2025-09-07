@@ -40,31 +40,25 @@ export type ChiefComplaintDto = {
     createdAt?: string | number[];
     updatedAt?: string | number[];
 };
+// --- HPI (History of Present Illness) ---
+
+// --- HPI (History of Present Illness) — compact schema ---
 export type HpiDto = {
     id?: number;
+    externalId?: string | null;
+    orgId?: number;
     patientId: number;
     encounterId: number;
 
-    // Keep one guaranteed field that every backend supports:
-    narrative: string;
+    // backend uses this single field
+    description: string;
 
-    // Optional structured fields (your backend can ignore any it doesn't use):
-    onset?: string;                // e.g., "2 days ago"
-    duration?: string;             // e.g., "2 days"
-    severity?: string;             // e.g., "mild | moderate | severe"
-    location?: string;             // e.g., "frontal head"
-    character?: string;            // e.g., "throbbing"
-    aggravatingFactors?: string;   // e.g., "light, noise"
-    alleviatingFactors?: string;   // e.g., "rest, NSAIDs"
-    associatedSymptoms?: string;   // e.g., "nausea, photophobia"
-    timing?: string;               // e.g., "intermittent, worse at night"
-
-    // audit fields if your API returns them:
     audit?: {
         createdDate?: string;
         lastModifiedDate?: string;
     };
 };
+
 
 export type RosDto = {
     id?: number;
@@ -99,61 +93,87 @@ export type PastMedicalHistoryDto = {
     };
 };
 
+// Family History types (aligns with backend DTO)
+
+// --- Family History ---
+export type FamilyHistoryEntryDto = {
+    id?: number;
+    relation: "FATHER" | "MOTHER" | "SIBLING" | "SPOUSE" | "OFFSPRING";
+    diagnosisCode?: string;
+    diagnosisText?: string;
+    notes?: string;
+};
+
 export type FamilyHistoryDto = {
     id?: number;
+    externalId?: string | null;
+    orgId?: number;
     patientId: number;
     encounterId: number;
-
-    // common fields for a single family history entry:
-    relation: string;          // e.g., Father, Mother, Brother
-    condition: string;         // e.g., Diabetes Mellitus Type 2
-    ageOfOnset?: number;       // optional
-    status?: string;           // e.g., Alive, Deceased, Unknown
-    notes?: string;            // free text
-    hereditary?: boolean;      // optional flag
-
+    entries: FamilyHistoryEntryDto[];
     audit?: {
         createdDate?: string;
         lastModifiedDate?: string;
     };
+};
+
+
+
+// --- Social History ---
+
+export type SocialHistoryEntryDto = {
+    id?: number;
+    category: string;     // e.g., "SMOKING", "DIET", ...
+    value?: string;       // e.g., "Former smoker", "Vegetarian"
+    details?: string;     // free text details
 };
 
 export type SocialHistoryDto = {
     id?: number;
+    externalId?: string | null;
+    orgId?: number;
     patientId: number;
     encounterId: number;
-
-    // Flexible, entry-based model (maps well to SocialHistoryEntry)
-    category: string;         // e.g., "Tobacco", "Alcohol", "Drugs", "Occupation", "Exercise", "Diet", "Sexual", etc.
-    status?: string;          // e.g., "Current", "Former", "Never", "Occasional"
-    frequency?: string;       // e.g., "Daily", "Weekly", "Socially"
-    duration?: string;        // e.g., "10 years", "2 months"
-    quantityPerDay?: number;  // e.g., cigarettes/day, drinks/day (optional)
-    years?: number;           // e.g., pack-years or overall years (optional)
-    notes?: string;           // free text
-
+    entries: SocialHistoryEntryDto[];
     audit?: {
         createdDate?: string;
         lastModifiedDate?: string;
     };
 };
 
+// ---- Physical Exam ----
+
 export type PhysicalExamSectionDto = {
-    name: string;         // e.g., "General", "HEENT", "Cardiovascular"
-    finding?: string;     // concise result: "NAD", "Clear to auscultation", etc.
-    notes?: string;       // optional detailed text
-    status?: "Normal" | "Abnormal" | "NotExamined";
+    sectionKey:
+        | "GENERAL"
+        | "HEENT"
+        | "NECK"
+        | "CARDIOVASCULAR"
+        | "RESPIRATORY"
+        | "ABDOMEN"
+        | "GENITOURINARY"
+        | "MUSCULOSKELETAL"
+        | "NEUROLOGICAL"
+        | "SKIN"
+        | "PSYCHIATRIC"
+        | "OTHER"
+        | string;      // allow future custom keys
+
+    allNormal: boolean;   // true = no abnormal findings
+    normalText?: string;  // e.g., “Well-nourished, no acute distress”
+    findings?: string;    // e.g., “Mild nasal congestion”
 };
 
 export type PhysicalExamDto = {
     id?: number;
+    externalId?: string | null;
+    orgId?: number;
     patientId: number;
     encounterId: number;
 
-    // free text summary for the whole exam
+    // if your backend includes an overall summary, keep it; otherwise omit:
     summary?: string;
 
-    // array of sectional findings (maps well to PhysicalExamSection on backend)
     sections: PhysicalExamSectionDto[];
 
     audit?: {
@@ -161,6 +181,8 @@ export type PhysicalExamDto = {
         lastModifiedDate?: string;
     };
 };
+
+
 
 export type AssessmentDto = {
     id?: number;
@@ -180,28 +202,29 @@ export type AssessmentDto = {
     };
 };
 
+// ---- Plan (aligned to backend)
 export type PlanDto = {
     id?: number;
+    externalId?: string | null;
+    orgId?: number;
     patientId: number;
     encounterId: number;
 
-    // free text plan summary
-    planText?: string;
-
-    // structured optional buckets
-    medications?: string;         // e.g., "Ibuprofen 400mg po q8h prn pain x5d"
-    labs?: string;                // e.g., "CBC, CMP"
-    imaging?: string;             // e.g., "CXR PA/LAT"
-    procedures?: string;          // e.g., "Wound debridement"
-    referrals?: string;           // e.g., "PT referral; Cardiology consult"
-    followUp?: string;            // e.g., "RTC 2 weeks"
-    patientInstructions?: string; // e.g., "Ice, rest, return precautions"
+    diagnosticPlan?: string;     // e.g., "Order CBC, CMP, Chest X-Ray."
+    plan?: string;               // e.g., "Start bronchodilator..."
+    notes?: string;              // free text
+    followUpVisit?: string;      // e.g., "4 weeks"
+    returnWorkSchool?: string;   // e.g., "Return to work on 2025-08-20"
+    sectionsJson?: Record<string, any>;   // arbitrary JSON payload
 
     audit?: {
         createdDate?: string;
         lastModifiedDate?: string;
     };
 };
+
+
+
 
 export type ProviderNoteDto = {
     id?: number;
@@ -219,22 +242,26 @@ export type ProviderNoteDto = {
     };
 };
 
+// ---- Procedures (aligned to Bruno screenshot) ----
 export type ProcedureDto = {
     id?: number;
+    externalId?: string | null;
+    orgId?: number;
     patientId: number;
     encounterId: number;
 
-    // Common fields — adjust names to your backend if needed
-    procedureCode?: string;     // CPT/HCPCS/ICD-10-PCS
-    procedureName: string;      // human-readable label
-    datePerformed?: string;     // yyyy-MM-dd
-    status?: "Planned" | "InProgress" | "Completed" | "Aborted";
-    performer?: string;         // provider name or ID
-    bodySite?: string;          // e.g., "Left knee"
-    laterality?: "Left" | "Right" | "Bilateral" | "Midline";
-    modifiers?: string;         // e.g., CPT modifiers "25,59"
-    anesthesia?: string;        // e.g., "Local", "General"
-    notes?: string;             // free text
+    cpt4: string;                // e.g., "99214"
+    description: string;         // e.g., "Office visit est. patient comprehensive"
+    units?: number;              // integer
+    rate?: string;               // keep as string: "239.00"
+    relatedIcds?: string;        // e.g., "E0500"
+    hospitalBillingStart?: string; // "YYYY-MM-DD"
+    hospitalBillingEnd?: string;   // "YYYY-MM-DD"
+    modifier1?: string | null;   // e.g., "25"
+    modifier2?: string | null;   // e.g., "34"
+    modifier3?: string | null;
+    modifier4?: string | null;
+    note?: string | null;
 
     audit?: {
         createdDate?: string;
@@ -242,26 +269,39 @@ export type ProcedureDto = {
     };
 };
 
+
+
+
+// ---- Codes (master/detail aligned to backend screenshot) ----
 export type CodeDto = {
-id?: number;
-patientId: number;
-encounterId: number;
+    id?: number;
+    externalId?: string | null;
+    orgId?: number;
+    patientId: number;
+    encounterId: number;
 
-codeType: "CPT" | "HCPCS" | "ICD10" | "ICD10PCS" | "Modifier" | "Other";
-code: string;                 // e.g., 99214, J1885, M54.50
-description?: string;
-units?: number;               // e.g., 1, 2
-amount?: number;              // charge amount (optional)
-diagnosisPointers?: string;   // e.g., "A,B" mapping to Assessment list (free text for now)
-modifiers?: string;           // comma‑separated: "25,59" (for CPT/HCPCS)
-status?: "Draft" | "Ready" | "Billed" | "Denied" | "Paid";
-notes?: string;
+    codeType: "CPT" | "HCPCS" | "ICD10" | "ICD10PCS" | "Modifier" | "Other" | string;
+    code: string;
+    modifier?: string | null;
 
-audit?: {
-    createdDate?: string;
-    lastModifiedDate?: string;
+    active: boolean;
+    description?: string;
+    shortDescription?: string;
+    category?: string;
+    diagnosisReporting?: boolean;
+    serviceReporting?: boolean;
+    relateTo?: string;
+    feeStandard?: number;
+
+    audit?: {
+        createdDate?: string;
+        lastModifiedDate?: string;
+    };
 };
-};
+
+// Generic API envelope (if not already defined)
+
+
 
 export type SignoffStatus =
     | "Draft"

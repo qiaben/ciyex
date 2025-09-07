@@ -1,4 +1,4 @@
-import ROSList from "@/components/ros/ROSList";
+import ROSList from "@/components/encounter/ros/ROSList";
 
 type Props = { params: Promise<{ patientId: string; encounterId: string }> };
 
