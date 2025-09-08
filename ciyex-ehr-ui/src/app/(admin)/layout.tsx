@@ -23,7 +23,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         "/settings/insurance": "Insurance Companies", // ✅ added
         "/settings": "Settings",
         "/appointments": "Appointments",
-        "/recall":"Recall"
+        "/recall":"Recall",
+        "/inventory-management": "Inventory Dashboard",
+        "/inventory-management/inventory": "Inventory Management",
+        "/inventory-management/orders": "Inventory Orders",
+        "/inventory-management/records":"Inventory Records",
+        "/inventory-management/suppliers":"Inventory Suppliers",
+        "/inventory-management/maintenance":"Inventory Maintenance",
+        "/inventory-management/settings":"Inventory Settings",
+
     };
 
     const pageTitle =
