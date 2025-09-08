@@ -95,10 +95,6 @@ const navItems: NavItem[] = [
 
 
 
-
-
-
-
     {
         icon: <RecallIcon />,
         name: "Recall",
@@ -115,7 +111,7 @@ const navItems: NavItem[] = [
                 name: "Codes",
                 path: "settings/codes",
             },
-
+            { name: "Config", path: "/settings/config" },
             {
                 name: "Forms",
                 subItems: [

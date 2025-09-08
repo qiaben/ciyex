@@ -548,14 +548,10 @@ export default function ListsPage(): JSX.Element {
             setHighlighted(-1);
         }
     };
+    const [showNewListDialog, setShowNewListDialog] = useState(false);
 
-    /* Create NEW list id */
-    const createNewList = async () => {
-        const id = prompt("Enter new list ID (e.g., 1_10):", "");
-        if (!id) return;
-        const trimmed = id.trim();
-        if (!trimmed) return;
-
+    // REPLACE the old createNewList(...) with this helper:
+    const commitCreateNewList = (trimmed: string) => {
         setListIds((prev) => {
             if (prev.some((x) => x.toLowerCase() === trimmed.toLowerCase())) return prev;
             return [trimmed, ...prev];
@@ -573,6 +569,103 @@ export default function ListsPage(): JSX.Element {
 
         pushToast("List created", `Created list "${trimmed}".`, "success");
     };
+    function NewListDialog(props: {
+        open: boolean;
+        onClose: () => void;
+        onCreate: (name: string) => void;
+        existingIds: string[];
+    }) {
+        const { open, onClose, onCreate, existingIds } = props;
+        const [value, setValue] = useState("");
+        const [error, setError] = useState<string | null>(null);
+        const inputRef = useRef<HTMLInputElement | null>(null);
+
+        useEffect(() => {
+            if (open) {
+                setValue("");
+                setError(null);
+                setTimeout(() => inputRef.current?.focus(), 0);
+            }
+        }, [open]);
+
+        useEffect(() => {
+            function onEsc(e: KeyboardEvent) {
+                if (!open) return;
+                if (e.key === "Escape") onClose();
+            }
+            window.addEventListener("keydown", onEsc);
+            return () => window.removeEventListener("keydown", onEsc);
+        }, [open, onClose]);
+
+        const lowerSet = useMemo(() => new Set(existingIds.map((x) => x.toLowerCase())), [existingIds]);
+
+        const validate = (name: string): string | null => {
+            const trimmed = name.trim();
+            if (!trimmed) return "List name can’t be empty.";
+            if (/\s/.test(name)) return "No spaces allowed. Use _ or - instead.";
+            if (!/^[A-Za-z0-9._-]+$/.test(name)) return "Use only letters, numbers, dot, underscore, or hyphen.";
+            if (trimmed.length > 64) return "Keep it under 64 characters.";
+            if (lowerSet.has(trimmed.toLowerCase())) return "That list already exists.";
+            return null;
+        };
+
+        const handleCreate = () => {
+            const err = validate(value);
+            if (err) {
+                setError(err);
+                inputRef.current?.focus();
+                return;
+            }
+            onCreate(value.trim());
+            onClose();
+        };
+
+        if (!open) return null;
+
+        return createPortal(
+            <div aria-modal="true" role="dialog" aria-labelledby="new-list-title"
+                 className="fixed inset-0 z-[2147483000] flex items-center justify-center">
+                <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px]" onClick={onClose} />
+                <div className="relative w-full max-w-md rounded-2xl border border-gray-200 bg-white p-4 shadow-xl dark:bg-gray-800 dark:border-gray-700"
+                     onClick={(e) => e.stopPropagation()}>
+                    <h2 id="new-list-title" className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                        Create New List
+                    </h2>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        Enter a name (no spaces). Example: <code>1_10</code>
+                    </p>
+
+                    <label htmlFor="new-list-input" className="sr-only">List name</label>
+                    <input
+                        id="new-list-input"
+                        ref={inputRef}
+                        value={value}
+                        onChange={(e) => { setValue(e.target.value); if (error) setError(null); }}
+                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleCreate(); } }}
+                        placeholder="e.g., 1_10"
+                        className={`mt-3 w-full rounded-lg border px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/70 ${
+                            error
+                                ? "border-red-400 dark:border-red-500"
+                                : "border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"
+                        }`}
+                    />
+                    {error && <div className="mt-1 text-[11px] text-red-600 dark:text-red-400" role="alert">{error}</div>}
+
+                    <div className="mt-4 flex items-center justify-end gap-2">
+                        <button onClick={onClose}
+                                className="rounded-lg border border-gray-300 px-3 py-1.5 text-[12px] text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700/50">
+                            Cancel
+                        </button>
+                        <button onClick={handleCreate}
+                                className="rounded-lg bg-emerald-600 px-3 py-1.5 text-[12px] font-medium text-white shadow-sm hover:bg-emerald-500 active:bg-emerald-600/90">
+                            Create
+                        </button>
+                    </div>
+                </div>
+            </div>,
+            document.body
+        );
+    }
 
     /* Row editing */
     const updateRow = useCallback(
@@ -949,7 +1042,7 @@ export default function ListsPage(): JSX.Element {
                                 {/* Buttons (same row) */}
                                 <div className="flex items-center gap-2">
                                     <button
-                                        onClick={createNewList}
+                                        onClick={() => setShowNewListDialog(true)}
                                         className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-[12px] font-medium text-white shadow-sm hover:bg-emerald-500 active:bg-emerald-600/90 transition"
                                     >
                                         📃 New List
@@ -1093,6 +1186,13 @@ export default function ListsPage(): JSX.Element {
                     </div>
                 </div>
             </AdminLayout>
+            <NewListDialog
+                open={showNewListDialog}
+                onClose={() => setShowNewListDialog(false)}
+                onCreate={commitCreateNewList}
+                existingIds={listIds}
+            />
+
 
             {/* Themed scrollbar + toast keyframes */}
             <style jsx global>{`
