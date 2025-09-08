@@ -27,7 +27,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         "/settings/insurance": "Insurance Companies",
         "/settings/codes": "Codes",
         "/settings": "Settings",
-        "/appointments": "Appointments",
         "/recall":"Recall",
         "/inventory-management": "Inventory Dashboard",
         "/inventory-management/inventory": "Inventory Management",
@@ -36,7 +35,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         "/inventory-management/suppliers":"Inventory Suppliers",
         "/inventory-management/maintenance":"Inventory Maintenance",
         "/inventory-management/settings":"Inventory Settings",
-        "/recall":"Recall"
     };
 
     // Pick the longest matching key (so /settings/codes wins over /settings)
