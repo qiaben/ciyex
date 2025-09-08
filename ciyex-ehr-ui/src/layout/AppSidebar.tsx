@@ -17,7 +17,7 @@ import {
     SettingsIcon, // ensure this exists in ../icons/index
     TableIcon,
     RecallIcon,
-    AppointmentIcon, MessagingIcon,
+    AppointmentIcon, MessagingIcon, InventoryIcon,
 
 
 } from "../icons/index";
@@ -92,6 +92,24 @@ const navItems: NavItem[] = [
         subItems: [
             { name: "Inbox", path: "/messaging/inbox" },],
     },
+
+
+
+    {
+        icon: <InventoryIcon/>, // swap MessagingIcon → better inventory icon
+        name: "Inventory",
+        subItems: [
+            { name: "Dashboard", path: "/inventory-management" },
+            { name: "Inventory", path: "/inventory-management/inventory" },
+            { name: "Orders", path: "/inventory-management/orders" },
+            { name: "Records", path: "/inventory-management/records" },
+            { name: "Suppliers", path: "/inventory-management/suppliers" },
+            { name: "Maintenance", path: "/inventory-management/maintenance" },
+            { name: "Settings", path: "/inventory-management/settings" },
+        ],
+    },
+
+
 
 
 
