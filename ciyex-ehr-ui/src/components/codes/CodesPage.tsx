@@ -1,5 +1,5 @@
 "use client";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { fetchWithAuth } from "@/utils/fetchWithAuth";
 
 interface Code {
@@ -29,14 +29,7 @@ const codeTypes = [
 // Use Next.js rewrite proxy so we don't depend on env URL at runtime
 const API_URL = `/api/codes`;
 
-async function safeJson(res: Response) {
-    try {
-        const text = await res.text();
-        return text ? JSON.parse(text) : null;
-    } catch {
-        return null;
-    }
-}
+
 
 export default function CodesPage() {
     const [codes, setCodes] = useState<Code[]>([]);
@@ -67,7 +60,7 @@ export default function CodesPage() {
     // Org identifier used by backend; validate numeric and build per-request headers
     const rawOrgId = typeof window !== "undefined" ? localStorage.getItem("orgId") : null;
     const orgId = rawOrgId && /^\d+$/.test(rawOrgId) ? rawOrgId : null;
-    const makeHeaders = (): HeadersInit => {
+    const makeHeaders = useCallback((): HeadersInit => {
         if (!orgId) return {};
         const facilityId = typeof window !== "undefined" ? localStorage.getItem("facilityId") : null;
         const role = typeof window !== "undefined" ? localStorage.getItem("role") : null;
@@ -75,7 +68,7 @@ export default function CodesPage() {
         if (facilityId) { h["facilityId"] = facilityId; }
         if (role) { h["role"] = role; }
         return h;
-    };
+    }, [orgId]);
 
     const loadCodes = useCallback(async (qOverride?: string, typeOverride?: string) => {
         if (!orgId) {
@@ -97,8 +90,9 @@ export default function CodesPage() {
             const reqHeaders: HeadersInit = makeHeaders();
             const res = await fetchWithAuth(url, { headers: reqHeaders });
             const body = await res.text();
-            let parsed: any = null;
-            try { parsed = body ? JSON.parse(body) : null; } catch {}
+            type ApiResponse = { data?: Code[]; message?: string; error?: string };
+            let parsed: ApiResponse | null = null;
+            try { parsed = body ? (JSON.parse(body) as ApiResponse) : null; } catch {}
             if (res.ok && parsed) {
                 setCodes(parsed.data || []);
                 setPage(1);
@@ -112,7 +106,7 @@ export default function CodesPage() {
             console.error("Error loading codes:", err);
             setError("Unexpected error while loading codes");
         }
-    }, [orgId, searchText, filter]);
+    }, [orgId, searchText, filter, makeHeaders]);
 
     // Do not auto-load on mount; user will click Search
 
