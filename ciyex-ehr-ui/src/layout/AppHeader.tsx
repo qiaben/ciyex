@@ -228,6 +228,34 @@ const AppHeader: React.FC<AppHeaderProps> = ({ pageTitle }) => {
                         {/*<span className="text-xl font-bold">+</span>*/}
 
                     </button>
+
+                    {/* 🔹 New Appointment create button */}
+                    <button
+                        onClick={() => window.dispatchEvent(new Event("open-appointment-modal"))}
+                        className="inline-flex items-center gap-1.5 rounded-md bg-blue-100 text-blue-700 px-3 py-1.5 text-sm font-medium hover:bg-blue-200"
+                    >
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-7 w-7"
+                            viewBox="0 0 26 26"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                        >
+                            {/* Calendar outline */}
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                            {/* Top divider */}
+                            <line x1="3" y1="10" x2="21" y2="10" />
+                            {/* Left binding */}
+                            <line x1="8" y1="2" x2="8" y2="6" />
+                            {/* Right binding */}
+                            <line x1="16" y1="2" x2="16" y2="6" />
+                            {/* Plus sign in the middle */}
+                            <line x1="12" y1="14" x2="12" y2="20" />
+                            <line x1="9" y1="17" x2="15" y2="17" />
+                        </svg>
+                    </button>
+
                     <ThemeToggleButton />
                     <NotificationDropdown />
                     <UserDropdown />

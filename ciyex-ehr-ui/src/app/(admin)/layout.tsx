@@ -6,6 +6,7 @@ import AppHeader from "@/layout/AppHeader";
 import AppSidebar from "@/layout/AppSidebar";
 import Backdrop from "@/layout/Backdrop";
 import { usePathname } from "next/navigation";
+import AppointmentModal from "@/components/calendar/AppointmentModal";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
     const { isExpanded, isHovered, isMobileOpen } = useSidebar();
@@ -66,6 +67,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     </div>
                 </div>
             </div>
+
+            {/* ✅ Global Appointment Modal is always mounted */}
+            <AppointmentModal />
         </div>
     );
 }
