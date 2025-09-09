@@ -26,7 +26,8 @@ const codeTypes = [
     { value: "CUSTOM", label: "Custom" },
 ];
 
-const API_URL = `${process.env.NEXT_PUBLIC_API_URL}/api/codes`;
+// Use Next.js rewrite proxy so we don't depend on env URL at runtime
+const API_URL = `/api/codes`;
 
 async function safeJson(res: Response) {
     try {
@@ -42,67 +43,112 @@ export default function CodesPage() {
     const [selected, setSelected] = useState<Partial<Code> | null>(null);
     const [showCreate, setShowCreate] = useState(false);
     const [showEdit, setShowEdit] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     // UI input values
-    const [q, setQ] = useState("");
-    const [selectedType, setSelectedType] = useState<string>("");
+    const [q, setQ] = useState<string>(() =>
+        typeof window !== "undefined" ? localStorage.getItem("codes_q") || "" : ""
+    );
+    const [selectedType, setSelectedType] = useState<string>(() =>
+        typeof window !== "undefined" ? localStorage.getItem("codes_type") || "" : ""
+    );
 
     // Actual applied filters (used for fetching)
-    const [searchText, setSearchText] = useState("");
-    const [filter, setFilter] = useState<string>("");
+    const [searchText, setSearchText] = useState<string>(() =>
+        typeof window !== "undefined" ? localStorage.getItem("codes_q") || "" : ""
+    );
+    const [filter, setFilter] = useState<string>(() =>
+        typeof window !== "undefined" ? localStorage.getItem("codes_type") || "" : ""
+    );
 
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
 
-    const orgId =
-        typeof window !== "undefined" ? localStorage.getItem("orgId") : null;
-    const headers: HeadersInit = { orgId: orgId ?? "" };
+    // Org identifier used by backend; validate numeric and build per-request headers
+    const rawOrgId = typeof window !== "undefined" ? localStorage.getItem("orgId") : null;
+    const orgId = rawOrgId && /^\d+$/.test(rawOrgId) ? rawOrgId : null;
+    const makeHeaders = (): HeadersInit => {
+        if (!orgId) return {};
+        const facilityId = typeof window !== "undefined" ? localStorage.getItem("facilityId") : null;
+        const role = typeof window !== "undefined" ? localStorage.getItem("role") : null;
+        const h: Record<string, string> = { orgId };
+        if (facilityId) { h["facilityId"] = facilityId; }
+        if (role) { h["role"] = role; }
+        return h;
+    };
 
-    const loadCodes = useCallback(async () => {
-        if (!orgId) return;
+    const loadCodes = useCallback(async (qOverride?: string, typeOverride?: string) => {
+        if (!orgId) {
+            setCodes([]);
+            setError("Missing orgId. Please sign in again.");
+            return;
+        }
         try {
+            setError(null);
             let url = API_URL;
-            if (searchText || filter) {
+            const qText = qOverride ?? searchText;
+            const fText = typeOverride ?? filter;
+            if (qText || fText) {
                 const params = new URLSearchParams();
-                if (searchText) params.append("q", searchText);
-                if (filter) params.append("codeType", filter);
+                if (qText) params.append("q", qText);
+                if (fText) params.append("codeType", fText);
                 url = `${API_URL}/search?${params.toString()}`;
             }
-            const res = await fetchWithAuth(url, { headers });
-            const json = await safeJson(res);
-            if (res.ok && json) {
-                setCodes(json.data || []);
+            const reqHeaders: HeadersInit = makeHeaders();
+            const res = await fetchWithAuth(url, { headers: reqHeaders });
+            const body = await res.text();
+            let parsed: any = null;
+            try { parsed = body ? JSON.parse(body) : null; } catch {}
+            if (res.ok && parsed) {
+                setCodes(parsed.data || []);
                 setPage(1);
+            } else {
+                const msg = (parsed && (parsed.message || parsed.error)) || body || `Failed to load codes (status ${res.status})`;
+                setCodes([]);
+                setError(msg);
+                console.error("/api/codes error", { status: res.status, body });
             }
         } catch (err) {
             console.error("Error loading codes:", err);
+            setError("Unexpected error while loading codes");
         }
-    }, [orgId, searchText, filter, headers]); // added headers
+    }, [orgId, searchText, filter]);
 
-    // Load once on mount
-    useEffect(() => {
-        loadCodes();
-    }, [loadCodes]);
+    // Do not auto-load on mount; user will click Search
 
     // Run search only when button clicked
     const runSearch = () => {
         setSearchText(q);
         setFilter(selectedType);
+        if (typeof window !== "undefined") {
+            localStorage.setItem("codes_q", q);
+            localStorage.setItem("codes_type", selectedType);
+        }
+        // Trigger fetch explicitly on search click using current inputs
+        loadCodes(q, selectedType);
+    };
+
+    const [toast, setToast] = useState<null | { message: string; kind?: "success" | "error" }>(null);
+    const showToast = (message: string, kind: "success" | "error" = "success") => {
+        setToast({ message, kind });
+        // Auto-hide after 2.5s
+        window.setTimeout(() => setToast(null), 2500);
     };
 
     const saveCode = async (form: Partial<Code>) => {
         if (!form.code || !form.codeType) return;
         let res: Response;
+        const reqHeaders: HeadersInit = makeHeaders();
         if (form.id) {
             res = await fetchWithAuth(`${API_URL}/${form.id}`, {
                 method: "PUT",
-                headers,
+                headers: reqHeaders,
                 body: JSON.stringify(form),
             });
         } else {
             res = await fetchWithAuth(API_URL, {
                 method: "POST",
-                headers,
+                headers: reqHeaders,
                 body: JSON.stringify(form),
             });
         }
@@ -110,15 +156,24 @@ export default function CodesPage() {
             await loadCodes();
             setShowCreate(false);
             setShowEdit(false);
+            showToast("Saved successfully", "success");
+        } else {
+            showToast("Save failed", "error");
         }
     };
 
     const deleteCode = async (id: number) => {
+        const reqHeaders: HeadersInit = makeHeaders();
         const res = await fetchWithAuth(`${API_URL}/${id}`, {
             method: "DELETE",
-            headers,
+            headers: reqHeaders,
         });
-        if (res.ok) await loadCodes();
+        if (res.ok) {
+            await loadCodes();
+            showToast("Deleted successfully", "success");
+        } else {
+            showToast("Delete failed", "error");
+        }
     };
 
     const startIndex = (page - 1) * pageSize;
@@ -127,6 +182,18 @@ export default function CodesPage() {
 
     return (
         <div className="p-6 space-y-6 font-sans">
+            {/* Toast */}
+            {toast && (
+                <div
+                    className={`fixed top-4 right-4 z-50 px-4 py-2 rounded shadow text-sm ${
+                        toast.kind === "success"
+                            ? "bg-green-600 text-white"
+                            : "bg-red-600 text-white"
+                    }`}
+                >
+                    {toast.message}
+                </div>
+            )}
             {/* Header */}
             {/*<h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">*/}
             {/*    Codes*/}
@@ -169,6 +236,13 @@ export default function CodesPage() {
                     + Add New
                 </button>
             </div>
+
+            {/* Error */}
+            {error && (
+                <div className="p-3 rounded bg-red-50 text-red-700 border border-red-200 text-sm">
+                    {error}
+                </div>
+            )}
 
             {/* Table */}
             <div className="border rounded-lg bg-white dark:bg-gray-800 shadow-sm overflow-hidden">
