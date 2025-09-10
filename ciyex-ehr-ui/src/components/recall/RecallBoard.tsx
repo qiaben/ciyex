@@ -178,6 +178,8 @@ export default function RecallPage() {
     const [to, setTo] = useState("");
     const [rows, setRows] = useState<RecallDTO[]>([]);
     const [loading, setLoading] = useState(false);
+    const [deleteTarget, setDeleteTarget] = useState<RecallDTO | null>(null); //  add here
+
     // Pagination state
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
@@ -296,6 +298,31 @@ export default function RecallPage() {
 
     const handlePrevious = () => currentPage > 1 && setCurrentPage(currentPage - 1);
     const handleNext = () => currentPage < totalPages && setCurrentPage(currentPage + 1);
+
+    async function deleteRecall(id: number) {
+        try {
+            const res = await fetchWithAuth(
+                `${process.env.NEXT_PUBLIC_API_URL}/api/recalls/${id}`,
+                { method: "DELETE" }
+            );
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.message || "Failed");
+            setRows(prev => prev.filter(r => r.id !== id));
+            setAlertData({
+                variant: "success",
+                title: "Deleted",
+                message: "Recall deleted successfully.",
+            });
+        } catch (err) {
+            console.error("Delete failed:", err);
+            setAlertData({
+                variant: "error",
+                title: "Error",
+                message: "Failed to delete recall.",
+            });
+        }
+    }
+
 
     /* =========================
      * Patient search (debounced)
@@ -682,36 +709,7 @@ export default function RecallPage() {
                                                 </svg>
                                             </button>
                                             <button
-                                                onClick={async () => {
-                                                    if (!confirm("Delete this recall?")) return;
-                                                    try {
-                                                        const res = await fetchWithAuth(
-                                                            `${process.env.NEXT_PUBLIC_API_URL}/api/recalls/${r.id}`,
-                                                            { method: "DELETE" }
-                                                        );
-                                                        if (res.ok) {
-                                                            setAlertData({
-                                                                variant: "success",
-                                                                title: "Deleted",
-                                                                message: "Recall deleted successfully.",
-                                                            });   // ✅ paste it here
-                                                            loadRecalls();
-                                                        } else {
-                                                            setAlertData({
-                                                                variant: "error",
-                                                                title: "Error",
-                                                                message: "Failed to delete recall.",
-                                                            });
-                                                        }
-                                                    } catch (err) {
-                                                        console.error("Delete failed", err);
-                                                        setAlertData({
-                                                            variant: "error",
-                                                            title: "Error",
-                                                            message: "Unexpected error deleting recall.",
-                                                        });
-                                                    }
-                                                }}
+                                                onClick={() => setDeleteTarget(r)}
                                                 className="p-1 text-red-600 hover:text-red-800 rounded"
                                             >
                                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4"
@@ -1174,6 +1172,34 @@ export default function RecallPage() {
                             </Button>
                             <Button size="sm" onClick={handleSaveRecall}>
                                 {modalMode === "add" ? "Add Recall" : "Update Recall"}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {deleteTarget && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                    <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg dark:bg-gray-900">
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                            Delete Recall
+                        </h3>
+                        <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                            Are you sure you want to delete{" "}
+                            <span className="font-medium">{deleteTarget.patientName}</span>’s recall?
+                        </p>
+                        <div className="mt-6 flex justify-end gap-3">
+                            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+                                Cancel
+                            </Button>
+                            <Button
+                                className="bg-rose-600 text-white hover:bg-rose-700"
+                                onClick={async () => {
+                                    await deleteRecall(deleteTarget.id);
+                                    setDeleteTarget(null);
+                                }}
+                            >
+                                Yes, Delete
                             </Button>
                         </div>
                     </div>

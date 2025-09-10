@@ -1,448 +1,317 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
-import { Inter } from "next/font/google";
-import AdminLayout from "@/app/(admin)/layout";
+import { useState } from "react";
 
-const inter = Inter({ subsets: ["latin"] });
-
-// ---------------- Lookup Options ----------------
-const STATUS_OPTIONS = ["NEW", "PENDING", "COMPLETED"];
-
-const PROCEDURE_OPTIONS = [
-    { code: "4548-4", display: "HbA1c" },
-    { code: "2093-3", display: "Cholesterol, Total" },
-    { code: "718-7", display: "Hemoglobin" },
-];
-
-const DIAGNOSIS_OPTIONS = [
-    { code: "E11.9", display: "Type 2 Diabetes Mellitus without complications" },
-    { code: "I10", display: "Essential (primary) hypertension" },
-    { code: "E78.5", display: "Hyperlipidemia, unspecified" },
-];
-
-// ---------------- Types ----------------
-export type LabOrderDto = {
-    id?: number;
-    orderNumber?: string;
-    procedureCode?: string;
-    procedureDisplay?: string;
-    diagnosisCode?: string;
-    status?: string;
-    orderDate?: string; // yyyy-MM-dd HH:mm
-    result?: string;
+type LabOrder = {
+    orderNumber: string;
+    reporting: string;
+    type: string;
+    qualifier: string;
+    procedure: string;
+    icd10: string;
+    modifier: string;
+    category: string;
+    diagnostic: string;
+    service: string;
+    status: string;
+    date: string;
 };
 
-// ---------------- Component ----------------
-export default function LabOrderPage({ className = "" }) {
-    const [items, setItems] = useState<LabOrderDto[]>([]);
-    const [query, setQuery] = useState("");
-    const [creating, setCreating] = useState<LabOrderDto>({ status: "NEW" });
-    const [editingId, setEditingId] = useState<number | null>(null);
-    const [draft, setDraft] = useState<LabOrderDto | null>(null);
-    const [toast, setToast] = useState<string | null>(null);
+export default function LabOrdersPage() {
+    const [orders, setOrders] = useState<LabOrder[]>([
+        {
+            orderNumber: "12345",
+            reporting: "Diagnosis X",
+            type: "Standard",
+            qualifier: "Primary",
+            procedure: "CPT4-99213",
+            icd10: "A10",
+            modifier: "None",
+            category: "Laboratory",
+            diagnostic: "Yes",
+            service: "Blood Test",
+            status: "Pending",
+            date: "2025-09-06",
+        },
+    ]);
 
-    // ---------------- Local CRUD ----------------
-    function createOne() {
-        const newItem: LabOrderDto = { ...creating, id: Date.now() };
-        setItems((prev) => [newItem, ...prev]);
-        setCreating({ status: "NEW" });
-        flashToast("✅ Lab order created (local only)");
-    }
+    const [form, setForm] = useState<LabOrder>({
+        orderNumber: "",
+        reporting: "",
+        type: "Standard",
+        qualifier: "All",
+        procedure: "",
+        icd10: "",
+        modifier: "",
+        category: "Unassigned",
+        diagnostic: "",
+        service: "",
+        status: "Pending",
+        date: new Date().toISOString().slice(0, 10),
+    });
 
-    function saveEdit() {
-        if (!draft || !editingId) return;
-        setItems((prev) => prev.map((it) => (it.id === editingId ? draft : it)));
-        cancelEdit();
-        flashToast("✅ Saved changes (local only)");
-    }
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        const { name, value } = e.target;
+        setForm((prev) => ({ ...prev, [name]: value }));
+    };
 
-    function removeOne(id?: number) {
-        if (!id) return;
-        setItems((prev) => prev.filter((it) => it.id !== id));
-        flashToast("🗑️ Deleted (local only)");
-    }
+    const handleSave = () => {
+        if (!form.orderNumber) {
+            alert("Order Number is required");
+            return;
+        }
+        setOrders([...orders, form]);
+        setForm({
+            orderNumber: "",
+            reporting: "",
+            type: "Standard",
+            qualifier: "All",
+            procedure: "",
+            icd10: "",
+            modifier: "",
+            category: "Unassigned",
+            diagnostic: "",
+            service: "",
+            status: "Pending",
+            date: new Date().toISOString().slice(0, 10),
+        });
+    };
 
-    function startEdit(item: LabOrderDto) {
-        if (!item.id) return;
-        setEditingId(item.id);
-        setDraft({ ...item });
-    }
+    const handleCancel = () => {
+        setForm({
+            orderNumber: "",
+            reporting: "",
+            type: "Standard",
+            qualifier: "All",
+            procedure: "",
+            icd10: "",
+            modifier: "",
+            category: "Unassigned",
+            diagnostic: "",
+            service: "",
+            status: "Pending",
+            date: new Date().toISOString().slice(0, 10),
+        });
+    };
 
-    function cancelEdit() {
-        setEditingId(null);
-        setDraft(null);
-    }
-
-    function onDraftChange<K extends keyof LabOrderDto>(key: K, value: LabOrderDto[K]) {
-        if (!draft) return;
-        setDraft({ ...draft, [key]: value });
-    }
-
-    function flashToast(msg: string) {
-        setToast(msg);
-        setTimeout(() => setToast(null), 2000);
-    }
-
-    // ---------------- Filter ----------------
-    const filtered = useMemo(() => {
-        if (!query) return items;
-        const q = query.toLowerCase();
-        return items.filter((it) =>
-            `${it.orderNumber || ""} ${it.procedureCode || ""} ${it.procedureDisplay || ""} ${
-                it.diagnosisCode || ""
-            } ${it.status || ""} ${it.result || ""}`
-                .toLowerCase()
-                .includes(q)
-        );
-    }, [items, query]);
-
-    // ---------------- Render ----------------
     return (
-        <AdminLayout>
-            <div className={`${inter.className} ${className} max-w-7xl mx-auto p-4`}>
-                <header className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <h1 className="text-2xl font-semibold tracking-tight">Lab Orders</h1>
-                    <input
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        placeholder="Search (order #, procedure, diagnosis, status, result)"
-                        className="w-full sm:w-80 rounded-xl border px-3 py-2 text-sm shadow-sm"
-                    />
-                </header>
-
-                {toast && (
-                    <div className="mb-3 rounded-xl bg-black/80 px-3 py-2 text-sm text-white shadow-lg">
-                        {toast}
-                    </div>
-                )}
-
-                {/* Quick Create Form */}
-                <div className="mb-4 rounded-2xl border bg-white p-3 shadow-sm">
-                    <div className="mb-2 text-sm font-medium text-gray-700">Quick create</div>
-                    <div className="grid grid-cols-1 gap-2 md:grid-cols-6">
-                        <Field
-                            label="Order #"
-                            value={creating.orderNumber || ""}
-                            onChange={(v: string) => setCreating((c) => ({ ...c, orderNumber: v }))}
-                            placeholder="e.g. ORD-123"
-                        />
-
-                        <LookupField
-                            label="Procedure code"
-                            value={creating.procedureCode || ""}
-                            onChange={(v: string) => {
-                                const selected = PROCEDURE_OPTIONS.find((opt) => opt.code === v);
-                                setCreating((c) => ({
-                                    ...c,
-                                    procedureCode: selected?.code,
-                                    procedureDisplay: selected?.display,
-                                }));
-                            }}
-                            options={PROCEDURE_OPTIONS}
-                        />
-
-                        <LookupField
-                            label="Diagnosis code"
-                            value={creating.diagnosisCode || ""}
-                            onChange={(v: string) => {
-                                const selected = DIAGNOSIS_OPTIONS.find((opt) => opt.code === v);
-                                setCreating((c) => ({ ...c, diagnosisCode: selected?.code }));
-                            }}
-                            options={DIAGNOSIS_OPTIONS}
-                        />
-
-                        <DropdownField
-                            label="Status"
-                            value={creating.status || "NEW"}
-                            onChange={(v: string) => setCreating((c) => ({ ...c, status: v }))}
-                            options={STATUS_OPTIONS}
-                        />
-
-                        <Field
-                            label="Result"
-                            value={creating.result || ""}
-                            onChange={(v: string) => setCreating((c) => ({ ...c, result: v }))}
-                            placeholder="Result text"
-                            textarea
-                            className="md:col-span-2"
-                        />
-
-                        <Field
-                            label="Order Date"
-                            value={creating.orderDate || ""}
-                            onChange={(v: string) =>
-                                setCreating((c) => ({ ...c, orderDate: formatDateTime(v) }))
-                            }
-                            type="datetime-local"
-                        />
-
-                        <div className="flex items-end">
-                            <button
-                                onClick={createOne}
-                                className="w-full rounded-xl bg-blue-600 px-4 py-2 text-sm text-white"
-                            >
-                                + Add
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Table */}
-                <div className="overflow-hidden rounded-2xl border bg-white shadow-sm">
-                    <div className="grid grid-cols-12 border-b bg-gray-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-600">
-                        <div className="col-span-2">Order #</div>
-                        <div className="col-span-2">Procedure code</div>
-                        <div className="col-span-2">Diagnosis code</div>
-                        <div className="col-span-2">Status</div>
-                        <div className="col-span-3">Result</div>
-                        <div className="col-span-1 text-right">Actions</div>
-                    </div>
-
-                    {filtered.length === 0 ? (
-                        <div className="px-3 py-6 text-sm text-gray-500">No lab orders found.</div>
-                    ) : (
-                        <ul className="divide-y">
-                            {filtered.map((item) => (
-                                <li
-                                    key={item.id}
-                                    className="grid grid-cols-12 items-start px-3 py-2 text-sm"
-                                >
-                                    {/* Order # */}
-                                    <div className="col-span-2 pr-2">
-                                        {item.orderNumber || "—"}
-                                        <div className="mt-1 text-[11px] text-gray-500">
-                                            {item.orderDate || ""}
-                                        </div>
-                                    </div>
-
-                                    {/* Procedure */}
-                                    <div className="col-span-2 pr-2">
-                                        <span className="font-medium">{item.procedureDisplay || "—"}</span>{" "}
-                                        {item.procedureCode && (
-                                            <span className="text-gray-500">({item.procedureCode})</span>
-                                        )}
-                                    </div>
-
-                                    {/* Diagnosis */}
-                                    <div className="col-span-2 pr-2">
-                                        {item.diagnosisCode || "—"}
-                                        <div className="mt-1 text-[11px] text-gray-500">
-                                            {item.status || ""}
-                                        </div>
-                                    </div>
-
-                                    {/* Status */}
-                                    <div className="col-span-2 pr-2">
-                                        <Badge text={item.status || "—"} />
-                                    </div>
-
-                                    {/* Result */}
-                                    <div className="col-span-3 pr-2 whitespace-pre-wrap">
-                                        {item.result || "—"}
-                                    </div>
-
-                                    {/* Actions */}
-                                    <div className="col-span-1 flex justify-end gap-2">
-                                        <button
-                                            onClick={() => startEdit(item)}
-                                            className="rounded border px-3 py-1 text-xs"
-                                        >
-                                            Edit
-                                        </button>
-                                        <button
-                                            onClick={() => removeOne(item.id)}
-                                            className="rounded border px-3 py-1 text-xs text-red-600"
-                                        >
-                                            Delete
-                                        </button>
-                                    </div>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                </div>
-
-                {/* Edit Form */}
-                {editingId && draft && (
-                    <div className="mt-4 rounded-2xl border bg-white p-4 shadow-sm">
-                        <h3 className="mb-2 text-sm font-medium text-gray-700">Edit Lab Order</h3>
-                        <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
-                            <Field
-                                label="Order #"
-                                value={draft.orderNumber || ""}
-                                onChange={(v) => onDraftChange("orderNumber", v)}
-                            />
-                            <LookupField
-                                label="Procedure code"
-                                value={draft.procedureCode || ""}
-                                onChange={(v) => {
-                                    const sel = PROCEDURE_OPTIONS.find((opt) => opt.code === v);
-                                    onDraftChange("procedureCode", sel?.code || "");
-                                    onDraftChange("procedureDisplay", sel?.display || "");
-                                }}
-                                options={PROCEDURE_OPTIONS}
-                            />
-                            <LookupField
-                                label="Diagnosis code"
-                                value={draft.diagnosisCode || ""}
-                                onChange={(v) => onDraftChange("diagnosisCode", v)}
-                                options={DIAGNOSIS_OPTIONS}
-                            />
-                            <DropdownField
-                                label="Status"
-                                value={draft.status || "NEW"}
-                                onChange={(v) => onDraftChange("status", v)}
-                                options={STATUS_OPTIONS}
-                            />
-                        </div>
-                        <Field
-                            label="Result"
-                            value={draft.result || ""}
-                            onChange={(v) => onDraftChange("result", v)}
-                            textarea
-                            className="mt-2"
-                        />
-                        <div className="mt-3 flex gap-2">
-                            <button
-                                onClick={saveEdit}
-                                className="rounded bg-green-600 px-4 py-2 text-sm text-white"
-                            >
-                                Save
-                            </button>
-                            <button
-                                onClick={cancelEdit}
-                                className="rounded bg-gray-400 px-4 py-2 text-sm text-white"
-                            >
-                                Cancel
-                            </button>
-                        </div>
-                    </div>
-                )}
+        <div className="p-8 max-w-7xl mx-auto space-y-8">
+            {/* Page Header */}
+            <div className="flex justify-between items-center">
+                <h1 className="text-2xl font-bold">Lab Orders – Medical Coding</h1>
             </div>
-        </AdminLayout>
-    );
-}
 
-// ---------------- Helpers ----------------
-function formatDateTime(value: string) {
-    if (!value) return "";
-    return value.replace("T", " ").slice(0, 16);
-}
+            {/* Entry Form */}
+            <div className="bg-white shadow rounded-lg p-6 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                <div className="flex flex-col">
+                    <label className="text-sm font-semibold">Order Number *</label>
+                    <input
+                        type="text"
+                        name="orderNumber"
+                        value={form.orderNumber}
+                        onChange={handleChange}
+                        placeholder="Enter Order #"
+                        className="border rounded p-2 text-sm"
+                    />
+                </div>
 
-function Field({
-                   label,
-                   value,
-                   onChange,
-                   placeholder,
-                   type = "text",
-                   textarea = false,
-                   className = "",
-               }: {
-    label: string;
-    value: string;
-    onChange: (v: string) => void;
-    placeholder?: string;
-    type?: string;
-    textarea?: boolean;
-    className?: string;
-}) {
-    return (
-        <label className={`flex flex-col ${className}`}>
-            {label && <span className="mb-1 text-xs text-gray-600">{label}</span>}
-            {textarea ? (
-                <textarea
-                    className="rounded-xl border px-3 py-2 text-sm shadow-sm"
-                    value={value}
-                    onChange={(e) => onChange(e.target.value)}
-                    placeholder={placeholder}
-                />
-            ) : (
-                <input
-                    type={type}
-                    className="rounded-xl border px-3 py-2 text-sm shadow-sm"
-                    value={value}
-                    onChange={(e) => onChange(e.target.value)}
-                    placeholder={placeholder}
-                />
-            )}
-        </label>
-    );
-}
+                <div className="flex flex-col">
+                    <label className="text-sm font-semibold">Reporting / Relate To</label>
+                    <input
+                        type="text"
+                        name="reporting"
+                        value={form.reporting}
+                        onChange={handleChange}
+                        placeholder="Diagnosis / Service Code"
+                        className="border rounded p-2 text-sm"
+                    />
+                </div>
 
-function DropdownField({
-                           label,
-                           value,
-                           onChange,
-                           options,
-                           className = "",
-                       }: {
-    label: string;
-    value: string;
-    onChange: (v: string) => void;
-    options: string[];
-    className?: string;
-}) {
-    return (
-        <label className={`flex flex-col ${className}`}>
-            {label && <span className="mb-1 text-xs text-gray-600">{label}</span>}
-            <select
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-                className="rounded-xl border px-3 py-2 text-sm shadow-sm"
-            >
-                {options.map((opt) => (
-                    <option key={opt} value={opt}>
-                        {opt}
-                    </option>
-                ))}
-            </select>
-        </label>
-    );
-}
+                <div className="flex flex-col">
+                    <label className="text-sm font-semibold">Type</label>
+                    <select
+                        name="type"
+                        value={form.type}
+                        onChange={handleChange}
+                        className="border rounded p-2 text-sm"
+                    >
+                        <option>Standard</option>
+                        <option>Custom</option>
+                    </select>
+                </div>
 
-function LookupField({
-                         label,
-                         value,
-                         onChange,
-                         options,
-                         className = "",
-                     }: {
-    label: string;
-    value: string;
-    onChange: (v: string) => void;
-    options: { code: string; display: string }[];
-    className?: string;
-}) {
-    return (
-        <label className={`flex flex-col ${className}`}>
-            {label && <span className="mb-1 text-xs text-gray-600">{label}</span>}
-            <select
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-                className="rounded-xl border px-3 py-2 text-sm shadow-sm"
-            >
-                <option value="">Select…</option>
-                {options.map((opt) => (
-                    <option key={opt.code} value={opt.code}>
-                        {opt.display} ({opt.code})
-                    </option>
-                ))}
-            </select>
-        </label>
-    );
-}
+                <div className="flex flex-col">
+                    <label className="text-sm font-semibold">Qualifier</label>
+                    <select
+                        name="qualifier"
+                        value={form.qualifier}
+                        onChange={handleChange}
+                        className="border rounded p-2 text-sm"
+                    >
+                        <option>All</option>
+                        <option>Primary</option>
+                        <option>Secondary</option>
+                    </select>
+                </div>
 
-function Badge({ text }: { text: string }) {
-    const tone =
-        text?.toLowerCase() === "completed"
-            ? "bg-green-100 text-green-800"
-            : text?.toLowerCase() === "pending"
-                ? "bg-amber-100 text-amber-800"
-                : "bg-gray-100 text-gray-800";
-    return (
-        <span className={`inline-flex rounded-full px-2 py-1 text-xs ${tone}`}>
-      {text || "—"}
-    </span>
+                <div className="flex flex-col">
+                    <label className="text-sm font-semibold">Procedure / Service</label>
+                    <input
+                        type="text"
+                        name="procedure"
+                        value={form.procedure}
+                        onChange={handleChange}
+                        placeholder="CPT4 / HCPCS"
+                        className="border rounded p-2 text-sm"
+                    />
+                </div>
+
+                <div className="flex flex-col">
+                    <label className="text-sm font-semibold">ICD10 Diagnosis</label>
+                    <input
+                        type="text"
+                        name="icd10"
+                        value={form.icd10}
+                        onChange={handleChange}
+                        placeholder="ICD-10 Code"
+                        className="border rounded p-2 text-sm"
+                    />
+                </div>
+
+                <div className="flex flex-col">
+                    <label className="text-sm font-semibold">Code Modifier</label>
+                    <input
+                        type="text"
+                        name="modifier"
+                        value={form.modifier}
+                        onChange={handleChange}
+                        placeholder="Modifier"
+                        className="border rounded p-2 text-sm"
+                    />
+                </div>
+
+                <div className="flex flex-col">
+                    <label className="text-sm font-semibold">Category</label>
+                    <select
+                        name="category"
+                        value={form.category}
+                        onChange={handleChange}
+                        className="border rounded p-2 text-sm"
+                    >
+                        <option>Unassigned</option>
+                        <option>Preventive</option>
+                        <option>Emergency</option>
+                        <option>Laboratory</option>
+                    </select>
+                </div>
+
+                <div className="flex flex-col">
+                    <label className="text-sm font-semibold">Diagnostic Reporting</label>
+                    <input
+                        type="text"
+                        name="diagnostic"
+                        value={form.diagnostic}
+                        onChange={handleChange}
+                        placeholder="Yes / No"
+                        className="border rounded p-2 text-sm"
+                    />
+                </div>
+
+                <div className="flex flex-col">
+                    <label className="text-sm font-semibold">Service</label>
+                    <input
+                        type="text"
+                        name="service"
+                        value={form.service}
+                        onChange={handleChange}
+                        placeholder="Service name"
+                        className="border rounded p-2 text-sm"
+                    />
+                </div>
+
+                <div className="flex flex-col">
+                    <label className="text-sm font-semibold">Status</label>
+                    <select
+                        name="status"
+                        value={form.status}
+                        onChange={handleChange}
+                        className="border rounded p-2 text-sm"
+                    >
+                        <option>Pending</option>
+                        <option>In Progress</option>
+                        <option>Completed</option>
+                    </select>
+                </div>
+            </div>
+
+            {/* Form Actions */}
+            <div className="flex gap-3">
+                <button
+                    onClick={handleSave}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                    Save
+                </button>
+                <button
+                    onClick={handleCancel}
+                    className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
+                >
+                    Cancel
+                </button>
+            </div>
+
+            {/* Dashboard Table */}
+            <div>
+                <h2 className="text-xl font-bold mb-4">Lab Orders Dashboard</h2>
+                <div className="overflow-x-auto bg-white shadow rounded-lg">
+                    <table className="w-full text-sm border-collapse">
+                        <thead className="bg-gray-100">
+                        <tr>
+                            <th className="border p-2">Order #</th>
+                            <th className="border p-2">Reporting</th>
+                            <th className="border p-2">Type</th>
+                            <th className="border p-2">Qualifier</th>
+                            <th className="border p-2">Procedure</th>
+                            <th className="border p-2">ICD10</th>
+                            <th className="border p-2">Modifier</th>
+                            <th className="border p-2">Category</th>
+                            <th className="border p-2">Diagnostic</th>
+                            <th className="border p-2">Service</th>
+                            <th className="border p-2">Status</th>
+                            <th className="border p-2">Date</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {orders.map((o, i) => (
+                            <tr key={i}>
+                                <td className="border p-2">{o.orderNumber}</td>
+                                <td className="border p-2">{o.reporting}</td>
+                                <td className="border p-2">{o.type}</td>
+                                <td className="border p-2">{o.qualifier}</td>
+                                <td className="border p-2">{o.procedure}</td>
+                                <td className="border p-2">{o.icd10}</td>
+                                <td className="border p-2">{o.modifier}</td>
+                                <td className="border p-2">{o.category}</td>
+                                <td className="border p-2">{o.diagnostic}</td>
+                                <td className="border p-2">{o.service}</td>
+                                <td
+                                    className={`border p-2 ${
+                                        o.status === "Pending"
+                                            ? "text-yellow-600"
+                                            : o.status === "Completed"
+                                                ? "text-green-600"
+                                                : "text-blue-600"
+                                    }`}
+                                >
+                                    {o.status}
+                                </td>
+                                <td className="border p-2">{o.date}</td>
+                            </tr>
+                        ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     );
 }

@@ -17,7 +17,7 @@ import {
     SettingsIcon, // ensure this exists in ../icons/index
     TableIcon,
     RecallIcon,
-    AppointmentIcon, MessagingIcon,
+    AppointmentIcon, MessagingIcon, InventoryIcon,
 
 
 } from "../icons/index";
@@ -95,6 +95,20 @@ const navItems: NavItem[] = [
 
 
 
+    {
+        icon: <InventoryIcon/>, // swap MessagingIcon → better inventory icon
+        name: "Inventory",
+        subItems: [
+            { name: "Dashboard", path: "/inventory-management" },
+            { name: "Inventory", path: "/inventory-management/inventory" },
+            { name: "Orders", path: "/inventory-management/orders" },
+            { name: "Records", path: "/inventory-management/records" },
+            { name: "Suppliers", path: "/inventory-management/suppliers" },
+            { name: "Maintenance", path: "/inventory-management/maintenance" },
+            { name: "Settings", path: "/inventory-management/settings" },
+        ],
+    },
+
 
 
 
@@ -111,7 +125,11 @@ const navItems: NavItem[] = [
         subItems: [
             { name: "Providers", path: "/settings/providers" },
             {name:"Insurance companies", path:"/settings/insurance"},
-
+            {
+                name: "Codes",
+                path: "settings/codes",
+            },
+            { name: "Config", path: "/settings/config" },
             {
                 name: "Forms",
                 subItems: [
@@ -119,6 +137,7 @@ const navItems: NavItem[] = [
                     { name: "Form Admin", path: "/settings/forms/admin" },
                 ],
             },
+
 
         ],
     },
@@ -141,11 +160,7 @@ const navItems: NavItem[] = [
             { name: "404 Error", path: "/error-404", pro: false },
         ],
     },
-    {
-        name: "Codes",
-        icon: <BoxCubeIcon />,
-        path: "/codes",
-    },
+
     {
         name: "Labs",
         icon: <BoxCubeIcon />,

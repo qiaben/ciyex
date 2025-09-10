@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { fetchWithAuth } from "@/utils/fetchWithAuth";
 
 interface Code {
@@ -26,280 +26,179 @@ const codeTypes = [
     { value: "CUSTOM", label: "Custom" },
 ];
 
-const API_URL = `${process.env.NEXT_PUBLIC_API_URL}/api/codes`;
+// Use Next.js rewrite proxy so we don't depend on env URL at runtime
+const API_URL = `/api/codes`;
 
-// 👇 safe JSON parser
-async function safeJson(res: Response) {
-    try {
-        const text = await res.text();
-        return text ? JSON.parse(text) : null;
-    } catch {
-        return null;
-    }
-}
 
-export default function CodesPage({
-                                      patientId,
-                                      encounterId,
-                                  }: {
-    patientId?: string | number;
-    encounterId?: string | number;
-}) {
+
+export default function CodesPage() {
     const [codes, setCodes] = useState<Code[]>([]);
-    const [form, setForm] = useState<Partial<Code>>({});
-    const [q, setQ] = useState("");
-    const [selectedType, setSelectedType] = useState<string>("");
+    const [selected, setSelected] = useState<Partial<Code> | null>(null);
+    const [showCreate, setShowCreate] = useState(false);
+    const [showEdit, setShowEdit] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    const orgId =
-        typeof window !== "undefined" ? localStorage.getItem("orgId") : null;
+    // UI input values
+    const [q, setQ] = useState<string>(() =>
+        typeof window !== "undefined" ? localStorage.getItem("codes_q") || "" : ""
+    );
+    const [selectedType, setSelectedType] = useState<string>(() =>
+        typeof window !== "undefined" ? localStorage.getItem("codes_type") || "" : ""
+    );
 
-    // ✅ Load Codes
-    const loadCodes = useCallback(async () => {
+    // Actual applied filters (used for fetching)
+    const [searchText, setSearchText] = useState<string>(() =>
+        typeof window !== "undefined" ? localStorage.getItem("codes_q") || "" : ""
+    );
+    const [filter, setFilter] = useState<string>(() =>
+        typeof window !== "undefined" ? localStorage.getItem("codes_type") || "" : ""
+    );
+
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
+
+    // Org identifier used by backend; validate numeric and build per-request headers
+    const rawOrgId = typeof window !== "undefined" ? localStorage.getItem("orgId") : null;
+    const orgId = rawOrgId && /^\d+$/.test(rawOrgId) ? rawOrgId : null;
+    const makeHeaders = useCallback((): HeadersInit => {
+        if (!orgId) return {};
+        const facilityId = typeof window !== "undefined" ? localStorage.getItem("facilityId") : null;
+        const role = typeof window !== "undefined" ? localStorage.getItem("role") : null;
+        const h: Record<string, string> = { orgId };
+        if (facilityId) { h["facilityId"] = facilityId; }
+        if (role) { h["role"] = role; }
+        return h;
+    }, [orgId]);
+
+    const loadCodes = useCallback(async (qOverride?: string, typeOverride?: string) => {
         if (!orgId) {
-            console.warn("Missing orgId in localStorage");
+            setCodes([]);
+            setError("Missing orgId. Please sign in again.");
             return;
         }
-        if (!patientId || !encounterId) {
-            console.warn("Missing patientId or encounterId");
-            return;
-        }
-
         try {
-            const url = q
-                ? `${API_URL}/${patientId}/${encounterId}/search?q=${encodeURIComponent(
-                    q
-                )}&codeType=${selectedType || ""}`
-                : `${API_URL}/${patientId}/${encounterId}`;
-
-            const res = await fetchWithAuth(url);
-            const json = await safeJson(res);
-
-            if (res.ok && json) {
-                setCodes(json.data || []);
+            setError(null);
+            let url = API_URL;
+            const qText = qOverride ?? searchText;
+            const fText = typeOverride ?? filter;
+            if (qText || fText) {
+                const params = new URLSearchParams();
+                if (qText) params.append("q", qText);
+                if (fText) params.append("codeType", fText);
+                url = `${API_URL}/search?${params.toString()}`;
+            }
+            const reqHeaders: HeadersInit = makeHeaders();
+            const res = await fetchWithAuth(url, { headers: reqHeaders });
+            const body = await res.text();
+            type ApiResponse = { data?: Code[]; message?: string; error?: string };
+            let parsed: ApiResponse | null = null;
+            try { parsed = body ? (JSON.parse(body) as ApiResponse) : null; } catch {}
+            if (res.ok && parsed) {
+                setCodes(parsed.data || []);
+                setPage(1);
             } else {
-                console.error("Failed to load codes:", json);
+                const msg = (parsed && (parsed.message || parsed.error)) || body || `Failed to load codes (status ${res.status})`;
+                setCodes([]);
+                setError(msg);
+                console.error("/api/codes error", { status: res.status, body });
             }
         } catch (err) {
             console.error("Error loading codes:", err);
+            setError("Unexpected error while loading codes");
         }
-    }, [orgId, patientId, encounterId, q, selectedType]);
+    }, [orgId, searchText, filter, makeHeaders]);
 
-    // ✅ Save Code
-    const saveCode = async () => {
-        if (!orgId) {
-            console.error("Missing orgId in localStorage. Cannot save.");
-            return;
+    // Do not auto-load on mount; user will click Search
+
+    // Run search only when button clicked
+    const runSearch = () => {
+        setSearchText(q);
+        setFilter(selectedType);
+        if (typeof window !== "undefined") {
+            localStorage.setItem("codes_q", q);
+            localStorage.setItem("codes_type", selectedType);
         }
-        if (!patientId || !encounterId) {
-            console.error("Missing patientId/encounterId. Cannot save.");
-            return;
-        }
-
-        try {
-            let res: Response;
-
-            if (form.id) {
-                res = await fetchWithAuth(
-                    `${API_URL}/${patientId}/${encounterId}/${form.id}`,
-                    {
-                        method: "PUT",
-                        body: JSON.stringify(form),
-                    }
-                );
-            } else {
-                res = await fetchWithAuth(`${API_URL}/${patientId}/${encounterId}`, {
-                    method: "POST",
-                    body: JSON.stringify(form),
-                });
-            }
-
-            const json = await safeJson(res);
-            if (res.ok) {
-                await loadCodes(); // always refresh from backend
-            } else {
-                console.error("Save failed:", json);
-            }
-        } catch (err) {
-            console.error("Error saving code:", err);
-        }
-
-        setForm({});
+        // Trigger fetch explicitly on search click using current inputs
+        loadCodes(q, selectedType);
     };
 
-    // ✅ Delete Code
+    const [toast, setToast] = useState<null | { message: string; kind?: "success" | "error" }>(null);
+    const showToast = (message: string, kind: "success" | "error" = "success") => {
+        setToast({ message, kind });
+        // Auto-hide after 2.5s
+        window.setTimeout(() => setToast(null), 2500);
+    };
+
+    const saveCode = async (form: Partial<Code>) => {
+        if (!form.code || !form.codeType) return;
+        let res: Response;
+        const reqHeaders: HeadersInit = makeHeaders();
+        if (form.id) {
+            res = await fetchWithAuth(`${API_URL}/${form.id}`, {
+                method: "PUT",
+                headers: reqHeaders,
+                body: JSON.stringify(form),
+            });
+        } else {
+            res = await fetchWithAuth(API_URL, {
+                method: "POST",
+                headers: reqHeaders,
+                body: JSON.stringify(form),
+            });
+        }
+        if (res.ok) {
+            await loadCodes();
+            setShowCreate(false);
+            setShowEdit(false);
+            showToast("Saved successfully", "success");
+        } else {
+            showToast("Save failed", "error");
+        }
+    };
+
     const deleteCode = async (id: number) => {
-        if (!patientId || !encounterId) {
-            console.error("Missing patientId/encounterId. Cannot delete.");
-            return;
-        }
-        try {
-            const res = await fetchWithAuth(
-                `${API_URL}/${patientId}/${encounterId}/${id}`,
-                { method: "DELETE" }
-            );
-            if (res.ok) {
-                await loadCodes();
-            } else {
-                console.error("Delete failed");
-            }
-        } catch (err) {
-            console.error("Error deleting code:", err);
+        const reqHeaders: HeadersInit = makeHeaders();
+        const res = await fetchWithAuth(`${API_URL}/${id}`, {
+            method: "DELETE",
+            headers: reqHeaders,
+        });
+        if (res.ok) {
+            await loadCodes();
+            showToast("Deleted successfully", "success");
+        } else {
+            showToast("Delete failed", "error");
         }
     };
 
-    // ✅ Load on mount and when filters change
-    useEffect(() => {
-        loadCodes();
-    }, [loadCodes]);
-
-    // 👇 Render fallback if no IDs
-    if (!patientId || !encounterId) {
-        return (
-            <div className="p-6">
-                ⚠️ Please provide <code>patientId</code> and <code>encounterId</code>
-            </div>
-        );
-    }
+    const startIndex = (page - 1) * pageSize;
+    const paginated = codes.slice(startIndex, startIndex + pageSize);
+    const totalPages = Math.ceil(codes.length / pageSize);
 
     return (
-        <div className="p-6 space-y-6">
-            <h2 className="text-xl font-semibold">Code Management</h2>
-
-            {/* Form */}
-            <div className="border rounded-lg p-4 bg-white shadow-sm space-y-4">
-                <h3 className="font-medium">
-                    {form.id ? "Update Code" : "Add New Code"}
-                </h3>
-                <div className="grid grid-cols-5 gap-4">
-                    <select
-                        value={form.codeType || ""}
-                        onChange={(e) => setForm({ ...form, codeType: e.target.value })}
-                        className="border rounded px-2 py-2 text-sm"
-                    >
-                        <option value="">Select Type</option>
-                        {codeTypes.map((t) => (
-                            <option key={t.value} value={t.value}>
-                                {t.label}
-                            </option>
-                        ))}
-                    </select>
-                    <input
-                        value={form.code || ""}
-                        onChange={(e) => setForm({ ...form, code: e.target.value })}
-                        placeholder="Code"
-                        className="border rounded px-2 py-2 text-sm"
-                    />
-                    <input
-                        value={form.modifier || ""}
-                        onChange={(e) => setForm({ ...form, modifier: e.target.value })}
-                        placeholder="Modifier"
-                        className="border rounded px-2 py-2 text-sm"
-                    />
-                    <label className="flex items-center gap-2">
-                        <input
-                            type="checkbox"
-                            checked={form.active || false}
-                            onChange={(e) =>
-                                setForm({ ...form, active: e.target.checked })
-                            }
-                        />
-                        Active
-                    </label>
+        <div className="p-6 space-y-6 font-sans">
+            {/* Toast */}
+            {toast && (
+                <div
+                    className={`fixed top-4 right-4 z-50 px-4 py-2 rounded shadow text-sm ${
+                        toast.kind === "success"
+                            ? "bg-green-600 text-white"
+                            : "bg-red-600 text-white"
+                    }`}
+                >
+                    {toast.message}
                 </div>
+            )}
+            {/* Header */}
+            {/*<h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">*/}
+            {/*    Codes*/}
+            {/*</h2>*/}
 
-                <div className="grid grid-cols-3 gap-4">
-                    <input
-                        value={form.description || ""}
-                        onChange={(e) => setForm({ ...form, description: e.target.value })}
-                        placeholder="Description"
-                        className="border rounded px-2 py-2 text-sm col-span-2"
-                    />
-                    <input
-                        value={form.shortDescription || ""}
-                        onChange={(e) =>
-                            setForm({ ...form, shortDescription: e.target.value })
-                        }
-                        placeholder="Short Description"
-                        className="border rounded px-2 py-2 text-sm"
-                    />
-                </div>
-
-                <div className="grid grid-cols-4 gap-4">
-                    <input
-                        value={form.category || ""}
-                        onChange={(e) => setForm({ ...form, category: e.target.value })}
-                        placeholder="Category"
-                        className="border rounded px-2 py-2 text-sm"
-                    />
-                    <label className="flex items-center gap-2">
-                        <input
-                            type="checkbox"
-                            checked={form.diagnosisReporting || false}
-                            onChange={(e) =>
-                                setForm({ ...form, diagnosisReporting: e.target.checked })
-                            }
-                        />
-                        Diagnosis Reporting
-                    </label>
-                    <label className="flex items-center gap-2">
-                        <input
-                            type="checkbox"
-                            checked={form.serviceReporting || false}
-                            onChange={(e) =>
-                                setForm({ ...form, serviceReporting: e.target.checked })
-                            }
-                        />
-                        Service Reporting
-                    </label>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                    <input
-                        value={form.relateTo || ""}
-                        onChange={(e) => setForm({ ...form, relateTo: e.target.value })}
-                        placeholder="Relate To"
-                        className="border rounded px-2 py-2 text-sm"
-                    />
-                    <input
-                        type="number"
-                        value={form.feeStandard ?? ""}
-                        onChange={(e) =>
-                            setForm({
-                                ...form,
-                                feeStandard: e.target.value
-                                    ? parseFloat(e.target.value)
-                                    : undefined,
-                            })
-                        }
-                        placeholder="Fee Standard"
-                        className="border rounded px-2 py-2 text-sm"
-                    />
-                </div>
-
-                <div className="flex justify-end gap-2 mt-4">
-                    {form.id && (
-                        <button
-                            onClick={() => setForm({})}
-                            className="bg-gray-400 text-white px-4 py-2 rounded"
-                        >
-                            Cancel
-                        </button>
-                    )}
-                    <button
-                        onClick={saveCode}
-                        className="bg-green-600 text-white px-4 py-2 rounded"
-                    >
-                        {form.id ? "Update" : "Add New"}
-                    </button>
-                </div>
-            </div>
-
-            {/* Search */}
+            {/* Search + Add New */}
             <div className="flex items-center gap-4">
                 <select
                     value={selectedType}
                     onChange={(e) => setSelectedType(e.target.value)}
-                    className="border rounded px-2 py-2 text-sm w-60"
+                    className="border rounded px-2 py-2 text-sm w-60 bg-white dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600"
                 >
                     <option value="">All Types</option>
                     {codeTypes.map((t) => (
@@ -314,73 +213,134 @@ export default function CodesPage({
                         value={q}
                         onChange={(e) => setQ(e.target.value)}
                         placeholder="Search..."
-                        className="border rounded px-3 py-2 w-80"
+                        className="border rounded px-3 py-2 w-80 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600"
                     />
                     <button
-                        onClick={loadCodes}
-                        className="bg-blue-600 text-white px-4 py-2 rounded"
+                        onClick={runSearch}
+                        className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
                     >
                         Search
                     </button>
                 </div>
+
+                <button
+                    onClick={() => setShowCreate(true)}
+                    className="ml-auto bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
+                >
+                    + Add New
+                </button>
             </div>
 
+            {/* Error */}
+            {error && (
+                <div className="p-3 rounded bg-red-50 text-red-700 border border-red-200 text-sm">
+                    {error}
+                </div>
+            )}
+
             {/* Table */}
-            <div className="border rounded-lg overflow-hidden bg-white shadow-sm">
+            <div className="border rounded-lg bg-white dark:bg-gray-800 shadow-sm overflow-hidden">
                 <table className="w-full text-sm">
-                    <thead className="bg-gray-100">
+                    <thead className="bg-gray-100 dark:bg-gray-700">
                     <tr>
-                        <th className="px-2 py-2">Code</th>
-                        <th className="px-2 py-2">Mod</th>
-                        <th className="px-2 py-2">Act</th>
-                        <th className="px-2 py-2">Category</th>
-                        <th className="px-2 py-2">Dx Rep</th>
-                        <th className="px-2 py-2">Serv Rep</th>
-                        <th className="px-2 py-2">Type</th>
-                        <th className="px-2 py-2">Description</th>
-                        <th className="px-2 py-2">Short Desc</th>
-                        <th className="px-2 py-2">Related</th>
-                        <th className="px-2 py-2">Fee</th>
-                        <th className="px-2 py-2 text-right">Actions</th>
+                        {[
+                            "Code",
+                            "Type",
+                            "Modifier",
+                            "Category",
+                            "Description",
+                            "Short Desc",
+                            "Relate To",
+                            "Active",
+                            "Dx Rep",
+                            "Serv Rep",
+                            "Fee",
+                            "Actions",
+                        ].map((h) => (
+                            <th
+                                key={h}
+                                className={`px-3 py-3 text-sm font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wide
+                    ${
+                                    h === "Fee"
+                                        ? "text-right"
+                                        : h === "Actions" ||
+                                        h === "Active" ||
+                                        h === "Dx Rep" ||
+                                        h === "Serv Rep"
+                                            ? "text-center"
+                                            : "text-left"
+                                }`}
+                            >
+                                {h}
+                            </th>
+                        ))}
                     </tr>
                     </thead>
                     <tbody>
-                    {codes.length === 0 ? (
+                    {paginated.length === 0 ? (
                         <tr>
-                            <td colSpan={12} className="text-center py-4">
+                            <td
+                                colSpan={12}
+                                className="text-center py-4 text-gray-500 dark:text-gray-400 text-sm"
+                            >
                                 No codes found.
                             </td>
                         </tr>
                     ) : (
-                        codes.map((c) => (
-                            <tr key={c.id} className="border-t">
-                                <td className="px-2 py-2">{c.code}</td>
-                                <td className="px-2 py-2">{c.modifier}</td>
-                                <td className="px-2 py-2">{c.active ? "Y" : "N"}</td>
-                                <td className="px-2 py-2">{c.category}</td>
-                                <td className="px-2 py-2">
+                        paginated.map((c) => (
+                            <tr
+                                key={c.id}
+                                className="border-t hover:bg-gray-50 dark:hover:bg-gray-700"
+                            >
+                                <td className="px-3 py-2 text-gray-900 dark:text-gray-100">
+                                    {c.code}
+                                </td>
+                                <td className="px-3 py-2">{c.codeType}</td>
+                                <td className="px-3 py-2">{c.modifier}</td>
+                                <td className="px-3 py-2">{c.category}</td>
+                                <td
+                                    className="px-3 py-2 truncate max-w-[200px]"
+                                    title={c.description}
+                                >
+                                    {c.description}
+                                </td>
+                                <td className="px-3 py-2">{c.shortDescription}</td>
+                                <td className="px-3 py-2">{c.relateTo}</td>
+                                <td className="px-3 py-2 text-center">
+                                    {c.active ? (
+                                        <span className="inline-block bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-200 text-[11px] px-2 py-0.5 rounded-full font-semibold">
+                        Active
+                      </span>
+                                    ) : (
+                                        <span className="inline-block bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-200 text-[11px] px-2 py-0.5 rounded-full font-semibold">
+                        Inactive
+                      </span>
+                                    )}
+                                </td>
+                                <td className="px-3 py-2 text-center">
                                     {c.diagnosisReporting ? "Y" : "N"}
                                 </td>
-                                <td className="px-2 py-2">
+                                <td className="px-3 py-2 text-center">
                                     {c.serviceReporting ? "Y" : "N"}
                                 </td>
-                                <td className="px-2 py-2">{c.codeType}</td>
-                                <td className="px-2 py-2">{c.description}</td>
-                                <td className="px-2 py-2">{c.shortDescription}</td>
-                                <td className="px-2 py-2">{c.relateTo}</td>
-                                <td className="px-2 py-2">{c.feeStandard}</td>
-                                <td className="px-2 py-2 text-right space-x-2">
+                                <td className="px-3 py-2 text-right">{c.feeStandard}</td>
+                                <td className="px-3 py-2 text-center space-x-2">
                                     <button
-                                        onClick={() => setForm(c)}
-                                        className="px-2 py-1 bg-yellow-400 rounded"
+                                        onClick={() => {
+                                            setSelected(c);
+                                            setShowEdit(true);
+                                        }}
+                                        className="text-gray-500 hover:text-blue-600"
+                                        title="Edit"
                                     >
-                                        Edit
+                                        ✎
                                     </button>
                                     <button
                                         onClick={() => deleteCode(c.id)}
-                                        className="px-2 py-1 bg-red-500 text-white rounded"
+                                        className="text-gray-500 hover:text-red-600"
+                                        title="Delete"
                                     >
-                                        Del
+                                        🗑
                                     </button>
                                 </td>
                             </tr>
@@ -388,6 +348,263 @@ export default function CodesPage({
                     )}
                     </tbody>
                 </table>
+            </div>
+
+            {/* Pagination footer */}
+            <div className="flex justify-between items-center mt-3 text-sm text-gray-600 dark:text-gray-400">
+                <div className="flex items-center gap-2">
+                    <button
+                        disabled={page === 1}
+                        onClick={() => setPage((p) => p - 1)}
+                        className="px-3 py-1 border rounded disabled:opacity-50 dark:border-gray-600"
+                    >
+                        Prev
+                    </button>
+                    <span>
+            Page {page} of {totalPages || 1}
+          </span>
+                    <button
+                        disabled={page === totalPages}
+                        onClick={() => setPage((p) => p + 1)}
+                        className="px-3 py-1 border rounded disabled:opacity-50 dark:border-gray-600"
+                    >
+                        Next
+                    </button>
+                </div>
+
+                <div className="ml-auto flex items-center gap-3">
+                    <div>
+                        Showing {paginated.length} of {codes.length}
+                    </div>
+                    <select
+                        value={pageSize}
+                        onChange={(e) => {
+                            setPageSize(Number(e.target.value));
+                            setPage(1);
+                        }}
+                        className="border rounded px-2 py-1 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600"
+                    >
+                        {[10, 20, 50].map((size) => (
+                            <option key={size} value={size}>
+                                {size}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            </div>
+
+            {/* Create Modal */}
+            {showCreate && (
+                <CodeModal
+                    title="Create Code"
+                    onClose={() => setShowCreate(false)}
+                    onSave={saveCode}
+                />
+            )}
+
+            {/* Edit Modal */}
+            {showEdit && selected && (
+                <CodeModal
+                    title="Edit Code"
+                    initialData={selected}
+                    onClose={() => setShowEdit(false)}
+                    onSave={saveCode}
+                />
+            )}
+        </div>
+    );
+}
+
+/* ---------------- Modal ---------------- */
+function CodeModal({
+                       title,
+                       initialData,
+                       onClose,
+                       onSave,
+                   }: {
+    title: string;
+    initialData?: Partial<Code>;
+    onClose: () => void;
+    onSave: (data: Partial<Code>) => void;
+}) {
+    const [form, setForm] = useState<Partial<Code>>(initialData || { active: true });
+
+    return (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
+            <div className="bg-white dark:bg-gray-900 rounded-lg w-[650px] p-6 space-y-4">
+                <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
+                        {title}
+                    </h3>
+                    <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+                        ✕
+                    </button>
+                </div>
+                <p className="text-gray-500 dark:text-gray-400 text-sm">
+                    Fill out the code details below.
+                </p>
+
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                    {/* Code and Type */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                            Code *
+                        </label>
+                        <input
+                            value={form.code || ""}
+                            onChange={(e) => setForm({ ...form, code: e.target.value })}
+                            placeholder="e.g. I10"
+                            className="w-full border rounded px-3 py-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                            Type *
+                        </label>
+                        <select
+                            value={form.codeType || ""}
+                            onChange={(e) => setForm({ ...form, codeType: e.target.value })}
+                            className="w-full border rounded px-3 py-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600"
+                        >
+                            <option value="">Select Type</option>
+                            {codeTypes.map((t) => (
+                                <option key={t.value} value={t.value}>
+                                    {t.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Modifier and Category */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                            Modifier
+                        </label>
+                        <input
+                            value={form.modifier || ""}
+                            onChange={(e) => setForm({ ...form, modifier: e.target.value })}
+                            placeholder="Modifier"
+                            className="w-full border rounded px-3 py-2 bg-white dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                            Category
+                        </label>
+                        <input
+                            value={form.category || ""}
+                            onChange={(e) => setForm({ ...form, category: e.target.value })}
+                            placeholder="Category"
+                            className="w-full border rounded px-3 py-2 bg-white dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600"
+                        />
+                    </div>
+
+                    {/* Descriptions */}
+                    <div className="col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                            Description
+                        </label>
+                        <input
+                            value={form.description || ""}
+                            onChange={(e) => setForm({ ...form, description: e.target.value })}
+                            placeholder="Full description"
+                            className="w-full border rounded px-3 py-2 bg-white dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600"
+                        />
+                    </div>
+                    <div className="col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                            Short Description
+                        </label>
+                        <input
+                            value={form.shortDescription || ""}
+                            onChange={(e) =>
+                                setForm({ ...form, shortDescription: e.target.value })
+                            }
+                            placeholder="Short description"
+                            className="w-full border rounded px-3 py-2 bg-white dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600"
+                        />
+                    </div>
+
+                    {/* RelateTo and Fee */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                            Relate To
+                        </label>
+                        <input
+                            value={form.relateTo || ""}
+                            onChange={(e) => setForm({ ...form, relateTo: e.target.value })}
+                            placeholder="Relate To"
+                            className="w-full border rounded px-3 py-2 bg-white dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                            Fee Standard
+                        </label>
+                        <input
+                            type="number"
+                            value={form.feeStandard ?? ""}
+                            onChange={(e) =>
+                                setForm({
+                                    ...form,
+                                    feeStandard: e.target.value
+                                        ? parseFloat(e.target.value)
+                                        : undefined,
+                                })
+                            }
+                            placeholder="Fee"
+                            className="w-full border rounded px-3 py-2 bg-white dark:bg-gray-800 dark:text-gray-100 dark:border-gray-600"
+                        />
+                    </div>
+
+                    {/* Checkboxes */}
+                    <div className="col-span-2 flex flex-wrap gap-6 mt-2">
+                        <label className="flex items-center gap-2 text-gray-700 dark:text-gray-200">
+                            <input
+                                type="checkbox"
+                                checked={form.active || false}
+                                onChange={(e) => setForm({ ...form, active: e.target.checked })}
+                            />
+                            Active
+                        </label>
+                        <label className="flex items-center gap-2 text-gray-700 dark:text-gray-200">
+                            <input
+                                type="checkbox"
+                                checked={form.diagnosisReporting || false}
+                                onChange={(e) =>
+                                    setForm({ ...form, diagnosisReporting: e.target.checked })
+                                }
+                            />
+                            Diagnosis Reporting
+                        </label>
+                        <label className="flex items-center gap-2 text-gray-700 dark:text-gray-200">
+                            <input
+                                type="checkbox"
+                                checked={form.serviceReporting || false}
+                                onChange={(e) =>
+                                    setForm({ ...form, serviceReporting: e.target.checked })
+                                }
+                            />
+                            Service Reporting
+                        </label>
+                    </div>
+                </div>
+
+                {/* Buttons */}
+                <div className="flex justify-end gap-2 mt-4">
+                    <button
+                        onClick={onClose}
+                        className="px-4 py-2 rounded bg-gray-300 dark:bg-gray-700 dark:text-gray-100 hover:bg-gray-400 dark:hover:bg-gray-600 text-sm"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={() => onSave(form)}
+                        className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 text-sm"
+                    >
+                        Save
+                    </button>
+                </div>
             </div>
         </div>
     );

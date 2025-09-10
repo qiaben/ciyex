@@ -6,6 +6,7 @@ import AppHeader from "@/layout/AppHeader";
 import AppSidebar from "@/layout/AppSidebar";
 import Backdrop from "@/layout/Backdrop";
 import { usePathname } from "next/navigation";
+import AppointmentModal from "@/components/calendar/AppointmentModal";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
     const { isExpanded, isHovered, isMobileOpen } = useSidebar();
@@ -17,20 +18,31 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         "/patients": "Patients",
         "/calendar": "Calendar",
         "/profile": "User Profile",
+        "/appointments": "Appointments",
+
+        // Settings and subroutes
         "/settings/providers": "Providers",
         "/settings/forms/lists": "Forms",
-        "/settings/forms/admin": "Form Admin",
-        "/settings/insurance": "Insurance Companies", // ✅ added
+        "/settings/forms/admin": "Encounter Sections",
+        "/settings/forms/config": "Configuration Settings",
+        "/settings/insurance": "Insurance Companies",
+        "/settings/codes": "Codes",
         "/settings": "Settings",
-        "/appointments": "Appointments",
-        "/recall":"Recall"
+        "/recall":"Recall",
+        "/inventory-management": "Inventory Dashboard",
+        "/inventory-management/inventory": "Inventory Management",
+        "/inventory-management/orders": "Inventory Orders",
+        "/inventory-management/records":"Inventory Records",
+        "/inventory-management/suppliers":"Inventory Suppliers",
+        "/inventory-management/maintenance":"Inventory Maintenance",
+        "/inventory-management/settings":"Inventory Settings",
     };
 
+    // Pick the longest matching key (so /settings/codes wins over /settings)
     const pageTitle =
         Object.entries(mapping)
             .filter(([key]) => pathname.startsWith(key))
             .sort((a, b) => b[0].length - a[0].length)[0]?.[1] || "";
-
 
     const mainContentMargin = isMobileOpen
         ? "ml-0"
@@ -47,12 +59,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <div className={`flex-1 transition-all duration-300 ease-in-out ${mainContentMargin}`}>
                 <AppHeader pageTitle={pageTitle} />
 
-                {/* Content area picks up theme automatically; children can use their own cards*/}
+                {/* Content area picks up theme automatically; children can use their own cards */}
                 <div className="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">
                     {/* ✅ Force remount of child on route change */}
-                    <div key={pathname} className="transition-colors duration-300">{children}</div>
+                    <div key={pathname} className="transition-colors duration-300">
+                        {children}
+                    </div>
                 </div>
             </div>
+
+            {/* ✅ Global Appointment Modal is always mounted */}
+            <AppointmentModal />
         </div>
     );
 }

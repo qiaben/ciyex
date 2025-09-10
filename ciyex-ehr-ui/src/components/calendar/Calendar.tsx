@@ -322,6 +322,7 @@ const Calendar: React.FC = () => {
     }, [alertData]);
 
 
+
     // Removed Title — auto-generate from Visit Type + Patient
     const [visitType, setVisitType] = useState<string>('Consultation');
 
@@ -1159,32 +1160,6 @@ const Calendar: React.FC = () => {
                         })}
                     </div>
                 </div>
-
-                {/* Right side: Create Appointment */}
-                <span className="ml-4">
-                <button
-                    onClick={() => {
-                        resetModalFields();
-                        setAppointmentLocationId(location === 'all' ? '' : location);
-                        openModal();
-                    }}
-                    type="button"
-                    aria-label="Create Appointment"
-                    className="flex items-center rounded-lg bg-brand-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-brand-600"
-                >
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-5 w-5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                    >
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                    </svg>
-                    create
-                </button>
-                </span>
             </div>
 
             {/* Calendar */}
