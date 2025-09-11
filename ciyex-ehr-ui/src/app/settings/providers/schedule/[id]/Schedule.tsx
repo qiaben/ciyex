@@ -356,9 +356,7 @@ const Page = () => {
                 {/* Header */}
                 <div className="mb-6 flex items-center justify-between">
                     <div>
-                        <h2 className="text-3xl font-normal text-slate-900 dark:text-slate-100">
-                            Provider Schedule
-                        </h2>
+
                         <p className="text-sm text-slate-500 dark:text-slate-400">
                             {loading
                                 ? "Loading provider…"
