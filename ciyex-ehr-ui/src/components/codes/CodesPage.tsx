@@ -27,8 +27,12 @@ const codeTypes = [
 ];
 
 // Use Next.js rewrite proxy so we don't depend on env URL at runtime
-const API_URL = `/api/codes`;
+// Always call the app-relative endpoint; next.config.ts rewrites /api/*
+// to the real backend using NEXT_PUBLIC_API_URL. Do not set a full host here.
+const API_URL = `${process.env.NEXT_PUBLIC_API_URL}/api/codes`;
 
+ 
+ 
 
 
 export default function CodesPage() {
