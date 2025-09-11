@@ -285,7 +285,6 @@ export default function AppointmentPage() {
             <div className="container mx-auto p-6 overflow-x-hidden text-gray-800 dark:text-gray-200">
                 {/* Heading */}
                 <div className="flex items-center justify-between mb-4">
-                    <h1 className="text-3xl font-semibold">Flow Board</h1>
                     <div className="text-sm">
                         <span className="italic font-semibold">Total appointments:</span>{" "}
                         {loadingAppointments ? "…" : total}

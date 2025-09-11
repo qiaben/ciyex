@@ -247,8 +247,8 @@ export default function RecallPage() {
     // Default date range: last 6 months
     useEffect(() => {
         const today = new Date();
-        const lastMonth = new Date(today);
-        lastMonth.setMonth(today.getMonth() - 1);
+        const yesterday = new Date(today);
+        yesterday.setDate(today.getDate() - 1);
 
         const formatDate = (date: Date): string => {
             const year = date.getFullYear();
@@ -257,9 +257,10 @@ export default function RecallPage() {
             return `${month}/${day}/${year}`;
         };
 
-        setFrom(formatDate(lastMonth));
+        setFrom(formatDate(yesterday));
         setTo(formatDate(today));
     }, []);
+
 
 
     // Load recalls (no pagination)
@@ -536,7 +537,6 @@ export default function RecallPage() {
                     </div>
                 )}
                 <div className="flex items-center justify-between mb-4">
-                    <h1 className="text-3xl font-semibold">Recall Board</h1>
                     <div className="text-sm">
                         <span className="italic font-semibold">Total recalls:</span> {loading ? "…" : total}
                     </div>

@@ -18,7 +18,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL!;
 type InventoryItem = {
     id: string;
     name: string;
-    category: "Consumable" | "Device";
+    category: string;  // <-- allow dynamic values from backend
     lot?: string;
     expiry?: string; // ISO
     sku: string;
@@ -28,27 +28,35 @@ type InventoryItem = {
     location: string;
     status: "Active" | "Inactive";
 };
-
+type ListOption = {
+    id: string | number;
+    title: string;
+};
 /** Helpers */
-const dateLabel = (iso?: string) => (iso && iso.trim().length ? iso : "—");
+const dateLabel = (iso?: string) => {
+    if (!iso || !iso.trim()) return "—";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso; // fallback if invalid
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    const yyyy = d.getFullYear();
+    return `${mm}/${dd}/${yyyy}`;
+};
 
 /** UI primitives */
 function TableShell({ children }: { children: React.ReactNode }) {
     return <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-md dark:border-gray-700 dark:bg-gray-900">{children}</div>;
 }
 
-function Panel({ title, children, className = "" }: { title?: string; children: React.ReactNode; className?: string }) {
-    return (
-        <div className={`rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:shadow-none ${className}`}>
-            {title && (
-                <div className="border-b border-slate-200 px-4 py-3 dark:border-slate-700">
-                    <h3 className="text-sm font-medium text-slate-600 dark:text-slate-300">{title}</h3>
-                </div>
-            )}
-            <div className="p-4">{children}</div>
-        </div>
-    );
+function formatDateForInput(iso?: string) {
+    if (!iso) return "";
+    const d = new Date(iso);
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    const yyyy = d.getFullYear();
+    return `${mm}/${dd}/${yyyy}`;
 }
+
 
 function Pill({ children, tone = "neutral" as const }: { children: React.ReactNode; tone?: "neutral" | "warn" | "ok" | "danger" }) {
     const map: Record<string, string> = {
@@ -87,6 +95,11 @@ export default function Inventory() {
     const [loading, setLoading] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<InventoryItem | null>(null);
 
+    const [typeOptions, setTypeOptions] = useState<{ id: string; label: string }[]>([]);
+    const [reorderMode, setReorderMode] = useState(false);
+
+
+
 
     // ✅ Alert state
     const [alertData, setAlertData] = useState<{
@@ -102,6 +115,26 @@ export default function Inventory() {
             return () => clearTimeout(timer);
         }
     }, [alertData]);
+
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await fetchWithAuth(`${API_URL}/api/list-options/list/inventory_type`);
+                const json = await res.json();
+                if (res.ok && Array.isArray(json)) {
+                    setTypeOptions(
+                        (json as ListOption[]).map(opt => ({
+                            id: String(opt.id),
+                            label: opt.title   // use title instead of value/name
+                        }))
+                    );
+                }
+            } catch (err) {
+                console.error("Failed to load type options:", err);
+            }
+        })();
+    }, []);
 
 
 
@@ -290,6 +323,62 @@ export default function Inventory() {
         }
     }
 
+    async function reorderItem(
+        id: string,
+        payload: { supplier: string; stock: number }
+    ) {
+        try {
+            const today = new Date().toISOString().split("T")[0]; // yyyy-mm-dd
+            const res = await fetchWithAuth(`${API_URL}/api/inventory/${id}/reorder`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    supplier: payload.supplier,
+                    stock: payload.stock,            // ✅ make sure backend sees correct field
+                    itemName: selected?.name,        // ✅ backend expects itemName
+                    category: selected?.category,    // ✅ include category for context
+                    status: "Pending",
+                    date: today,
+                    amount: 0,                       // backend expects amount field in OrderDto
+                }),
+            });
+
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.message || "Failed to reorder");
+
+            const order = json.data;
+
+            // ✅ Close modal
+            setSelected(null);
+            setReorderMode(false);
+
+            // ✅ Refresh inventory list
+            const refreshed = await fetchWithAuth(`${API_URL}/api/inventory/list`);
+            const refreshedJson = await refreshed.json();
+            if (refreshed.ok && refreshedJson.success) {
+                setInventory(refreshedJson.data);
+            }
+
+            // ✅ Success alert
+            setAlertData({
+                variant: "success",
+                title: "Reorder Placed",
+                message: `Order ${order.orderNumber} was created for ${order.supplier}.`,
+            });
+        } catch (err) {
+            console.error("Reorder failed:", err);
+            setAlertData({
+                variant: "error",
+                title: "Error",
+                message: "Failed to place reorder.",
+            });
+        }
+    }
+
+
+
+
+
     async function deleteItem(id: string) {
         if (!confirm("Are you sure you want to delete this item?")) {
             return;
@@ -349,8 +438,11 @@ export default function Inventory() {
                         className="h-9 w-48 rounded-md border border-slate-300 bg-white px-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                     >
                         <option value="All">All</option>
-                        <option value="Consumable">Consumable</option>
-                        <option value="Device">Device</option>
+                        {typeOptions.map(opt => (
+                            <option key={opt.id} value={opt.label}>
+                                {opt.label}
+                            </option>
+                        ))}
                     </select>
                 </div>
                 <div>
@@ -422,7 +514,26 @@ export default function Inventory() {
                                 <td className="px-6 py-3 text-gray-700 dark:text-gray-200">{dateLabel(i.expiry)}</td>
                                 <td className="px-6 py-3 text-right tabular-nums text-gray-700 dark:text-gray-200">{i.stock}</td>
                                 <td className="px-6 py-3 text-gray-700 dark:text-gray-200">{i.location}</td>
-                                <td className="px-6 py-3"><Pill tone={pillTone}>{pillText}</Pill>
+                                <td className="px-6 py-3">
+                                    <Pill
+                                        tone={
+                                            i.status === "Inactive"
+                                                ? "neutral"
+                                                : isExpired(i.expiry)
+                                                    ? "danger"
+                                                    : isExpiringSoon(i.expiry)
+                                                        ? "warn"
+                                                        : pillTone
+                                        }
+                                    >
+                                        {i.status === "Inactive"
+                                            ? "Inactive"
+                                            : isExpired(i.expiry)
+                                                ? "Expired"
+                                                : isExpiringSoon(i.expiry)
+                                                    ? "Expiring Soon"
+                                                    : pillText}
+                                    </Pill>
                                 </td>
                                 <td className="px-6 py-3 text-right">
                                     <Button
@@ -432,7 +543,7 @@ export default function Inventory() {
                                             setEditMode(false);   // ✅ reset editMode when opening
                                         }}
                                     >
-                                        Details
+                                        View
                                     </Button>
                                 </td>
                             </tr>
@@ -494,6 +605,8 @@ export default function Inventory() {
                                 onClick={() => {
                                     setSelected(null);
                                     setEditMode(false);
+                                    setReorderMode(false);   // ✅ reset reorder mode too
+
                                 }}
                                 className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                             >
@@ -501,206 +614,198 @@ export default function Inventory() {
                             </button>
                         </div>
 
-                        {/* Body */}
-                        <div className="p-6 max-h-[70vh] overflow-y-auto text-sm">
-                            {editMode ? (
-                                <form
-                                    onSubmit={(e) => {
-                                        e.preventDefault();
-                                        const form = new FormData(e.currentTarget);
-                                        editItem(selected!.id, {
-                                            name: String(form.get("name")),
-                                            category: form.get("category") as "Consumable" | "Device",
-                                            lot: String(form.get("lot") || ""),
-                                            expiry: String(form.get("expiry") || ""),
-                                            sku: String(form.get("sku") || ""),
-                                            stock: Number(form.get("stock") || 0),
-                                            unit: String(form.get("unit") || ""),
-                                            minStock: Number(form.get("minStock") || 0),
-                                            location: String(form.get("location") || ""),
-                                            status: form.get("status") as "Active" | "Inactive",
-                                        });
+                        {/* Body + Footer combined */}
+                        <form
+                            onSubmit={(e) => {
+                                e.preventDefault();
+                                const form = new FormData(e.currentTarget);
+
+                                if (reorderMode) {
+                                    // ✅ Reorder API call
+                                    reorderItem(selected!.id, {
+                                        supplier: String(form.get("supplier") || ""),
+                                        stock: Number(form.get("stock") || 0),
+                                    });
+                                } else {
+                                    // ✅ Edit API call
+                                    editItem(selected!.id, {
+                                        name: String(form.get("name")),
+                                        category: form.get("category") as "Consumable" | "Device",
+                                        lot: String(form.get("lot") || ""),
+                                        expiry: String(form.get("expiry") || ""),
+                                        sku: String(form.get("sku") || ""),
+                                        stock: Number(form.get("stock") || 0),
+                                        unit: String(form.get("unit") || ""),
+                                        minStock: Number(form.get("minStock") || 0),
+                                        location: String(form.get("location") || ""),
+                                        status: form.get("status") as "Active" | "Inactive",
+                                    });
+                                }
+                            }}
+                            className="flex flex-col max-h-[70vh]"
+                        >
+
+                        <div className="flex-1 overflow-y-auto p-6 text-sm">
+                                {editMode ? (
+                                    // ✅ Edit Form
+                                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                                        <div>
+                                            <Label>Name</Label>
+                                            <Input name="name" defaultValue={selected.name} className="h-10" />
+                                        </div>
+                                        <div>
+                                            <Label>Category</Label>
+                                            <select
+                                                name="category"
+                                                defaultValue={selected.category}
+                                                className="h-10 w-full rounded-md border px-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                                            >
+                                                <option value="Consumable">Consumable</option>
+                                                <option value="Device">Device</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <Label>Lot</Label>
+                                            <Input name="lot" defaultValue={selected?.lot || ""} className="h-10" />                                        </div>
+                                        <div>
+                                            <Label>Expiry</Label>
+                                            <Input
+                                                type="text"
+                                                name="expiry"
+                                                defaultValue={formatDateForInput(selected.expiry)}
+                                                placeholder="MM/DD/YYYY"
+                                                className="h-10"
+                                                maxLength={10}
+                                                onChange={(e) => {
+                                                    let v = e.target.value.replace(/\D/g, "");
+                                                    if (v.length > 2) v = v.slice(0, 2) + "/" + v.slice(2);
+                                                    if (v.length > 5) v = v.slice(0, 5) + "/" + v.slice(5, 9);
+                                                    e.target.value = v;
+                                                }}
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label>SKU</Label>
+                                            <Input name="sku" defaultValue={selected.sku} className="h-10" />
+                                        </div>
+                                        <div>
+                                            <Label>Stock</Label>
+                                            <Input type="number" name="stock" defaultValue={selected?.stock ?? 0} className="h-10" />
+                                        </div>
+                                        <div>
+                                            <Label>Unit</Label>
+                                            <Input name="unit" defaultValue={selected?.unit || ""} className="h-10" />                                        </div>
+                                        <div>
+                                            <Label>Min. Required</Label>
+                                            <Input type="number" name="minStock" defaultValue={selected?.minStock ?? 0} className="h-10" />
+                                        </div>
+                                        <div>
+                                            <Label>Clinic</Label>
+                                            <Input name="location" defaultValue={selected?.location || ""} className="h-10" />
+                                        </div>
+                                        <div>
+                                            <Label>Status</Label>
+                                            <select
+                                                name="status"
+                                                defaultValue={selected.status}
+                                                className="h-10 w-full rounded-md border px-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                                            >
+                                                <option value="Active">Active</option>
+                                                <option value="Inactive">Inactive</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                ) : reorderMode ? (
+                                    // ✅ Reorder Form
+                                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                                        <div>
+                                            <Label>Supplier</Label>
+                                            <Input name="supplier" placeholder="Enter supplier" required />
+                                        </div>
+                                        <div>
+                                            <Label>Item Name</Label>
+                                            <Input type="text" defaultValue={selected?.name || ""} readOnly />                                        </div>
+                                        <div>
+                                            <Label>Category</Label>
+                                            <Input type="text" defaultValue={selected?.category || ""} readOnly />                                        </div>
+                                        <div>
+                                            <Label>Stock Quantity</Label>
+                                            <Input
+                                                type="number"
+                                                name="stock"
+                                                min={1}
+                                                defaultValue={selected.stock}
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+                                ) : (
+                                    // ✅ Read-only Info view
+                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                        <Info label="Name" value={selected.name} />
+                                        <Info label="Category" value={selected.category} />
+                                        <Info label="Lot" value={selected.lot || "—"} />
+                                        <Info label="Expiry" value={dateLabel(selected.expiry)} />
+                                        <Info label="SKU" value={selected.sku} />
+                                        <Info label="Stock" value={selected.stock} />
+                                        <Info label="Unit" value={selected.unit} />
+                                        <Info label="Min. Required" value={String(selected.minStock)} />
+                                        <Info label="Clinic" value={selected.location} />
+                                        <Info label="Status" value={selected.status} />
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Footer */}
+                            <div className="flex justify-end gap-3 px-6 py-4 border-t dark:border-gray-700">
+                                <Button
+                                    type="button"
+                                    onClick={() => {
+                                        setSelected(null);
+                                        setEditMode(false);
+                                        setReorderMode(false);
                                     }}
-                                    className="grid grid-cols-1 gap-6 sm:grid-cols-2"
                                 >
-                                    <div>
-                                        <Label>Name</Label>
-                                        <Input name="name" defaultValue={selected.name} className="h-10" />
-                                    </div>
-                                    <div>
-                                        <Label>Category</Label>
-                                        <select
-                                            name="category"
-                                            defaultValue={selected.category}
-                                            className="h-10 w-full rounded-md border px-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                                        >
-                                            <option value="Consumable">Consumable</option>
-                                            <option value="Device">Device</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <Label>Lot</Label>
-                                        <Input name="lot" defaultValue={selected.lot} className="h-10" />
-                                    </div>
-                                    <div>
-                                        <Label>Expiry</Label>
-                                        <Input type="date" name="expiry" defaultValue={selected.expiry} className="h-10" />
-                                    </div>
-                                    <div>
-                                        <Label>SKU</Label>
-                                        <Input name="sku" defaultValue={selected.sku} className="h-10" />
-                                    </div>
-                                    <div>
-                                        <Label>Stock</Label>
-                                        <Input type="number" name="stock" defaultValue={selected.stock} className="h-10" />
-                                    </div>
-                                    <div>
-                                        <Label>Unit</Label>
-                                        <Input name="unit" defaultValue={selected.unit} className="h-10" />
-                                    </div>
-                                    <div>
-                                        <Label>Min. Required</Label>
-                                        <Input type="number" name="minStock" defaultValue={selected.minStock} className="h-10" />
-                                    </div>
-                                    <div>
-                                        <Label>Clinic</Label>
-                                        <Input name="location" defaultValue={selected.location} className="h-10" />
-                                    </div>
-                                    <div>
-                                        <Label>Status</Label>
-                                        <select
-                                            name="status"
-                                            defaultValue={selected.status}
-                                            className="h-10 w-full rounded-md border px-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                                        >
-                                            <option value="Active">Active</option>
-                                            <option value="Inactive">Inactive</option>
-                                        </select>
-                                    </div>
+                                    Cancel
+                                </Button>
 
-                                    <div className="col-span-2 flex gap-2 mt-4">
-                                        <Button type="button" onClick={() => setEditMode(false)}>
-                                            Cancel
+                                {(editMode || reorderMode) && (
+                                    <Button
+                                        type="submit"
+                                        className="bg-blue-600 text-white hover:bg-blue-700"
+                                    >
+                                        {editMode ? "Save Changes" : "Place Reorder"}
+                                    </Button>
+                                )}
+
+                                {!editMode && !reorderMode && (
+                                    <>
+                                        <Button type="button" onClick={() => setEditMode(true)}>
+                                            Edit
                                         </Button>
-                                        <Button type="submit">Save Changes</Button>
-                                    </div>
-                                </form>
-                            ) : (
-                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                    <Info label="Name" value={selected.name} />
-                                    <Info label="Category" value={selected.category} />
-                                    <Info label="Lot" value={selected.lot || "—"} />
-                                    <Info label="Expiry" value={dateLabel(selected.expiry)} />
-                                    <Info label="SKU" value={selected.sku} />
-                                    <Info label="Stock" value={selected.stock} />
-                                    <Info label="Unit" value={selected.unit} />
-                                    <Info label="Min. Required" value={String(selected.minStock)} />
-                                    <Info label="Clinic" value={selected.location} />
-                                    <Info label="Status" value={selected.status} />
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Footer */}
-                        <div className="flex justify-end gap-3 px-6 py-4 border-t dark:border-gray-700">
-                            <Button
-                                onClick={() => {
-                                    setSelected(null);
-                                    setEditMode(false);   // ✅ reset editMode when closing
-                                }}
-                            >
-                                Close
-                            </Button>
-                            {!editMode && (
-                                <Button onClick={() => setEditMode(true)}>Edit</Button>
-                            )}
-                            <Button className="rounded-2xl">Create Reorder</Button>
-                            <Button
-                                className="rounded-2xl bg-rose-600 text-white hover:bg-rose-700"
-                                onClick={() => setDeleteTarget(selected)}
-                            >
-                                Delete
-                            </Button>
-                        </div>
+                                        <Button
+                                            type="button"
+                                            className="rounded-2xl bg-emerald-600 text-white hover:bg-emerald-700"
+                                            onClick={() => {
+                                                setReorderMode(true);
+                                                setEditMode(false);
+                                            }}
+                                        >
+                                            Reorder
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            className="rounded-2xl bg-rose-600 text-white hover:bg-rose-700"
+                                            onClick={() => setDeleteTarget(selected)}
+                                        >
+                                            Delete
+                                        </Button>
+                                    </>
+                                )}
+                            </div>
+                        </form>
                     </div>
                 </div>
-            )}
-
-
-
-            {/* Add form */}
-            {addOpen && (
-                <Panel title="Add Inventory Item">
-                    <form onSubmit={addItem} className="grid grid-cols-1 gap-6 sm:grid-cols-2 text-sm">
-                        <div>
-                            <Label className="dark:text-slate-300">Name</Label>
-                            <Input name="name" required className="h-10 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
-                        </div>
-                        <div>
-                            <Label className="dark:text-slate-300">Category</Label>
-                            <select
-                                name="category"
-                                defaultValue="Consumable"
-                                className="h-10 w-full rounded-md border border-slate-300 px-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                            >
-                                <option value="Consumable">Consumable</option>
-                                <option value="Device">Device</option>
-                            </select>
-                        </div>
-
-                        <div>
-                            <Label className="dark:text-slate-300">Lot</Label>
-                            <Input name="lot" placeholder="LOT- / SN-" className="h-10 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
-                        </div>
-                        <div>
-                            <Label className="dark:text-slate-300">Expiry</Label>
-                            <Input name="expiry" type="date" className="h-10 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
-                        </div>
-
-                        <div>
-                            <Label className="dark:text-slate-300">SKU</Label>
-                            <Input name="sku" required className="h-10 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
-                        </div>
-                        <div>
-                            <Label className="dark:text-slate-300">Unit</Label>
-                            <Input name="unit" placeholder="pcs / box / pair" required className="h-10 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
-                        </div>
-
-                        <div>
-                            <Label className="dark:text-slate-300">On Hand</Label>
-                            <Input name="stock" type="number" min={0} required className="h-10 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
-                        </div>
-                        <div>
-                            <Label className="dark:text-slate-300">Min. Required</Label>
-                            <Input name="minStock" type="number" min={0} required className="h-10 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
-                        </div>
-
-                        <div>
-                            <Label className="dark:text-slate-300">Clinic</Label>
-                            <Input name="location" placeholder="Main" className="h-10 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
-                        </div>
-                        <div>
-                            <Label className="dark:text-slate-300">Status</Label>
-                            <select
-                                name="status"
-                                defaultValue="Active"
-                                className="h-10 w-full rounded-md border border-slate-300 px-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-                            >
-                                <option value="Active">Active</option>
-                                <option value="Inactive">Inactive</option>
-                            </select>
-                        </div>
-
-                        <div className="col-span-2 flex items-center gap-2 mt-4">
-                            <Button type="button" onClick={() => setAddOpen(false)} className="rounded-2xl">
-                                Cancel
-                            </Button>
-                            <Button type="submit" className="rounded-2xl">
-                                Save Item
-                            </Button>
-                        </div>
-                    </form>
-                </Panel>
             )}
 
             {/* ✅ Delete confirmation modal */}
@@ -735,6 +840,110 @@ export default function Inventory() {
                     </div>
                 </div>
             )}
+
+            {/* Add Modal */}
+            {addOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                    <div className="w-full max-w-2xl rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
+
+                        {/* Header */}
+                        <div className="flex items-start justify-between px-6 py-4 border-b dark:border-gray-700">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                                Add Inventory Item
+                            </h3>
+                            <button
+                                onClick={() => setAddOpen(false)}
+                                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* Body + Footer */}
+                        <form onSubmit={addItem} className="flex flex-col max-h-[70vh]">
+                            <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 gap-6 sm:grid-cols-2 text-sm">
+                                <div>
+                                    <Label>Name</Label>
+                                    <Input name="name" required className="h-10" />
+                                </div>
+                                <div>
+                                    <Label>Category</Label>
+                                    <select
+                                        name="category"
+                                        defaultValue="Consumable"
+                                        className="h-10 w-full rounded-md border px-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                                    >
+                                        <option value="Consumable">Consumable</option>
+                                        <option value="Device">Device</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <Label>Lot</Label>
+                                    <Input name="lot" placeholder="LOT- / SN-" className="h-10" />
+                                </div>
+                                <div>
+                                    <Label>Expiry</Label>
+                                    <Input
+                                        type="text"
+                                        name="expiry"
+                                        placeholder="MM/DD/YYYY"
+                                        className="h-10"
+                                        maxLength={10}
+                                        onChange={(e) => {
+                                            let v = e.target.value.replace(/\D/g, ""); // digits only
+                                            if (v.length > 2) v = v.slice(0, 2) + "/" + v.slice(2);
+                                            if (v.length > 5) v = v.slice(0, 5) + "/" + v.slice(5, 9);
+                                            e.target.value = v;
+                                        }}
+                                    />
+                                </div>
+                                <div>
+                                    <Label>SKU</Label>
+                                    <Input name="sku" required className="h-10" />
+                                </div>
+                                <div>
+                                    <Label>Unit</Label>
+                                    <Input name="unit" placeholder="pcs / box / pair" required className="h-10" />
+                                </div>
+                                <div>
+                                    <Label>On Hand</Label>
+                                    <Input name="stock" type="number" min={0} required className="h-10" />
+                                </div>
+                                <div>
+                                    <Label>Min. Required</Label>
+                                    <Input name="minStock" type="number" min={0} required className="h-10" />
+                                </div>
+                                <div>
+                                    <Label>Clinic</Label>
+                                    <Input name="location" placeholder="Main" className="h-10" />
+                                </div>
+                                <div>
+                                    <Label>Status</Label>
+                                    <select
+                                        name="status"
+                                        defaultValue="Active"
+                                        className="h-10 w-full rounded-md border px-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                                    >
+                                        <option value="Active">Active</option>
+                                        <option value="Inactive">Inactive</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Footer */}
+                            <div className="flex justify-end gap-3 px-6 py-4 border-t dark:border-gray-700">
+                                <Button type="button" onClick={() => setAddOpen(false)}>
+                                    Cancel
+                                </Button>
+                                <Button type="submit" className="bg-blue-600 text-white hover:bg-blue-700">
+                                    Save Item
+                                </Button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
 
         </div>
             </div>

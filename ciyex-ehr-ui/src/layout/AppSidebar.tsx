@@ -129,7 +129,7 @@ const navItems: NavItem[] = [
                 name: "Codes",
                 path: "settings/codes",
             },
-            { name: "Config", path: "/settings/config" },
+            { name: "Integration", path: "/settings/config" },
             {
                 name: "Forms",
                 subItems: [
