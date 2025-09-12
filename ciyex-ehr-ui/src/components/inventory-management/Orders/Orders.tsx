@@ -43,6 +43,17 @@ function TableShell({ children }: { children: React.ReactNode }) {
     );
 }
 
+function dateLabel(iso?: string) {
+    if (!iso || !iso.trim()) return "—";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso; // fallback if invalid
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    const yyyy = d.getFullYear();
+    return `${mm}/${dd}/${yyyy}`;
+}
+
+
 function Pill({
                   children,
                   tone = "neutral" as const,
@@ -175,7 +186,6 @@ export default function Orders() {
                     }
                 );
 
-                // ✅ Safe parse
                 // ✅ Safe parse with proper typing
                 let json: ApiResponse<Order> = {};
                 try {
@@ -258,7 +268,7 @@ export default function Orders() {
                     />
                 </div>
             )}
-            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                 View and manage purchase orders, statuses, and receipts.
             </p>
 
@@ -315,7 +325,7 @@ export default function Orders() {
                                     {o.category}
                                 </td>
                                 <td className="px-6 py-3 text-gray-700 dark:text-gray-200">
-                                    {o.date}
+                                    {dateLabel(o.date)}
                                 </td>
                                 <td className="px-6 py-3">
                                     <Pill
@@ -445,10 +455,17 @@ export default function Orders() {
                                             <div>
                                                 <Label>Date</Label>
                                                 <Input
-                                                    type="date"
+                                                    type="text"
                                                     name="date"
-                                                    // ✅ Use value directly since API gives YYYY-MM-DD
-                                                    defaultValue={selected.date || ""}
+                                                    defaultValue={dateLabel(selected.date)}
+                                                    placeholder="MM/DD/YYYY"
+                                                    maxLength={10}
+                                                    onChange={(e) => {
+                                                        let v = e.target.value.replace(/\D/g, "");
+                                                        if (v.length > 2) v = v.slice(0, 2) + "/" + v.slice(2);
+                                                        if (v.length > 5) v = v.slice(0, 5) + "/" + v.slice(5, 9);
+                                                        e.target.value = v;
+                                                    }}
                                                 />
                                             </div>
                                             <div>
@@ -478,7 +495,7 @@ export default function Orders() {
                                             <Info label="Supplier" value={selected.supplier} />
                                             <Info label="Item Name" value={selected.itemName} />
                                             <Info label="Category" value={selected.category} />
-                                            <Info label="Date" value={selected.date} />
+                                            <Info label="Date" value={dateLabel(selected.date)} />
                                             <Info label="Status" value={selected.status} />
                                             <Info label="Stock" value={selected.stock ?? 0} />
                                             <Info label="Amount" value={currency(selected.amount)} />

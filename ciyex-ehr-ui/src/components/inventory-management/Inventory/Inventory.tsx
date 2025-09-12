@@ -25,12 +25,17 @@ type InventoryItem = {
     stock: number;
     unit: string;
     minStock: number;
+    supplier?: string;
     location: string;
     status: "Active" | "Inactive";
 };
 type ListOption = {
     id: string | number;
     title: string;
+};
+type SupplierApiResponse = {
+    id: string | number;
+    name: string;
 };
 /** Helpers */
 const dateLabel = (iso?: string) => {
@@ -97,6 +102,11 @@ export default function Inventory() {
 
     const [typeOptions, setTypeOptions] = useState<{ id: string; label: string }[]>([]);
     const [reorderMode, setReorderMode] = useState(false);
+    const [criticalLowPercentage, setCriticalLowPercentage] = useState(10);
+    const [lowStockAlerts, setLowStockAlerts] = useState(false);
+    const [supplierOptions, setSupplierOptions] = useState<{ id: string; name: string }[]>([]);
+
+
 
 
 
@@ -116,6 +126,50 @@ export default function Inventory() {
         }
     }, [alertData]);
 
+    useEffect(() => {
+        const orgId = localStorage.getItem("orgId");
+        if (!orgId) return;
+
+        (async () => {
+            try {
+                const res = await fetchWithAuth(
+                    `${process.env.NEXT_PUBLIC_API_URL}/api/inventory-settings/${orgId}`
+                );
+                const text = await res.text();
+                if (!text) return; // backend returned no body
+                const json = JSON.parse(text);
+
+                if (res.ok && json.success) {
+                    const data = json.data;
+                    setLowStockAlerts(data.lowStockAlerts);
+                    setCriticalLowPercentage(data.criticalLowPercentage);
+                }
+            } catch (err) {
+                console.error("Failed to fetch settings:", err);
+            }
+        })();
+    }, []);
+
+
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await fetchWithAuth(`${API_URL}/api/suppliers`);
+                const json = await res.json();
+                if (res.ok && json.success && Array.isArray(json.data?.content)) {
+                    setSupplierOptions(
+                        (json.data.content as SupplierApiResponse[]).map((s) => ({
+                            id: String(s.id),
+                            name: s.name,
+                        }))
+                    );
+                }
+            } catch (err) {
+                console.error("Failed to load suppliers:", err);
+            }
+        })();
+    }, []);
 
     useEffect(() => {
         (async () => {
@@ -150,6 +204,7 @@ export default function Inventory() {
                 if (res.ok && json.success && json.data?.content) {
                     const items: InventoryItem[] = json.data.content.map((d: Record<string, unknown>) => ({
                         id: String(d.id),
+                        supplier: String(d.supplier || ""),
                         name: d.name,
                         category: d.category,
                         lot: d.lot ?? undefined,
@@ -196,6 +251,7 @@ export default function Inventory() {
                             minStock: d.minStock,
                             location: d.location,
                             status: d.status,
+                            supplier: String(d.supplier || ""),
                         }));
                         setInventory(items);
                     }
@@ -242,6 +298,7 @@ export default function Inventory() {
             unit: String(form.get("unit") || "pcs"),
             minStock: Number(form.get("minStock") || 0),
             location: String(form.get("location") || "Main"),
+            supplier: String(form.get("supplier") || ""),
             status: (String(form.get("status")) as InventoryItem["status"]) || "Active",
         };
 
@@ -267,6 +324,8 @@ export default function Inventory() {
                 minStock: created.minStock,
                 location: created.location,
                 status: created.status,
+                supplier: created.supplier || "",   // ✅ include supplier
+
             };
 
             setInventory(prev => [uiItem, ...prev]);
@@ -288,6 +347,8 @@ export default function Inventory() {
             });
         }
     }
+
+
 
     async function editItem(id: string, updates: Partial<InventoryItem>) {
         try {
@@ -492,6 +553,7 @@ export default function Inventory() {
                 <table className="w-full table-auto text-sm">
                     <thead className="bg-gray-100 dark:bg-gray-800">
                     <tr className="text-left text-sm font-medium text-gray-600 dark:text-gray-300">
+                        <th className="px-6 py-3">Suppliers</th>
                         <th className="px-6 py-3">Item</th>
                         <th className="px-6 py-3">Category</th>
                         <th className="px-6 py-3">Lot</th>
@@ -504,10 +566,28 @@ export default function Inventory() {
                     </thead>
                     <tbody>
                     {filtered.map((i) => {
-                        const pillTone = i.stock === 0 ? "danger" : i.stock <= i.minStock ? "warn" : "ok";
-                        const pillText = i.stock === 0 ? "Out" : i.stock <= i.minStock ? "Low" : "OK";
+                        // 🔎 Calculate % of stock vs minStock
+                        const percent = i.minStock > 0 ? (i.stock / i.minStock) * 100 : 100;
+
+                        let pillTone: "neutral" | "warn" | "ok" | "danger";
+                        let pillText: string;
+
+                        if (i.stock === 0) {
+                            pillTone = "danger";
+                            pillText = "Out";
+                        } else if (lowStockAlerts && percent <= criticalLowPercentage) {
+                            pillTone = "danger";
+                            pillText = "Critical";
+                        } else if (lowStockAlerts && i.stock <= i.minStock) {
+                            pillTone = "warn";
+                            pillText = "Low";
+                        } else {
+                            pillTone = "ok";
+                            pillText = "OK";
+                        }
                         return (
                             <tr key={i.id} className="border-b border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">
+                                <td className="px-6 py-3 text-gray-700 dark:text-gray-200">{i.supplier || "—"}</td>
                                 <td className="px-6 py-3 font-medium text-gray-900 dark:text-gray-100">{i.name}</td>
                                 <td className="px-6 py-3 text-gray-700 dark:text-gray-200">{i.category}</td>
                                 <td className="px-6 py-3 text-gray-700 dark:text-gray-200">{i.lot || "—"}</td>
@@ -637,6 +717,7 @@ export default function Inventory() {
                                         stock: Number(form.get("stock") || 0),
                                         unit: String(form.get("unit") || ""),
                                         minStock: Number(form.get("minStock") || 0),
+                                        supplier: String(form.get("supplier") || ""),
                                         location: String(form.get("location") || ""),
                                         status: form.get("status") as "Active" | "Inactive",
                                     });
@@ -650,6 +731,22 @@ export default function Inventory() {
                                     // ✅ Edit Form
                                     <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                                         <div>
+                                            <Label>Supplier</Label>
+                                            <select
+                                                name="supplier"
+                                                defaultValue={selected?.supplier || ""}
+                                                className="h-10 w-full rounded-md border px-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                                                required
+                                            >
+                                                <option value="" disabled>Select supplier</option>
+                                                {supplierOptions.map(s => (
+                                                    <option key={s.id} value={s.id}>
+                                                        {s.name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
                                             <Label>Name</Label>
                                             <Input name="name" defaultValue={selected.name} className="h-10" />
                                         </div>
@@ -657,11 +754,15 @@ export default function Inventory() {
                                             <Label>Category</Label>
                                             <select
                                                 name="category"
-                                                defaultValue={selected.category}
+                                                defaultValue={typeOptions.length > 0 ? typeOptions[0].label : ""}
                                                 className="h-10 w-full rounded-md border px-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                                                required
                                             >
-                                                <option value="Consumable">Consumable</option>
-                                                <option value="Device">Device</option>
+                                                {typeOptions.map(opt => (
+                                                    <option key={opt.id} value={opt.label}>
+                                                        {opt.label}
+                                                    </option>
+                                                ))}
                                             </select>
                                         </div>
                                         <div>
@@ -720,7 +821,19 @@ export default function Inventory() {
                                     <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                                         <div>
                                             <Label>Supplier</Label>
-                                            <Input name="supplier" placeholder="Enter supplier" required />
+                                            <select
+                                                name="supplier"
+                                                defaultValue={selected?.supplier || ""}
+                                                className="h-10 w-full rounded-md border px-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                                                required
+                                            >
+                                                <option value="" disabled>Select supplier</option>
+                                                {supplierOptions.map(s => (
+                                                    <option key={s.id} value={s.id}>
+                                                        {s.name}
+                                                    </option>
+                                                ))}
+                                            </select>
                                         </div>
                                         <div>
                                             <Label>Item Name</Label>
@@ -742,6 +855,7 @@ export default function Inventory() {
                                 ) : (
                                     // ✅ Read-only Info view
                                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                        <Info label="Suppliers" value={selected.supplier || "—"} />
                                         <Info label="Name" value={selected.name} />
                                         <Info label="Category" value={selected.category} />
                                         <Info label="Lot" value={selected.lot || "—"} />
@@ -772,11 +886,16 @@ export default function Inventory() {
                                 {(editMode || reorderMode) && (
                                     <Button
                                         type="submit"
-                                        className="bg-blue-600 text-white hover:bg-blue-700"
+                                        className={
+                                            editMode
+                                                ? "bg-blue-600 text-white hover:bg-blue-700"
+                                                :"rounded-2xl bg-emerald-600 text-white hover:bg-emerald-700"
+                                        }
                                     >
-                                        {editMode ? "Save Changes" : "Place Reorder"}
+                                        {editMode ? "Save" : "Reorder"}
                                     </Button>
                                 )}
+
 
                                 {!editMode && !reorderMode && (
                                     <>
@@ -863,6 +982,24 @@ export default function Inventory() {
                         <form onSubmit={addItem} className="flex flex-col max-h-[70vh]">
                             <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 gap-6 sm:grid-cols-2 text-sm">
                                 <div>
+                                    <div>
+                                        <Label>Supplier</Label>
+                                        <select
+                                            name="supplier"
+                                            defaultValue=""
+                                            className="h-10 w-full rounded-md border px-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                                            required
+                                        >
+                                            <option value="" disabled>Select supplier</option>
+                                            {supplierOptions.map(s => (
+                                                <option key={s.id} value={s.name}>
+                                                    {s.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div>
                                     <Label>Name</Label>
                                     <Input name="name" required className="h-10" />
                                 </div>
@@ -870,11 +1007,15 @@ export default function Inventory() {
                                     <Label>Category</Label>
                                     <select
                                         name="category"
-                                        defaultValue="Consumable"
+                                        defaultValue={typeOptions.length > 0 ? typeOptions[0].label : ""}
                                         className="h-10 w-full rounded-md border px-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                                        required
                                     >
-                                        <option value="Consumable">Consumable</option>
-                                        <option value="Device">Device</option>
+                                        {typeOptions.map(opt => (
+                                            <option key={opt.id} value={opt.label}>
+                                                {opt.label}
+                                            </option>
+                                        ))}
                                     </select>
                                 </div>
                                 <div>
