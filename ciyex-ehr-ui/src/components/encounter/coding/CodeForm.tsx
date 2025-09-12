@@ -232,7 +232,7 @@ export default function CodeForm({ patientId, encounterId, editing, onSaved, onC
 
     useEffect(() => {
         if (editing?.id) {
-            setCodeType((editing.codeType as any) || "ICD10");
+            setCodeType((editing.codeType as CodeDto["codeType"]) || "ICD10");
             setCode(editing.code || "");
             setModifier(editing.modifier ?? "");
             setActive(!!editing.active);

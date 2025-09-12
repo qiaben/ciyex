@@ -1,116 +1,143 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { fetchWithOrg } from "@/utils/fetchWithOrg";
-import type { ApiResponse, DateTimeFinalizedDto } from "@/utils/types";
+import type { ApiResponse } from "@/utils/types";
+import type { DateTimeFinalizedDto } from "./DateTimeFinalizedCard";
 
 type Props = {
     patientId: number;
     encounterId: number;
-    value?: DateTimeFinalizedDto | null;
+    editing?: DateTimeFinalizedDto | null;
     onSaved: (saved: DateTimeFinalizedDto) => void;
+    onCancel?: () => void;
 };
 
-function toLocalInputValue(iso?: string) {
-    if (!iso) return "";
-    const d = new Date(iso);
-    // datetime-local expects "YYYY-MM-DDTHH:mm"
-    const pad = (n: number) => String(n).padStart(2, "0");
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+const TARGET_TYPES = ["NOTE", "ORDER", "RESULT"];
+const METHODS = ["MANUAL", "AUTO"];
+const STATUSES = ["finalized", "amended", "revoked"];
+const ROLES = ["MD", "DO", "NP", "PA"];
+
+async function safeJson<T = unknown>(res: Response): Promise<T | null> {
+    const text = await res.text().catch(() => "");
+    if (!text) return null;
+    try { return JSON.parse(text) as T; } catch { return null; }
 }
 
-function fromLocalInputValue(v: string) {
-    // Treat input as local time; send ISO string
-    const d = new Date(v);
-    return d.toISOString();
-}
+export default function DateTimeFinalizedForm({ patientId, encounterId, editing, onSaved, onCancel }: Props) {
+    const [targetType, setTargetType] = useState<string>("NOTE");
+    const [targetId, setTargetId] = useState<string>("");
+    const [targetVersion, setTargetVersion] = useState<string>("v1");
 
-export default function DateTimeFinalizedForm({ patientId, encounterId, value, onSaved }: Props) {
-    const [finalizedLocal, setFinalizedLocal] = useState("");
-    const [timezone, setTimezone] = useState("");
-    const [locked, setLocked] = useState(true);
-    const [source, setSource] = useState("Manual");
-    const [notes, setNotes] = useState("");
+    const [finalizedAt, setFinalizedAt] = useState<string>("");
+    const [finalizedBy, setFinalizedBy] = useState<string>("");
+    const [finalizerRole, setFinalizerRole] = useState<string>("MD");
+    const [method, setMethod] = useState<string>("MANUAL");
+    const [status, setStatus] = useState<string>("finalized");
+    const [reason, setReason] = useState<string>("");
+
+    const [comments, setComments] = useState<string>("");
+    const [contentHash, setContentHash] = useState<string>("");
+    const [providerSignatureId, setProviderSignatureId] = useState<string>("");
+    const [signoffId, setSignoffId] = useState<string>("");
+
     const [saving, setSaving] = useState(false);
     const [err, setErr] = useState<string | null>(null);
 
     useEffect(() => {
-        setFinalizedLocal(toLocalInputValue(value?.finalizedAt));
-        setTimezone(value?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "");
-        setLocked(value?.locked ?? true);
-        setSource(value?.source || "Manual");
-        setNotes(value?.notes || "");
-    }, [value]);
+        if (editing?.id) {
+            setTargetType(editing.targetType || "NOTE");
+            setTargetId(editing.targetId?.toString() ?? "");
+            setTargetVersion(editing.targetVersion || "v1");
 
-    const canEdit = useMemo(() => !value?.locked, [value?.locked]);
+            setFinalizedAt(editing.finalizedAt || "");
+            setFinalizedBy(editing.finalizedBy || "");
+            setFinalizerRole(editing.finalizerRole || "MD");
+            setMethod(editing.method || "MANUAL");
+            setStatus(editing.status || "finalized");
+            setReason(editing.reason || "");
 
-    async function saveCustom() {
+            setComments(editing.comments || "");
+            setContentHash(editing.contentHash || "");
+            setProviderSignatureId(editing.providerSignatureId?.toString() ?? "");
+            setSignoffId(editing.signoffId?.toString() ?? "");
+        } else {
+            setTargetType("NOTE");
+            setTargetId("");
+            setTargetVersion("v1");
+
+            setFinalizedAt("");
+            setFinalizedBy("");
+            setFinalizerRole("MD");
+            setMethod("MANUAL");
+            setStatus("finalized");
+            setReason("");
+
+            setComments("");
+            setContentHash("");
+            setProviderSignatureId("");
+            setSignoffId("");
+        }
+    }, [editing]);
+
+    function setNow() {
+        setFinalizedAt(new Date().toISOString());
+    }
+
+    async function submit(e: React.FormEvent) {
+        e.preventDefault();
+        setSaving(true);
+        setErr(null);
+
         try {
-            setSaving(true);
-            setErr(null);
             const body: DateTimeFinalizedDto = {
                 patientId,
                 encounterId,
-                finalizedAt: finalizedLocal ? fromLocalInputValue(finalizedLocal) : undefined,
-                timezone,
-                locked,
-                source,
-                ...(notes ? { notes: notes.trim() } : {}),
-                ...(value?.id ? { id: value.id } : {}),
+                targetType,
+                ...(targetId ? { targetId: Number(targetId) } : {}),
+                ...(targetVersion ? { targetVersion } : {}),
+                ...(finalizedAt ? { finalizedAt } : {}),
+                ...(finalizedBy ? { finalizedBy } : {}),
+                ...(finalizerRole ? { finalizerRole } : {}),
+                ...(method ? { method } : {}),
+                ...(status ? { status } : {}),
+                ...(reason ? { reason } : {}),
+                ...(comments ? { comments } : {}),
+                ...(contentHash ? { contentHash } : {}),
+                ...(providerSignatureId ? { providerSignatureId: Number(providerSignatureId) } : {}),
+                ...(signoffId ? { signoffId: Number(signoffId) } : {}),
+                ...(editing?.id ? { id: editing.id } : {}),
             };
 
-            const url = value?.id
-                ? `/api/datetime-finalized/${patientId}/${encounterId}/${value.id}`
-                : `/api/datetime-finalized/${patientId}/${encounterId}`;
-            const method = value?.id ? "PUT" : "POST";
+            const url = editing?.id
+                ? `/api/date-time-finalized/${patientId}/${encounterId}/${editing.id}`
+                : `/api/date-time-finalized/${patientId}/${encounterId}`;
+            const methodHttp = editing?.id ? "PUT" : "POST";
 
-            const res = await fetchWithOrg(url, { method, body: JSON.stringify(body) });
-            const json = (await res.json()) as ApiResponse<DateTimeFinalizedDto>;
-            if (!res.ok || !json.success) throw new Error(json.message || "Save failed");
-            onSaved(json.data!);
-        } catch (e: unknown) {
-            setErr(e instanceof Error ? e.message : "Something went wrong");
-        } finally {
-            setSaving(false);
-        }
-    }
+            const res = await fetchWithOrg(url, { method: methodHttp, body: JSON.stringify(body) });
+            const json = (await safeJson<ApiResponse<DateTimeFinalizedDto>>(res)) ?? undefined;
 
-    async function setNow() {
-        if (!confirm("Set finalized date/time to now?")) return;
-        setSaving(true);
-        setErr(null);
-        try {
-            // Preferred: dedicated endpoint
-            let res = await fetchWithOrg(
-                `/api/datetime-finalized/${patientId}/${encounterId}/${value?.id ?? ""}/finalize-now`,
-                {
-                    method: "POST",
-                    body: JSON.stringify({ locked }),
-                }
-            );
+            if (!res.ok) { setErr(`Save failed (${res.status})`); return; }
+            if (!json || json.success !== true || !json.data) { setErr(json?.message || "Save failed"); return; }
 
-            // Fallback: just PUT with current timestamp
-            if (res.status === 404) {
-                const nowIso = new Date().toISOString();
-                const body: DateTimeFinalizedDto = {
-                    patientId,
-                    encounterId,
-                    finalizedAt: nowIso,
-                    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || timezone || "",
-                    locked,
-                    source: "Manual",
-                    ...(value?.id ? { id: value.id } : {}),
-                    ...(notes ? { notes: notes.trim() } : {}),
-                };
-                res = await fetchWithOrg(
-                    `/api/datetime-finalized/${patientId}/${encounterId}/${value?.id ?? ""}`,
-                    { method: value?.id ? "PUT" : "POST", body: JSON.stringify(body) }
-                );
+            onSaved(json.data);
+
+            if (!editing?.id) {
+                // Reset to defaults after create
+                setTargetType("NOTE");
+                setTargetId("");
+                setTargetVersion("v1");
+                setFinalizedAt("");
+                setFinalizedBy("");
+                setFinalizerRole("MD");
+                setMethod("MANUAL");
+                setStatus("finalized");
+                setReason("");
+                setComments("");
+                setContentHash("");
+                setProviderSignatureId("");
+                setSignoffId("");
             }
-
-            const json = (await res.json()) as ApiResponse<DateTimeFinalizedDto>;
-            if (!res.ok || !json.success) throw new Error(json.message || "Finalize-now failed");
-            onSaved(json.data!);
         } catch (e: unknown) {
             setErr(e instanceof Error ? e.message : "Something went wrong");
         } finally {
@@ -119,88 +146,101 @@ export default function DateTimeFinalizedForm({ patientId, encounterId, value, o
     }
 
     return (
-        <div className="rounded-2xl border p-4 shadow-sm bg-white space-y-4">
+        <form onSubmit={submit} className="space-y-4 rounded-2xl border p-4 shadow-sm bg-white">
+            <h3 className="text-lg font-semibold">{editing?.id ? "Edit Finalization Timestamp" : "Add Finalization Timestamp"}</h3>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                    <label className="block text-sm font-medium mb-1">Finalized Date/Time</label>
-                    <input
-                        type="datetime-local"
-                        className="w-full rounded-lg border px-3 py-2 focus:ring"
-                        value={finalizedLocal}
-                        onChange={(e) => setFinalizedLocal(e.target.value)}
-                        disabled={!canEdit}
-                    />
+                    <label className="block text-sm font-medium mb-1">Target Type</label>
+                    <select className="w-full rounded-lg border px-3 py-2" value={targetType} onChange={(e) => setTargetType(e.target.value)}>
+                        {TARGET_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
                 </div>
                 <div>
-                    <label className="block text-sm font-medium mb-1">Timezone</label>
-                    <input
-                        className="w-full rounded-lg border px-3 py-2 focus:ring"
-                        value={timezone}
-                        onChange={(e) => setTimezone(e.target.value)}
-                        placeholder="e.g., Asia/Kolkata"
-                        disabled={!canEdit}
-                    />
+                    <label className="block text-sm font-medium mb-1">Target ID</label>
+                    <input className="w-full rounded-lg border px-3 py-2" value={targetId} onChange={(e) => setTargetId(e.target.value)} placeholder="e.g., 5001" />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium mb-1">Target Version</label>
+                    <input className="w-full rounded-lg border px-3 py-2" value={targetVersion} onChange={(e) => setTargetVersion(e.target.value)} placeholder="e.g., v1" />
                 </div>
 
-                <div className="flex items-center gap-2">
-                    <input
-                        id="lock"
-                        type="checkbox"
-                        checked={locked}
-                        onChange={(e) => setLocked(e.target.checked)}
-                        disabled={!canEdit}
-                    />
-                    <label htmlFor="lock" className="text-sm">Lock encounter after finalization</label>
+                <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                        <label className="block text-sm font-medium mb-1">Finalized Date/Time</label>
+                        <div className="flex gap-2">
+                            <input
+                                className="flex-1 rounded-lg border px-3 py-2"
+                                value={finalizedAt}
+                                onChange={(e) => setFinalizedAt(e.target.value)}
+                                placeholder="YYYY-MM-DDTHH:mm:ssZ"
+                            />
+                            <button type="button" onClick={setNow} className="rounded-lg border px-3 py-1.5 hover:bg-gray-50">
+                                Set to Now
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium mb-1">Finalized By</label>
+                        <input className="w-full rounded-lg border px-3 py-2" value={finalizedBy} onChange={(e) => setFinalizedBy(e.target.value)} placeholder="dr.smith@clinic" />
+                    </div>
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium mb-1">Source</label>
-                    <input
-                        className="w-full rounded-lg border px-3 py-2 focus:ring"
-                        value={source}
-                        onChange={(e) => setSource(e.target.value)}
-                        placeholder="Signoff / ProviderSignature / Manual"
-                        disabled={!canEdit}
-                    />
+                    <label className="block text-sm font-medium mb-1">Role</label>
+                    <select className="w-full rounded-lg border px-3 py-2" value={finalizerRole} onChange={(e) => setFinalizerRole(e.target.value)}>
+                        {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                </div>
+                <div>
+                    <label className="block text-sm font-medium mb-1">Method</label>
+                    <select className="w-full rounded-lg border px-3 py-2" value={method} onChange={(e) => setMethod(e.target.value)}>
+                        {METHODS.map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                </div>
+                <div>
+                    <label className="block text-sm font-medium mb-1">Status</label>
+                    <select className="w-full rounded-lg border px-3 py-2" value={status} onChange={(e) => setStatus(e.target.value)}>
+                        {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                </div>
+                <div>
+                    <label className="block text-sm font-medium mb-1">Reason</label>
+                    <input className="w-full rounded-lg border px-3 py-2" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g., signed off" />
                 </div>
 
                 <div className="md:col-span-2">
-                    <label className="block text-sm font-medium mb-1">Notes (optional)</label>
-                    <textarea
-                        className="w-full rounded-lg border px-3 py-2 focus:ring min-h-20"
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                        disabled={!canEdit}
-                    />
+                    <label className="block text-sm font-medium mb-1">Notes</label>
+                    <textarea className="w-full rounded-lg border px-3 py-2 min-h-20" value={comments} onChange={(e) => setComments(e.target.value)} placeholder="Additional notes" />
+                </div>
+
+                <div className="md:col-span-2">
+                    <label className="block text-sm font-medium mb-1">Content Hash</label>
+                    <input className="w-full rounded-lg border px-3 py-2" value={contentHash} onChange={(e) => setContentHash(e.target.value)} placeholder="optional" />
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium mb-1">Provider Signature ID</label>
+                    <input className="w-full rounded-lg border px-3 py-2" value={providerSignatureId} onChange={(e) => setProviderSignatureId(e.target.value)} placeholder="e.g., 4" />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium mb-1">Sign-off ID</label>
+                    <input className="w-full rounded-lg border px-3 py-2" value={signoffId} onChange={(e) => setSignoffId(e.target.value)} placeholder="e.g., 9" />
                 </div>
             </div>
 
             {err && <p className="text-sm text-red-600">{err}</p>}
 
-            <div className="flex flex-wrap items-center gap-2">
-                {canEdit ? (
-                    <>
-                        <button
-                            type="button"
-                            onClick={saveCustom}
-                            disabled={saving}
-                            className="rounded-xl border px-4 py-2 hover:bg-gray-50"
-                        >
-                            Save
-                        </button>
-                        <button
-                            type="button"
-                            onClick={setNow}
-                            disabled={saving}
-                            className="rounded-xl bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:opacity-60"
-                        >
-                            Set to Now
-                        </button>
-                    </>
-                ) : (
-                    <span className="rounded-full bg-green-100 text-green-700 px-3 py-1 text-sm">Locked</span>
+            <div className="flex items-center gap-2">
+                <button type="submit" disabled={saving} className="rounded-xl bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:opacity-60">
+                    {saving ? "Saving..." : editing?.id ? "Update" : "Save"}
+                </button>
+                {onCancel && (
+                    <button type="button" onClick={onCancel} className="rounded-xl border px-4 py-2 hover:bg-gray-50">
+                        Cancel
+                    </button>
                 )}
             </div>
-        </div>
+        </form>
     );
 }

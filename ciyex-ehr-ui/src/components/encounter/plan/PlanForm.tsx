@@ -236,7 +236,9 @@ export default function PlanForm({ patientId, encounterId, editing, onSaved, onC
 
         try {
             // Validate JSON
-            let sectionsJson: Record<string, any> | undefined = undefined;
+          //  let sectionsJson: Record<string, any> | undefined = undefined;
+            let sectionsJson: Record<string, unknown> | undefined = undefined;
+
             const trimmed = sectionsJsonText.trim();
             if (trimmed) {
                 try {

@@ -16,6 +16,11 @@ export type EncounterDto = {
     reason?: string;
     status?: "OPEN" | "CLOSED";
     audit?: Audit;
+    visitCategory?: string;
+    type?: string;
+
+    dateOfService?: string;
+    reasonForVisit?: string;
 };
 
 
@@ -24,6 +29,9 @@ export type PatientMedicalHistoryDto = {
     patientId: number;
     encounterId: number;
     description: string;
+    esigned?: boolean;
+    signedAt?: string;
+    signedBy?: string;
     audit?: {
         createdDate?: string;
         lastModifiedDate?: string;
@@ -36,6 +44,9 @@ export type ChiefComplaintDto = {
     encounterId: number;
     complaint: string;
     details?: string;
+    esigned?: boolean;
+    signedAt?: string;
+    signedBy?: string;
     // Your backend returns createdAt/updatedAt either as strings or arrays (e.g., [2025,8,18,0,0])
     createdAt?: string | number[];
     updatedAt?: string | number[];
@@ -49,7 +60,9 @@ export type HpiDto = {
     orgId?: number;
     patientId: number;
     encounterId: number;
-
+    esigned?: boolean;
+    signedAt?: string;
+    signedBy?: string;
     // backend uses this single field
     description: string;
 
@@ -70,6 +83,9 @@ export type RosDto = {
     status: "Positive" | "Negative" | "NotAsked";
     finding?: string;          // e.g., the specific symptom (fever, cough)
     notes?: string;            // free-text comments
+    esigned?: boolean;
+    signedAt?: string;
+    signedBy?: string;
 
     audit?: {
         createdDate?: string;
@@ -79,19 +95,23 @@ export type RosDto = {
 
 export type PastMedicalHistoryDto = {
     id?: number;
+    orgId?: number;
+    externalId?: string | null;
+
     patientId: number;
     encounterId: number;
 
-    condition: string;       // e.g., "Hypertension"
-    diagnosisDate?: string;  // yyyy-MM-dd (optional)
-    status?: string;         // e.g., "Active", "Resolved"
-    notes?: string;          // free text
+    description: string; // e.g., "Patient has history of hypertension, diagnosed in 2018."
+    esigned?: boolean;
+    signedAt?: string;
+    signedBy?: string;
 
     audit?: {
         createdDate?: string;
         lastModifiedDate?: string;
     };
 };
+
 
 // Family History types (aligns with backend DTO)
 
@@ -111,6 +131,10 @@ export type FamilyHistoryDto = {
     patientId: number;
     encounterId: number;
     entries: FamilyHistoryEntryDto[];
+    esigned?: boolean;
+    signedAt?: string;
+    signedBy?: string;
+    signedEntryId?: number;
     audit?: {
         createdDate?: string;
         lastModifiedDate?: string;
@@ -126,6 +150,7 @@ export type SocialHistoryEntryDto = {
     category: string;     // e.g., "SMOKING", "DIET", ...
     value?: string;       // e.g., "Former smoker", "Vegetarian"
     details?: string;     // free text details
+
 };
 
 export type SocialHistoryDto = {
@@ -135,6 +160,10 @@ export type SocialHistoryDto = {
     patientId: number;
     encounterId: number;
     entries: SocialHistoryEntryDto[];
+    esigned?: boolean;
+    signedAt?: string;
+    signedBy?: string;
+
     audit?: {
         createdDate?: string;
         lastModifiedDate?: string;
@@ -162,7 +191,10 @@ export type PhysicalExamSectionDto = {
     allNormal: boolean;   // true = no abnormal findings
     normalText?: string;  // e.g., “Well-nourished, no acute distress”
     findings?: string;    // e.g., “Mild nasal congestion”
+
 };
+
+
 
 export type PhysicalExamDto = {
     id?: number;
@@ -175,6 +207,9 @@ export type PhysicalExamDto = {
     summary?: string;
 
     sections: PhysicalExamSectionDto[];
+    esigned?: boolean;
+    signedAt?: string;
+    signedBy?: string;
 
     audit?: {
         createdDate?: string;
@@ -195,6 +230,9 @@ export type AssessmentDto = {
     priority?: "Primary" | "Secondary" | "Tertiary";
     assessmentText?: string;  // free-text impression/assessment
     notes?: string;
+    esigned?: boolean;
+    signedAt?: string;
+    signedBy?: string;
 
     audit?: {
         createdDate?: string;
@@ -215,7 +253,10 @@ export type PlanDto = {
     notes?: string;              // free text
     followUpVisit?: string;      // e.g., "4 weeks"
     returnWorkSchool?: string;   // e.g., "Return to work on 2025-08-20"
-    sectionsJson?: Record<string, any>;   // arbitrary JSON payload
+    sectionsJson?: Record<string, unknown>;   // arbitrary JSON payload
+    esigned?: boolean;
+    signedAt?: string;
+    signedBy?: string;
 
     audit?: {
         createdDate?: string;
@@ -228,20 +269,40 @@ export type PlanDto = {
 
 export type ProviderNoteDto = {
     id?: number;
-    patientId: number;
-    encounterId: number;
+    orgId?: number;
+    patientId?: number;
+    encounterId?: number;
 
-    noteType?: string;     // e.g., "General", "Addendum", "Attending"
-    content: string;       // required free-text note
-    author?: string;       // provider name or ID
-    signed?: boolean;      // mark as signed/finalized
+    // Core note metadata
+    noteTitle?: string;          // "SOAP Note"
+    noteTypeCode?: string;       // e.g. "34109-0"
+    noteStatus?: "draft" | "final" | "amended";
+    noteDateTime?: string;       // "2025-09-09T10:30:00" or "2025-09-09T10:30"
+
+    // Author
+    authorPractitionerId?: number;
+
+    // SOAP / narrative
+    subjective?: string;
+    objective?: string;
+    assessment?: string;
+    plan?: string;
+    narrative?: string;
+
+    // Optional external reference
+    externalId?: string;
+    esigned?: boolean;
+    signedAt?: string | number | null;   // some endpoints return ISO string, others epoch
+    signedBy?: string | null;
+    printedAt?: string | number | null;
+    // If your backend sets this once signed to lock edits
+    signed?: boolean;
 
     audit?: {
         createdDate?: string;
         lastModifiedDate?: string;
     };
 };
-
 // ---- Procedures (aligned to Bruno screenshot) ----
 export type ProcedureDto = {
     id?: number;
@@ -279,6 +340,9 @@ export type CodeDto = {
     orgId?: number;
     patientId: number;
     encounterId: number;
+    esigned?: boolean;
+    signedAt?: string;
+    signedBy?: string;
 
     codeType: "CPT" | "HCPCS" | "ICD10" | "ICD10PCS" | "Modifier" | "Other" | string;
     code: string;
@@ -309,26 +373,41 @@ export type SignoffStatus =
     | "Signed"
     | "CosignRequested"
     | "Cosigned"
-    | "Locked";
+    | "Locked"
+    | "finalized"; // backend sometimes returns lowercase
 
 export type SignoffDto = {
     id?: number;
     patientId: number;
     encounterId: number;
 
-    status: SignoffStatus;            // workflow state
-    attestationText?: string;         // free text visible on the signed note
+    // workflow state
+    status: SignoffStatus;
+    attestationText?: string;
     acknowledgeBillingComplete?: boolean;
-    lockEncounter?: boolean;          // lock charts upon sign
+    lockEncounter?: boolean;
 
     // signature fields
-    signedBy?: string;                // provider display name / id
-    signedAt?: string;                // ISO/Date string
-    cosigner?: string;                // optional cosigner
-    cosignedAt?: string;
+    signedBy?: string;            // provider display name / id
+    signerRole?: string;          // e.g., MD, NP
+    signedAt?: string;            // ISO/Date string
+    signatureType?: string;       // electronic / digital
+    signatureData?: string;       // backend signature payload
+    contentHash?: string;         // for integrity verification
 
-    // optional extra message
+    // cosign info
+    cosigner?: string;
+    cosignedAt?: string;
+    cosignedBy?: string;
+    cosigners?: string[];
+
+    // optional extra
+    comments?: string;
     notes?: string;
+
+    // finalization
+    finalizedAt?: string;
+    lockedAt?: string;
 
     audit?: {
         createdDate?: string;
@@ -336,24 +415,45 @@ export type SignoffDto = {
     };
 };
 
-export type ProviderSignatureStatus = "Draft" | "Signed" | "Locked";
 
-export type ProviderSignatureDto = {
+// --- Provider Signature DTOs ---
+
+export type ProviderSignatureStatus =
+    | "active"
+    | "inactive"
+    | "signed"
+    | "locked";
+
+export interface ProviderSignatureDto {
     id?: number;
+
+    // identity
+    orgId?: number;
     patientId: number;
     encounterId: number;
 
-    signatureText?: string;     // could be "Electronically signed by Dr. Smith"
-    signatureImage?: string;    // optional: base64 encoded drawn signature
-    signedBy?: string;          // provider name or ID
-    signedAt?: string;          // ISO datetime
-    status: ProviderSignatureStatus;
+    // who/when
+    signedAt?: string;             // ISO datetime, e.g. "2025-08-20T09:30:00Z"
+    signedBy?: string;             // e.g. "dr.rajaclinic.test"
+    signerRole?: string;           // e.g. "MD", "DO", "NP"
 
+    // signature payload
+    signatureType?: "ELECTRONIC" | "WET" | string;
+    signatureFormat?: string;      // e.g. "image/png"
+    signatureData?: string;        // Base64 string (no "data:*;base64," prefix)
+    signatureHash?: string;        // SHA-256 hex
+
+    // misc
+    status?: ProviderSignatureStatus; // "active" / "signed" / etc.
+    comments?: string;
+
+    // optional audit block from backend
     audit?: {
         createdDate?: string;
         lastModifiedDate?: string;
     };
-};
+}
+
 
 export type DateTimeFinalizedDto = {
     id?: number;
@@ -384,6 +484,9 @@ export type AssignedProviderDto = {
     startDate?: string;        // yyyy-MM-dd
     endDate?: string;          // yyyy-MM-dd
     notes?: string;
+    esigned?: boolean;
+    signedAt?: string;
+    signedBy?: string;
 
     audit?: {
         createdDate?: string;

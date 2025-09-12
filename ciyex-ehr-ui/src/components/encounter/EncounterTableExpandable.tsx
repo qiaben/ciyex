@@ -1,331 +1,4 @@
 
-//
-// "use client";
-//
-// import { useEffect, useState } from "react";
-// import { useRouter } from "next/navigation";
-// import { fetchWithOrg } from "@/utils/fetchWithOrg";
-// import EncounterTabs from "./EncounterTabs";
-//
-// type Encounter = {
-//     id: number;
-//     encounterDate?: string; // ISO
-//     visitCategory?: string;
-//     encounterProvider?: string;
-//     type?: string;
-//     sensitivity?: string;
-//     dischargeDisposition?: string;
-//     reasonForVisit?: string;
-// };
-//
-// type ApiResponse<T> = { success: boolean; message?: string; data?: T };
-//
-// const INITIAL_FORM = {
-//     visitCategory: "OPD",
-//     encounterProvider: "",
-//     type: "",
-//     sensitivity: "Normal",
-//     dischargeDisposition: "",
-//     reasonForVisit: "",
-// };
-//
-// export default function EncounterTableExpandable({ patientId }: { patientId: number }) {
-//     const router = useRouter();
-//
-//     const [rows, setRows] = useState<Encounter[]>([]);
-//     const [openNew, setOpenNew] = useState(false);
-//     const [saving, setSaving] = useState(false);
-//     const [loading, setLoading] = useState(false);
-//     const [error, setError] = useState<string | null>(null);
-//     const [form, setForm] = useState({ ...INITIAL_FORM });
-//
-//     // Helper to build the REST base for the selected patient
-//     const base = `${process.env.NEXT_PUBLIC_API_URL}/api/${patientId}/encounters`;
-//
-//     // ---- LOAD (GET list) ----
-//     async function load() {
-//         setLoading(true);
-//         setError(null);
-//         try {
-//             const res = await fetchWithOrg(base, { method: "GET" });
-//             const body: ApiResponse<Encounter[]> = await res.json();
-//             if (!res.ok || !body?.success) throw new Error(body?.message || `HTTP ${res.status}`);
-//             // sort newest first (optional)
-//             setRows((body.data ?? []).sort((a, b) => b.id - a.id));
-//         } catch (e: any) {
-//             setRows([]);
-//             setError(e?.message || "Failed to fetch encounters.");
-//         } finally {
-//             setLoading(false);
-//         }
-//     }
-//
-//     useEffect(() => {
-//         load();
-//         // eslint-disable-next-line react-hooks/exhaustive-deps
-//     }, [patientId]);
-//
-//     // ---- CREATE (POST) ----
-//     async function createEncounter() {
-//         setSaving(true);
-//         setError(null);
-//         try {
-//             // patientId comes from the path; no need to send it in the body
-//             const res = await fetchWithOrg(base, {
-//                 method: "POST",
-//                 headers: { "Content-Type": "application/json" },
-//                 body: JSON.stringify(form),
-//             });
-//             const body: ApiResponse<Encounter> = await res.json();
-//             if (!res.ok || !body?.success) throw new Error(body?.message || `HTTP ${res.status}`);
-//
-//             // Reset form and show the new row
-//             setOpenNew(false);
-//             setForm({ ...INITIAL_FORM });
-//             await load();
-//             // (optional) You could auto-navigate to tabs for the created encounter:
-//             // if (body.data?.id) router.push(`/patients/${patientId}/encounters/${body.data.id}/chief-complaint`);
-//         } catch (e: any) {
-//             setError(e?.message || "Failed to create encounter.");
-//         } finally {
-//             setSaving(false);
-//         }
-//     }
-//
-//     // ---- UPDATE (PUT) ----
-//     async function updateEncounter(encounter: Encounter) {
-//         if (!encounter?.id) return;
-//         setSaving(true);
-//         setError(null);
-//         try {
-//             const res = await fetchWithOrg(`${base}/${encounter.id}`, {
-//                 method: "PUT",
-//                 headers: { "Content-Type": "application/json" },
-//                 body: JSON.stringify(encounter),
-//             });
-//             const body: ApiResponse<Encounter> = await res.json();
-//             if (!res.ok || !body?.success) throw new Error(body?.message || `HTTP ${res.status}`);
-//             await load();
-//         } catch (e: any) {
-//             setError(e?.message || "Failed to update encounter.");
-//         } finally {
-//             setSaving(false);
-//         }
-//     }
-//
-//     // ---- DELETE ----
-//     async function deleteEncounter(id: number) {
-//         if (!confirm(`Delete encounter #${id}?`)) return;
-//         setSaving(true);
-//         setError(null);
-//         try {
-//             const res = await fetchWithOrg(`${base}/${id}`, { method: "DELETE" });
-//             if (!res.ok) throw new Error(`HTTP ${res.status}`);
-//             await load();
-//         } catch (e: any) {
-//             setError(e?.message || "Failed to delete encounter.");
-//         } finally {
-//             setSaving(false);
-//         }
-//     }
-//
-//     const isSaveDisabled =
-//         !form.encounterProvider.trim() || !form.type.trim() || !form.reasonForVisit.trim();
-//
-//     return (
-//         <div className="bg-white border rounded-xl shadow-sm">
-//             <div className="flex items-center justify-between px-4 py-3 border-b">
-//                 <h3 className="text-sm font-semibold text-neutral-800">Encounters</h3>
-//                 <button
-//                     onClick={() => setOpenNew(true)}
-//                     className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700"
-//                 >
-//                     + New Encounter
-//                 </button>
-//             </div>
-//
-//             {error && (
-//                 <div className="px-4 py-2 text-sm text-red-700 bg-red-50 border-b border-red-200">
-//                     {error}
-//                 </div>
-//             )}
-//
-//             <div className="overflow-x-auto">
-//                 <table className="w-full text-sm">
-//                     <thead className="bg-neutral-50 text-xs uppercase text-neutral-500">
-//                     <tr>
-//                         <th className="px-3 py-2 text-left">ID</th>
-//                         <th className="px-3 py-2 text-left">Date</th>
-//                         <th className="px-3 py-2 text-left">Visit Category</th>
-//                         <th className="px-3 py-2 text-left">Provider</th>
-//                         <th className="px-3 py-2 text-left">Type</th>
-//                         <th className="px-3 py-2 text-left">Reason</th>
-//                         <th className="px-3 py-2 text-left w-28">Action</th>
-//                     </tr>
-//                     </thead>
-//                     <tbody className="divide-y">
-//                     {loading && (
-//                         <tr>
-//                             <td colSpan={7} className="px-3 py-6 text-center text-neutral-500">
-//                                 Loading…
-//                             </td>
-//                         </tr>
-//                     )}
-//
-//                     {!loading &&
-//                         rows.map((e) => (
-//                             <tr key={e.id} className="hover:bg-neutral-50">
-//                                 <td className="px-3 py-2">{e.id}</td>
-//                                 <td className="px-3 py-2">
-//                                     {e.encounterDate ? new Date(e.encounterDate).toLocaleString() : "-"}
-//                                 </td>
-//                                 <td className="px-3 py-2">{e.visitCategory || "-"}</td>
-//                                 <td className="px-3 py-2">{e.encounterProvider || "-"}</td>
-//                                 <td className="px-3 py-2">{e.type || "-"}</td>
-//                                 <td className="px-3 py-2">{e.reasonForVisit || "-"}</td>
-//                                 <td className="px-3 py-2">
-//                                     <div className="flex gap-2">
-//                                         {/* (+) redirects to EncounterTabs */}
-//                                         <button
-//                                             onClick={() =>
-//                                                 router.push(`/components/encounter/EncounterTabs`)
-//                                             }
-//                                             title="Open encounter tabs"
-//                                             className="h-7 w-7 grid place-items-center rounded-full border hover:bg-neutral-100"
-//                                         >
-//                                             +
-//                                         </button>
-//                                         <button
-//                                             onClick={() => deleteEncounter(e.id)}
-//                                             className="px-2 py-1 rounded border hover:bg-red-50"
-//                                         >
-//                                             Delete
-//                                         </button>
-//                                     </div>
-//                                 </td>
-//                             </tr>
-//                         ))}
-//
-//                     {!loading && rows.length === 0 && (
-//                         <tr>
-//                             <td colSpan={7} className="px-3 py-6 text-center text-neutral-500">
-//                                 No encounters yet.
-//                             </td>
-//                         </tr>
-//                     )}
-//                     </tbody>
-//                 </table>
-//             </div>
-//
-//             {/* New Encounter modal */}
-//             {openNew && (
-//                 <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center">
-//                     <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-4">
-//                         <div className="text-lg font-semibold mb-3">New Encounter</div>
-//
-//                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-//                             <label className="grid gap-1">
-//                                 <span className="text-sm">Visit Category</span>
-//                                 <select
-//                                     className="border rounded-lg px-3 py-2"
-//                                     value={form.visitCategory}
-//                                     onChange={(e) => setForm((f) => ({ ...f, visitCategory: e.target.value }))}
-//                                 >
-//                                     <option value="OPD">OPD</option>
-//                                     <option value="IPD">IPD</option>
-//                                     <option value="ER">ER</option>
-//                                 </select>
-//                             </label>
-//
-//                             <label className="grid gap-1">
-//                 <span className="text-sm">
-//                   Provider<span className="text-red-500">*</span>
-//                 </span>
-//                                 <input
-//                                     className="border rounded-lg px-3 py-2"
-//                                     placeholder='e.g. "Dr. Smith"'
-//                                     value={form.encounterProvider}
-//                                     onChange={(e) => setForm((f) => ({ ...f, encounterProvider: e.target.value }))}
-//                                 />
-//                             </label>
-//
-//                             <label className="grid gap-1">
-//                 <span className="text-sm">
-//                   Type<span className="text-red-500">*</span>
-//                 </span>
-//                                 <input
-//                                     className="border rounded-lg px-3 py-2"
-//                                     placeholder="Consultation / Follow-up / Telehealth…"
-//                                     value={form.type}
-//                                     onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
-//                                 />
-//                             </label>
-//
-//                             <label className="grid gap-1">
-//                                 <span className="text-sm">Sensitivity</span>
-//                                 <select
-//                                     className="border rounded-lg px-3 py-2"
-//                                     value={form.sensitivity}
-//                                     onChange={(e) => setForm((f) => ({ ...f, sensitivity: e.target.value }))}
-//                                 >
-//                                     <option value="Normal">Normal</option>
-//                                     <option value="Restricted">Restricted</option>
-//                                 </select>
-//                             </label>
-//
-//                             <label className="grid gap-1 md:col-span-2">
-//                                 <span className="text-sm">Discharge Disposition</span>
-//                                 <input
-//                                     className="border rounded-lg px-3 py-2"
-//                                     placeholder='e.g. "Home"'
-//                                     value={form.dischargeDisposition}
-//                                     onChange={(e) =>
-//                                         setForm((f) => ({ ...f, dischargeDisposition: e.target.value }))
-//                                     }
-//                                 />
-//                             </label>
-//
-//                             <label className="grid gap-1 md:col-span-2">
-//                 <span className="text-sm">
-//                   Reason for Visit<span className="text-red-500">*</span>
-//                 </span>
-//                                 <textarea
-//                                     className="border rounded-lg px-3 py-2"
-//                                     rows={3}
-//                                     placeholder="General checkup"
-//                                     value={form.reasonForVisit}
-//                                     onChange={(e) => setForm((f) => ({ ...f, reasonForVisit: e.target.value }))}
-//                                 />
-//                             </label>
-//                         </div>
-//
-//                         <div className="mt-4 flex justify-end gap-2">
-//                             <button
-//                                 className="px-3 py-1.5 rounded-lg bg-neutral-200 hover:bg-neutral-300"
-//                                 onClick={() => setOpenNew(false)}
-//                                 disabled={saving}
-//                             >
-//                                 Cancel
-//                             </button>
-//                             <button
-//                                 className="px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
-//                                 onClick={createEncounter}
-//                                 disabled={saving || isSaveDisabled}
-//                             >
-//                                 {saving ? "Saving..." : "Save"}
-//                             </button>
-//                         </div>
-//                     </div>
-//                 </div>
-//             )}
-//         </div>
-//     );
-// }
-
-
-
-
-
 "use client";
 
 import { useEffect, useState, MouseEvent } from "react";
@@ -382,9 +55,9 @@ export default function EncounterTableExpandable({ patientId }: { patientId: num
             const body: ApiResponse<Encounter[]> = await res.json();
             if (!res.ok || !body?.success) throw new Error(body?.message || `HTTP ${res.status}`);
             setRows((body.data ?? []).sort((a, b) => b.id - a.id));
-        } catch (e: any) {
+        } catch (e: unknown) {
             setRows([]);
-            setError(e?.message || "Failed to fetch encounters.");
+            setError(e instanceof Error ? e.message : "Failed to fetch encounters.");
         } finally {
             setLoading(false);
         }
@@ -410,8 +83,8 @@ export default function EncounterTableExpandable({ patientId }: { patientId: num
             setOpenNew(false);
             setNewForm({ ...INITIAL_FORM });
             await load();
-        } catch (e: any) {
-            setError(e?.message || "Failed to create encounter.");
+        } catch (e: unknown) {
+            setError(e instanceof Error ? e.message : "Failed to create encounter.");
         } finally {
             setSaving(false);
         }
@@ -433,8 +106,8 @@ export default function EncounterTableExpandable({ patientId }: { patientId: num
             setOpenEdit(false);
             setEditing(null);
             await load();
-        } catch (e: any) {
-            setError(e?.message || "Failed to update encounter.");
+        } catch (e: unknown) {
+            setError(e instanceof Error ? e.message : "Failed to update encounter.");
         } finally {
             setSaving(false);
         }
@@ -449,8 +122,8 @@ export default function EncounterTableExpandable({ patientId }: { patientId: num
             const res = await fetchWithOrg(`${base}/${id}`, { method: "DELETE" });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             await load();
-        } catch (e: any) {
-            setError(e?.message || "Failed to delete encounter.");
+        } catch (e: unknown) {
+            setError(e instanceof Error ? e.message : "Failed to delete encounter.");
         } finally {
             setSaving(false);
         }

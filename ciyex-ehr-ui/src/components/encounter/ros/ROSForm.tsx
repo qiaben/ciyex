@@ -4,6 +4,55 @@ import { useEffect, useState } from "react";
 import { fetchWithOrg } from "@/utils/fetchWithOrg";
 import type { ApiResponse, RosDto } from "@/utils/types";
 
+// split "a, b\nc" → ["a","b","c"]
+function splitDetails(s: string): string[] {
+    return s
+        .split(/[,;\n]+/)
+        .map((x) => x.trim())
+        .filter(Boolean);
+}
+
+// Convert backend → UI
+// function toRosDto(b: any): RosDto {
+//     return {
+//         id: b.id,
+//         patientId: b.patientId,
+//         encounterId: b.encounterId,
+//         system: b.systemName,
+//         status: b.isNegative ? "Negative" : "Positive",
+//         finding: Array.isArray(b.systemDetails) ? b.systemDetails.join(", ") : "",
+//         notes: b.notes ?? "",
+//         audit: {
+//             createdDate: b.createdDate,
+//             lastModifiedDate: b.lastModifiedDate,
+//         },
+//     };
+// }
+function toRosDto(b: unknown): RosDto {
+    const rec = b as Record<string, unknown>;
+    return {
+        id: rec.id as number,
+        patientId: rec.patientId as number,
+        encounterId: rec.encounterId as number,
+        system: rec.systemName as string,
+        status: rec.isNegative ? "Negative" : "Positive",
+        finding: Array.isArray(rec.systemDetails) ? (rec.systemDetails as string[]).join(", ") : "",
+        notes: (rec.notes as string) ?? "",
+        audit: {
+            createdDate: rec.createdDate as string | undefined,
+            lastModifiedDate: rec.lastModifiedDate as string | undefined,
+        },
+    };
+}
+
+
+// Safe JSON
+async function safeJson<T>(res: Response): Promise<T | null> {
+    const t = await res.text().catch(() => "");
+    if (!t) return null;
+    try { return JSON.parse(t) as T; } catch { return null; }
+}
+
 type Props = {
     patientId: number;
     encounterId: number;
@@ -13,20 +62,9 @@ type Props = {
 };
 
 const ROS_SYSTEMS = [
-    "Constitutional",
-    "Eyes",
-    "ENT",
-    "Cardiovascular",
-    "Respiratory",
-    "Gastrointestinal",
-    "Genitourinary",
-    "Musculoskeletal",
-    "Skin",
-    "Neurological",
-    "Psychiatric",
-    "Endocrine",
-    "Hematologic/Lymphatic",
-    "Allergic/Immunologic",
+    "Constitutional","Eyes","ENT","Cardiovascular","Respiratory","Gastrointestinal",
+    "Genitourinary","Musculoskeletal","Skin","Neurological","Psychiatric",
+    "Endocrine","Hematologic/Lymphatic","Allergic/Immunologic",
 ];
 
 export default function ROSForm({ patientId, encounterId, editing, onSaved, onCancel }: Props) {
@@ -57,27 +95,37 @@ export default function ROSForm({ patientId, encounterId, editing, onSaved, onCa
         setErr(null);
 
         try {
-            const body: RosDto = {
-                patientId,
-                encounterId,
-                system,
-                status,
-                ...(finding ? { finding } : {}),
-                ...(notes ? { notes } : {}),
-                ...(editing?.id ? { id: editing.id } : {}),
+            // Map UI → backend payload
+            const payload = {
+                systemName: system,
+                isNegative: status !== "Positive", // Positive => false; Negative/NotAsked => true
+                ...(notes.trim() ? { notes: notes.trim() } : {}),
+                systemDetails:
+                    status === "Positive" && finding.trim()
+                        ? splitDetails(finding)
+                        : [],
             };
 
             const url = editing?.id
-                ? `/api/review-of-systems/${patientId}/${encounterId}/${editing.id}`
-                : `/api/review-of-systems/${patientId}/${encounterId}`;
+                ? `/api/reviewofsystems/${patientId}/${encounterId}/${editing.id}`
+                : `/api/reviewofsystems/${patientId}/${encounterId}`;
 
             const method = editing?.id ? "PUT" : "POST";
 
-            const res = await fetchWithOrg(url, { method, body: JSON.stringify(body) });
-            const json = (await res.json()) as ApiResponse<RosDto>;
-            if (!res.ok || !json.success) throw new Error(json.message || "Save failed");
-            onSaved(json.data!);
+            const res = await fetchWithOrg(url, {
+                method,
+                headers: { "Content-Type": "application/json", Accept: "application/json" },
+                body: JSON.stringify(payload),
+            });
 
+          //  const json = await safeJson<ApiResponse<any>>(res);
+            const json = await safeJson<ApiResponse<unknown>>(res);
+
+            if (!res.ok || !json || json.success !== true) {
+                throw new Error(json?.message || `Save failed (${res.status})`);
+            }
+
+            onSaved(toRosDto(json.data));
             if (!editing?.id) {
                 setSystem(ROS_SYSTEMS[0]);
                 setStatus("Negative");
@@ -86,7 +134,8 @@ export default function ROSForm({ patientId, encounterId, editing, onSaved, onCa
             }
         } catch (e: unknown) {
             setErr(e instanceof Error ? e.message : "Something went wrong");
-        } finally {
+        }
+        finally {
             setSaving(false);
         }
     }
@@ -128,7 +177,7 @@ export default function ROSForm({ patientId, encounterId, editing, onSaved, onCa
                         className="w-full rounded-lg border px-3 py-2 focus:ring"
                         value={finding}
                         onChange={(e) => setFinding(e.target.value)}
-                        placeholder="e.g., fever, cough, chest pain"
+                        placeholder="e.g., chest pain, shortness of breath"
                     />
                 </div>
 
@@ -146,7 +195,8 @@ export default function ROSForm({ patientId, encounterId, editing, onSaved, onCa
             {err && <p className="text-sm text-red-600">{err}</p>}
 
             <div className="flex items-center gap-2">
-                <button type="submit" disabled={saving} className="rounded-xl bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:opacity-60">
+                <button type="submit" disabled={saving}
+                        className="rounded-xl bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:opacity-60">
                     {saving ? "Saving..." : editing?.id ? "Update" : "Save"}
                 </button>
                 {onCancel && (

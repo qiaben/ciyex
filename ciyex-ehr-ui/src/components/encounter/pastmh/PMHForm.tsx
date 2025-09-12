@@ -12,47 +12,45 @@ type Props = {
     onCancel?: () => void;
 };
 
-const isDate = (v: unknown): v is Date => v instanceof Date;
+/** Safely read an ApiResponse<T>; returns null when body is empty or not JSON */
+async function safeApiJson<T>(res: Response): Promise<ApiResponse<T> | null> {
+    const text = await res.text();
+    if (!text) return null;
+    try {
+        return JSON.parse(text) as ApiResponse<T>;
+    } catch {
+        return null;
+    }
+}
 
-export default function PMHForm({ patientId, encounterId, editing, onSaved, onCancel }: Props) {
-    const [condition, setCondition] = useState("");
-    const [diagnosisDate, setDiagnosisDate] = useState("");
-    const [status, setStatus] = useState<PastMedicalHistoryDto["status"] | "Active">("Active");
-    const [notes, setNotes] = useState("");
-
+export default function PMHForm({
+                                    patientId,
+                                    encounterId,
+                                    editing,
+                                    onSaved,
+                                    onCancel,
+                                }: Props) {
+    const [description, setDescription] = useState("");
     const [saving, setSaving] = useState(false);
     const [err, setErr] = useState<string | null>(null);
 
     useEffect(() => {
-        setCondition(editing?.condition ?? "");
-
-        const raw: unknown = editing?.diagnosisDate as unknown;
-        setDiagnosisDate(
-            typeof raw === "string"
-                ? raw.slice(0, 10)
-                : isDate(raw)
-                    ? raw.toISOString().slice(0, 10)
-                    : ""
-        );
-
-        setStatus((editing?.status as PastMedicalHistoryDto["status"]) ?? "Active");
-        setNotes(editing?.notes ?? "");
+        setDescription(editing?.description ?? "");
     }, [editing]);
 
     async function handleSubmit(e: React.FormEvent<HTMLFormElement>): Promise<void> {
         e.preventDefault();
+        if (!description.trim()) {
+            setErr("Description is required.");
+            return;
+        }
+
         setSaving(true);
         setErr(null);
 
         try {
-            const body: PastMedicalHistoryDto = {
-                patientId,
-                encounterId,
-                condition: condition.trim(),
-                ...(diagnosisDate ? { diagnosisDate } : {}),
-                ...(status ? { status } : {}),
-                ...(notes ? { notes } : {}),
-                ...(editing?.id ? { id: editing.id } : {}),
+            const body = {
+                description: description.trim(),
             };
 
             const url = editing?.id
@@ -61,16 +59,28 @@ export default function PMHForm({ patientId, encounterId, editing, onSaved, onCa
 
             const method = editing?.id ? "PUT" : "POST";
 
-            const res = await fetchWithOrg(url, { method, body: JSON.stringify(body) });
-            const json = (await res.json()) as ApiResponse<PastMedicalHistoryDto>;
-            if (!res.ok || !json.success) throw new Error(json.message || "Save failed");
+            const res = await fetchWithOrg(url, {
+                method,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+            });
+
+            const json = await safeApiJson<PastMedicalHistoryDto>(res);
+
+            if (!res.ok) {
+                throw new Error(json?.message || `Save failed (HTTP ${res.status})`);
+            }
+            if (!json) {
+                throw new Error("Saved, but received an empty response from server.");
+            }
+            if (!json.success) {
+                throw new Error(json.message || "Save failed");
+            }
 
             onSaved(json.data!);
+
             if (!editing?.id) {
-                setCondition("");
-                setDiagnosisDate("");
-                setStatus("Active");
-                setNotes("");
+                setDescription("");
             }
         } catch (e: unknown) {
             setErr(e instanceof Error ? e.message : "Something went wrong");
@@ -80,51 +90,27 @@ export default function PMHForm({ patientId, encounterId, editing, onSaved, onCa
     }
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border p-4 shadow-sm bg-white">
-            <h3 className="text-lg font-semibold">{editing?.id ? "Edit PMH Entry" : "Add PMH Entry"}</h3>
+        <form
+            onSubmit={handleSubmit}
+            className="space-y-4 rounded-2xl border p-4 shadow-sm bg-white"
+            aria-label={editing?.id ? "Edit PMH Entry" : "Add PMH Entry"}
+        >
+            <h3 className="text-lg font-semibold">
+                {editing?.id ? "Edit PMH Entry" : "Add PMH Entry"}
+            </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="md:col-span-2">
-                    <label className="block text-sm font-medium mb-1">Condition</label>
-                    <input
-                        className="w-full rounded-lg border px-3 py-2 focus:ring"
-                        value={condition}
-                        onChange={(e) => setCondition(e.target.value)}
-                        placeholder="e.g., Hypertension"
-                        required
-                    />
-                </div>
-
+            <div className="grid grid-cols-1 gap-3">
                 <div>
-                    <label className="block text-sm font-medium mb-1">Diagnosis Date</label>
-                    <input
-                        type="date"
-                        className="w-full rounded-lg border px-3 py-2 focus:ring"
-                        value={diagnosisDate}
-                        onChange={(e) => setDiagnosisDate(e.target.value)}
-                    />
-                </div>
-
-                <div>
-                    <label className="block text-sm font-medium mb-1">Status</label>
-                    <select
-                        className="w-full rounded-lg border px-3 py-2 focus:ring"
-                        value={status}
-                        onChange={(e) => setStatus(e.target.value as PastMedicalHistoryDto["status"])}
-                    >
-                        <option value="Active">Active</option>
-                        <option value="Resolved">Resolved</option>
-                        <option value="Unknown">Unknown</option>
-                    </select>
-                </div>
-
-                <div className="md:col-span-2">
-                    <label className="block text-sm font-medium mb-1">Notes</label>
+                    <label className="block text-sm font-medium mb-1" htmlFor="pmh-description">
+                        Description
+                    </label>
                     <textarea
-                        className="w-full rounded-lg border px-3 py-2 focus:ring min-h-24"
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                        placeholder="Additional details"
+                        id="pmh-description"
+                        className="w-full rounded-lg border px-3 py-2 focus:ring min-h-28"
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        placeholder='e.g., Patient has history of hypertension, diagnosed in 2018.'
+                        required
                     />
                 </div>
             </div>
@@ -132,11 +118,19 @@ export default function PMHForm({ patientId, encounterId, editing, onSaved, onCa
             {err && <p className="text-sm text-red-600">{err}</p>}
 
             <div className="flex items-center gap-2">
-                <button type="submit" disabled={saving} className="rounded-xl bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:opacity-60">
+                <button
+                    type="submit"
+                    disabled={saving}
+                    className="rounded-xl bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:opacity-60"
+                >
                     {saving ? "Saving..." : editing?.id ? "Update" : "Save"}
                 </button>
                 {onCancel && (
-                    <button type="button" onClick={onCancel} className="rounded-xl border px-4 py-2 hover:bg-gray-50">
+                    <button
+                        type="button"
+                        onClick={onCancel}
+                        className="rounded-xl border px-4 py-2 hover:bg-gray-50"
+                    >
                         Cancel
                     </button>
                 )}
