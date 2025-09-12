@@ -1,16 +1,12 @@
 "use client";
+
 import AdminLayout from "@/app/(admin)/layout";
 import React, { useMemo, useState, useRef, useEffect } from "react";
 import { fetchWithAuth } from "@/utils/fetchWithAuth";
 import TemplateManagement from "../Template/TemplateManagement";
 
 /* ------------ Types ------------ */
-type ApiResponse<T> = {
-    success: boolean;
-    message: string;
-    data: T;
-};
-
+type ApiResponse<T> = { success: boolean; message: string; data: T };
 type FolderType = "inbox" | "sent" | "archive";
 
 type Message = {
@@ -26,11 +22,19 @@ type Message = {
     isRead?: boolean;
 };
 
-type Patient = { id: number; firstName: string; lastName: string };
+type Patient = {
+    id: number;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phoneNumber: string;
+};
+
 type Provider = {
     id: number;
     identification?: { firstName?: string; lastName?: string };
 };
+
 type Template = {
     id: number;
     templateName: string;
@@ -39,17 +43,26 @@ type Template = {
     archived?: boolean;
 };
 
-// ✅ Backend-facing DTO
 type CommunicationDto = {
     id: number;
-    sender: string;
-    recipient: string;
     subject: string;
-    payload: string; // backend field (was message)
+    payload: string;
     status: string;
+    fromName?: string;
+    toNames?: string[];
+    createdDate?: string;
+    inResponseTo?: number;
 };
 
-const STORAGE_MSGS = "hinisoft:messaging:all";
+const avatarColors = [
+    "bg-blue-600",
+    "bg-pink-600",
+    "bg-green-600",
+    "bg-red-600",
+    "bg-orange-600",
+    "bg-purple-600",
+    "bg-indigo-600",
+];
 
 /* ------------ Helpers ------------ */
 function formatTime(ts: number): string {
@@ -64,41 +77,20 @@ function initials(name: string) {
     );
 }
 
-function saveMessages(msgs: Message[]) {
-    try {
-        localStorage.setItem(STORAGE_MSGS, JSON.stringify(msgs));
-    } catch {
-        // ignore
-    }
-}
-
-const avatarColors = [
-    "bg-blue-600",
-    "bg-pink-600",
-    "bg-green-600",
-    "bg-red-600",
-    "bg-orange-600",
-    "bg-purple-600",
-    "bg-indigo-600",
-];
-
 /* ------------ Component ------------ */
 export default function MessagingPage() {
     const [messages, setMessages] = useState<Message[]>([]);
     const hydratedOnce = useRef(false);
 
-    // view toggles
     const [currentFolder, setCurrentFolder] = useState<FolderType>("inbox");
     const [showTemplates, setShowTemplates] = useState(false);
-
-    // search
     const [query, setQuery] = useState("");
 
     // pagination
     const [currentPage, setCurrentPage] = useState(1);
-    const pageSize = 50;
+    const [pageSize, setPageSize] = useState(50);
 
-    // compose
+    // compose state
     const [isCreating, setIsCreating] = useState(false);
     const [patients, setPatients] = useState<Patient[]>([]);
     const [providers, setProviders] = useState<Provider[]>([]);
@@ -110,45 +102,60 @@ export default function MessagingPage() {
     const [attachments, setAttachments] = useState<File[]>([]);
     const [selectedTemplateId, setSelectedTemplateId] = useState<number | "">("");
 
-    // replying
     const [replyingTo, setReplyingTo] = useState<Message | null>(null);
     const [replyBody, setReplyBody] = useState("");
 
     const isSendDisabled =
         !subject || !body || !selectedProviderId || !selectedPatientId;
 
+    /* ---- Derived Data ---- */
+    const rows = useMemo(() => {
+        return messages.filter(
+            (m) =>
+                m.folder === currentFolder &&
+                (m.sender.toLowerCase().includes(query.toLowerCase()) ||
+                    m.recipient.toLowerCase().includes(query.toLowerCase()) ||
+                    m.subject.toLowerCase().includes(query.toLowerCase()) ||
+                    m.body.toLowerCase().includes(query.toLowerCase()))
+        );
+    }, [messages, currentFolder, query]);
+
+    const paginatedRows = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return rows.slice(start, start + pageSize);
+    }, [rows, currentPage, pageSize]);
+
+    const unreadInboxCount = useMemo(
+        () => messages.filter((m) => m.folder === "inbox" && !m.isRead).length,
+        [messages]
+    );
+
+    const composeTemplateOptions: Template[] = useMemo(
+        () => templates.filter((t: Template) => !t.archived),
+        [templates]
+    );
+
     /* ---- Load patients/providers ---- */
     useEffect(() => {
         if (!isCreating) return;
-
         const loadPatients = async () => {
-            try {
-                const res = await fetchWithAuth(
-                    `${process.env.NEXT_PUBLIC_API_URL}/api/patients?page=0&size=50`
-                );
-                const json: ApiResponse<{ content: Patient[] }> = await res.json();
-                if (json.success && Array.isArray(json.data?.content)) {
-                    setPatients(json.data.content);
-                }
-            } catch (err) {
-                console.error("Error loading patients:", err);
+            const res = await fetchWithAuth(
+                `${process.env.NEXT_PUBLIC_API_URL}/api/patients?page=0&size=50`
+            );
+            const json: ApiResponse<{ content: Patient[] }> = await res.json();
+            if (json.success && Array.isArray(json.data?.content)) {
+                setPatients(json.data.content);
             }
         };
-
         const loadProviders = async () => {
-            try {
-                const res = await fetchWithAuth(
-                    `${process.env.NEXT_PUBLIC_API_URL}/api/providers?status=ACTIVE`
-                );
-                const json: ApiResponse<Provider[]> = await res.json();
-                if (json.success && Array.isArray(json.data)) {
-                    setProviders(json.data);
-                }
-            } catch (err) {
-                console.error("Error loading providers:", err);
+            const res = await fetchWithAuth(
+                `${process.env.NEXT_PUBLIC_API_URL}/api/providers?status=ACTIVE`
+            );
+            const json: ApiResponse<Provider[]> = await res.json();
+            if (json.success && Array.isArray(json.data)) {
+                setProviders(json.data);
             }
         };
-
         void loadPatients();
         void loadProviders();
     }, [isCreating]);
@@ -156,91 +163,16 @@ export default function MessagingPage() {
     /* ---- Load templates ---- */
     useEffect(() => {
         const loadTemplates = async () => {
-            try {
-                const res = await fetchWithAuth(
-                    `${process.env.NEXT_PUBLIC_API_URL}/api/templates`
-                );
-                const json: ApiResponse<Template[]> = await res.json();
-                if (json.success && Array.isArray(json.data)) {
-                    setTemplates(json.data);
-                }
-            } catch (err) {
-                console.error("Error loading templates:", err);
+            const res = await fetchWithAuth(
+                `${process.env.NEXT_PUBLIC_API_URL}/api/templates`
+            );
+            const json: ApiResponse<Template[]> = await res.json();
+            if (json.success && Array.isArray(json.data)) {
+                setTemplates(json.data);
             }
         };
         void loadTemplates();
     }, []);
-
-    /* ---- Hydrate messages from backend ---- */
-    useEffect(() => {
-        if (hydratedOnce.current) return;
-        hydratedOnce.current = true;
-
-        const loadCommunications = async () => {
-            try {
-                const res = await fetchWithAuth(
-                    `${process.env.NEXT_PUBLIC_API_URL}/api/communications`
-                );
-                const json: ApiResponse<CommunicationDto[]> = await res.json();
-                if (json.success && Array.isArray(json.data)) {
-                    const mapped: Message[] = json.data.map((comm, idx) => ({
-                        id: comm.id,
-                        sender: comm.sender,
-                        recipient: comm.recipient,
-                        subject: comm.subject,
-                        body: comm.payload,
-                        createdAt: Date.now(),
-                        time: formatTime(Date.now()),
-                        folder: "sent",
-                        avatar: {
-                            initials: initials(comm.sender),
-                            color: avatarColors[idx % avatarColors.length],
-                        },
-                        isRead: true,
-                    }));
-                    setMessages(mapped);
-                    saveMessages(mapped);
-                }
-            } catch (err) {
-                console.error("Error loading communications:", err);
-            }
-        };
-
-        void loadCommunications();
-    }, []);
-
-    /* ---- Unread count ---- */
-    const unreadInboxCount = useMemo(
-        () => messages.filter((m) => m.folder === "inbox" && !m.isRead).length,
-        [messages]
-    );
-
-    /* ---- Filter rows ---- */
-    const rows = useMemo(() => {
-        const q = query.trim().toLowerCase();
-        return messages
-            .filter((m) => !showTemplates && m.folder === currentFolder)
-            .filter(
-                (m) =>
-                    !q ||
-                    m.sender.toLowerCase().includes(q) ||
-                    m.recipient.toLowerCase().includes(q) ||
-                    m.subject.toLowerCase().includes(q) ||
-                    m.body.toLowerCase().includes(q)
-            )
-            .sort((a, b) => b.createdAt - a.createdAt);
-    }, [messages, query, currentFolder, showTemplates]);
-
-    const paginatedRows = useMemo(() => {
-        const start = (currentPage - 1) * pageSize;
-        return rows.slice(start, start + pageSize);
-    }, [rows, currentPage]);
-
-    /* ---- Template helpers ---- */
-    const composeTemplateOptions = useMemo(
-        () => templates.filter((t) => !t.archived),
-        [templates]
-    );
 
     function applySelectedTemplate() {
         const t = composeTemplateOptions.find((t) => t.id === selectedTemplateId);
@@ -250,63 +182,118 @@ export default function MessagingPage() {
         }
     }
 
-    /* ---- Message helpers ---- */
+    /* ---- Hydrate communications ---- */
+    const loadCommunications = async () => {
+        const res = await fetchWithAuth(
+            `${process.env.NEXT_PUBLIC_API_URL}/api/communications`
+        );
+        const json: ApiResponse<CommunicationDto[]> = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+            const mapped: Message[] = json.data.map((comm, idx) => {
+                const ts = comm.createdDate
+                    ? new Date(comm.createdDate).getTime()
+                    : Date.now();
+                let folder: FolderType = "sent";
+                if (comm.status === "RECEIVED") folder = "inbox";
+                else if (comm.status === "ARCHIVED") folder = "archive";
+                return {
+                    id: comm.id,
+                    sender: comm.fromName || "Unknown Provider",
+                    recipient: comm.toNames?.[0] || "Unknown Patient",
+                    subject: comm.subject,
+                    body: comm.payload,
+                    createdAt: ts,
+                    time: formatTime(ts),
+                    folder,
+                    avatar: {
+                        initials: initials(comm.fromName || "U"),
+                        color: avatarColors[idx % avatarColors.length],
+                    },
+                    isRead: folder !== "inbox",
+                };
+            });
+            setMessages(mapped);
+        }
+    };
+
+    useEffect(() => {
+        if (hydratedOnce.current) return;
+        hydratedOnce.current = true;
+        void loadCommunications();
+    }, []);
+
+    /* ---- Actions ---- */
+    async function archiveMessage(id: number) {
+        const res = await fetchWithAuth(
+            `${process.env.NEXT_PUBLIC_API_URL}/api/communications/archive/${id}`,
+            { method: "PUT" }
+        );
+        if (res.ok) {
+            setMessages((prev) =>
+                prev.map((m) => (m.id === id ? { ...m, folder: "archive" } : m))
+            );
+        }
+    }
+
+    async function restoreMessage(id: number) {
+        const res = await fetchWithAuth(
+            `${process.env.NEXT_PUBLIC_API_URL}/api/communications/restore/${id}`,
+            { method: "PUT" }
+        );
+        if (res.ok) {
+            setMessages((prev) =>
+                prev.map((m) => {
+                    if (m.id === id) {
+                        const restoredFolder: FolderType =
+                            m.subject?.toLowerCase().startsWith("re:") || m.folder === "sent"
+                                ? "sent"
+                                : "inbox";
+                        return { ...m, folder: restoredFolder };
+                    }
+                    return m;
+                })
+            );
+        }
+    }
+
+    function markAsRead(id: number) {
+        setMessages((prev) =>
+            prev.map((m) => (m.id === id ? { ...m, isRead: true } : m))
+        );
+    }
+
+    /* ---- Create Message ---- */
     async function createMessage() {
         if (isSendDisabled) return;
         const provider = providers.find((p) => String(p.id) === selectedProviderId);
         const patient = patients.find((p) => String(p.id) === selectedPatientId);
 
+        const providerIdNum = provider?.id ?? Number(selectedProviderId);
+        const patientIdNum = patient?.id ?? Number(selectedPatientId);
+
         const payloadObj = {
-            sender: provider
-                ? `${provider.identification?.firstName || ""} ${
-                    provider.identification?.lastName || ""
-                }`
-                : "Provider",
-            recipient: patient
-                ? `${patient.firstName} ${patient.lastName}`
-                : "Patient",
+            sender: providerIdNum ? `Provider/${providerIdNum}` : undefined,
+            recipients: patientIdNum ? [`Patient/${patientIdNum}`] : [],
+            providerId: providerIdNum,
+            patientId: patientIdNum,
             subject,
-            payload: body, // ✅ renamed
-            status: "QUEUED",
+            payload: body,
+            status: "SENT",
+            category: "appointment",
+            sentDate: new Date().toISOString(),
         };
 
-        try {
-            const res = await fetchWithAuth(
-                `${process.env.NEXT_PUBLIC_API_URL}/api/communications`,
-                {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payloadObj),
-                }
-            );
-            const json: ApiResponse<CommunicationDto> = await res.json();
-
-            if (json.success && json.data) {
-                const comm = json.data;
-                const now = Date.now();
-
-                const savedMsg: Message = {
-                    id: comm.id,
-                    sender: comm.sender,
-                    recipient: comm.recipient,
-                    subject: comm.subject,
-                    body: comm.payload,
-                    createdAt: now,
-                    time: formatTime(now),
-                    folder: "sent",
-                    avatar: {
-                        initials: initials(comm.sender),
-                        color: avatarColors[messages.length % avatarColors.length],
-                    },
-                    isRead: true,
-                };
-
-                const updated = [savedMsg, ...messages];
-                setMessages(updated);
-                saveMessages(updated);
+        const res = await fetchWithAuth(
+            `${process.env.NEXT_PUBLIC_API_URL}/api/communications`,
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payloadObj),
             }
-        } catch (err) {
-            console.error("Error creating communication:", err);
+        );
+        const json: ApiResponse<CommunicationDto> = await res.json();
+        if (json.success && json.data) {
+            await loadCommunications();
         }
 
         setIsCreating(false);
@@ -318,90 +305,74 @@ export default function MessagingPage() {
         setAttachments([]);
     }
 
+    /* ---- Send Reply ---- */
     async function sendReply() {
         if (!replyingTo || !replyBody.trim()) return;
-        const now = Date.now();
+
+        const provider = providers.find((p) => String(p.id) === selectedProviderId);
+        const patient = patients.find(
+            (p) => `${p.firstName} ${p.lastName}`.trim() === replyingTo.recipient.trim()
+        );
+
+        const providerIdNum = provider?.id ?? Number(selectedProviderId);
+        const patientIdNum = patient?.id ?? Number(selectedPatientId);
+
+        const providerName = provider
+            ? `${provider.identification?.firstName || ""} ${
+                provider.identification?.lastName || ""
+            }`.trim()
+            : "";
 
         const payloadObj = {
-            sender: replyingTo.recipient,
-            recipient: replyingTo.sender,
+            sender: providerIdNum ? `Provider/${providerIdNum}` : undefined,
+            recipients: patientIdNum ? [`Patient/${patientIdNum}`] : [],
+            providerId: providerIdNum,
+            patientId: patientIdNum,
             subject: `Re: ${replyingTo.subject}`,
-            payload: replyBody, // ✅ renamed
-            status: "QUEUED",
+            payload: replyBody,
+            status: "SENT",
+            category: "reply",
+            sentDate: new Date().toISOString(),
+            inResponseTo: replyingTo.id,
+            fromName: providerName,
         };
 
-        try {
-            const res = await fetchWithAuth(
-                `${process.env.NEXT_PUBLIC_API_URL}/api/communications`,
-                {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payloadObj),
-                }
-            );
-            const json: ApiResponse<CommunicationDto> = await res.json();
-
-            if (json.success && json.data) {
-                const comm = json.data;
-
-                const replyMsg: Message = {
-                    id: comm.id,
-                    sender: comm.sender,
-                    recipient: comm.recipient,
-                    subject: comm.subject,
-                    body: comm.payload,
-                    createdAt: now,
-                    time: formatTime(now),
-                    folder: "sent",
-                    isRead: true,
-                };
-
-                const updated = [replyMsg, ...messages];
-                setMessages(updated);
-                saveMessages(updated);
+        const res = await fetchWithAuth(
+            `${process.env.NEXT_PUBLIC_API_URL}/api/communications`,
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payloadObj),
             }
-        } catch (err) {
-            console.error("Error sending reply:", err);
+        );
+        const json: ApiResponse<CommunicationDto> = await res.json();
+        if (json.success && json.data) {
+            const comm = json.data;
+            const ts = comm.createdDate
+                ? new Date(comm.createdDate).getTime()
+                : Date.now();
+            const newMsg: Message = {
+                id: comm.id,
+                sender: comm.fromName || "Unknown Provider",
+                recipient: comm.toNames?.[0] || "Unknown Patient",
+                subject: comm.subject,
+                body: comm.payload,
+                createdAt: ts,
+                time: formatTime(ts),
+                folder: "sent",
+                avatar: {
+                    initials: initials(comm.fromName || "U"),
+                    color: avatarColors[Math.floor(Math.random() * avatarColors.length)],
+                },
+                isRead: true,
+            };
+            setMessages((prev) => [newMsg, ...prev]);
         }
 
         setReplyingTo(null);
         setReplyBody("");
     }
 
-    function archiveMessage(id: number) {
-        setMessages((prev) => {
-            const updated = prev.map((m) =>
-                m.id === id ? { ...m, folder: "archive" as const } : m
-            );
-            saveMessages(updated);
-            return updated;
-        });
-    }
-
-    function restoreMessage(
-        id: number,
-        targetFolder: Exclude<FolderType, "archive">
-    ) {
-        setMessages((prev) => {
-            const updated = prev.map((m) =>
-                m.id === id ? { ...m, folder: targetFolder } : m
-            );
-            saveMessages(updated);
-            return updated;
-        });
-    }
-
-    function markAsRead(id: number) {
-        setMessages((prev) => {
-            const updated = prev.map((m) =>
-                m.id === id ? { ...m, isRead: true } : m
-            );
-            saveMessages(updated);
-            return updated;
-        });
-    }
-
-    /* ------------ Render ------------ */
     return (
         <AdminLayout>
             <div className="px-4 pt-0 pb-4">
@@ -424,14 +395,13 @@ export default function MessagingPage() {
                             >
                                 {f === "inbox" ? (
                                     <span className="inline-flex items-center gap-2">
-                  Inbox
+                    Inbox
                                         {unreadInboxCount > 0 && (
-                                            <span
-                                                className="inline-flex min-w-[20px] h-5 items-center justify-center rounded-full bg-blue-600 text-white text-xs px-1">
-                      {unreadInboxCount}
-                    </span>
+                                            <span className="inline-flex min-w-[20px] h-5 items-center justify-center rounded-full bg-blue-600 text-white text-xs px-1">
+                        {unreadInboxCount}
+                      </span>
                                         )}
-                </span>
+                  </span>
                                 ) : (
                                     f.charAt(0).toUpperCase() + f.slice(1)
                                 )}
@@ -500,11 +470,11 @@ export default function MessagingPage() {
                                     return (
                                         <tr key={m.id} className="border-t hover:bg-gray-50">
                                             <td className="px-3 py-2 flex items-center gap-2">
-                        <span
-                            className={`w-2 h-2 rounded-full ${
-                                isInboxUnread ? "bg-blue-500" : "bg-transparent"
-                            }`}
-                        />
+                          <span
+                              className={`w-2 h-2 rounded-full ${
+                                  isInboxUnread ? "bg-blue-500" : "bg-transparent"
+                              }`}
+                          />
                                                 <div
                                                     className={`w-8 h-8 flex items-center justify-center rounded-full text-white text-xs font-bold shadow ${m.avatar?.color}`}
                                                 >
@@ -523,10 +493,9 @@ export default function MessagingPage() {
                                             >
                                                 {m.subject}
                                                 {isInboxUnread && (
-                                                    <span
-                                                        className="ml-2 inline-block text-[10px] font-semibold uppercase tracking-wide text-blue-600 bg-blue-50 px-2 py-[2px] rounded">
-                            NEW
-                          </span>
+                                                    <span className="ml-2 inline-block text-[10px] font-semibold uppercase tracking-wide text-blue-600 bg-blue-50 px-2 py-[2px] rounded">
+                              NEW
+                            </span>
                                                 )}
                                             </td>
                                             <td className="px-3 py-2 whitespace-nowrap text-gray-600">
@@ -535,18 +504,12 @@ export default function MessagingPage() {
                                             <td className="px-3 py-2 text-right">
                                                 {currentFolder === "archive" ? (
                                                     <button
-                                                        onClick={() =>
-                                                            restoreMessage(
-                                                                m.id,
-                                                                m.sender.includes("Provider") ? "sent" : "inbox"
-                                                            )
-                                                        }
+                                                        onClick={() => restoreMessage(m.id)}
                                                         className="text-green-600 hover:text-green-800"
                                                         title="Restore"
                                                     >
                                                         ↑
                                                     </button>
-
                                                 ) : (
                                                     <div className="flex gap-3 justify-end items-center">
                                                         <button
@@ -554,12 +517,30 @@ export default function MessagingPage() {
                                                                 if (m.folder === "inbox" && !m.isRead)
                                                                     markAsRead(m.id);
                                                                 setReplyingTo(m);
+
+                                                                // Autofill provider
+                                                                const prov = providers.find(
+                                                                    (p) =>
+                                                                        `${p.identification?.firstName || ""} ${
+                                                                            p.identification?.lastName || ""
+                                                                        }`.trim() === m.sender.trim()
+                                                                );
+                                                                if (prov) setSelectedProviderId(String(prov.id));
+
+                                                                // Autofill patient
+                                                                const pat = patients.find(
+                                                                    (p) =>
+                                                                        `${p.firstName} ${p.lastName}`.trim() ===
+                                                                        m.recipient.trim()
+                                                                );
+                                                                if (pat) setSelectedPatientId(String(pat.id));
                                                             }}
                                                             className="text-blue-600 hover:text-blue-800"
                                                             title="Reply"
                                                         >
                                                             ↩
                                                         </button>
+
                                                         <button
                                                             onClick={() => archiveMessage(m.id)}
                                                             className="text-red-600 hover:text-red-800"
@@ -567,7 +548,6 @@ export default function MessagingPage() {
                                                         >
                                                             ↓
                                                         </button>
-
                                                     </div>
                                                 )}
                                             </td>
@@ -587,35 +567,65 @@ export default function MessagingPage() {
                             </tbody>
                         </table>
 
-                        {/* Pagination */}
-                        {rows.length > pageSize && (
-                            <div className="flex justify-end items-center gap-2 mt-3 text-sm">
-                                <button
-                                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                                    disabled={currentPage === 1}
-                                    className="px-3 py-1 rounded bg-gray-100 disabled:opacity-50"
-                                >
-                                    Prev
-                                </button>
-                                <span>
-                Page {currentPage} of {Math.ceil(rows.length / pageSize)}
-              </span>
-                                <button
-                                    onClick={() =>
-                                        setCurrentPage((p) =>
-                                            p < Math.ceil(rows.length / pageSize) ? p + 1 : p
-                                        )
-                                    }
-                                    disabled={currentPage >= Math.ceil(rows.length / pageSize)}
-                                    className="px-3 py-1 rounded bg-gray-100 disabled:opacity-50"
-                                >
-                                    Next
-                                </button>
+                        {/* Pagination Footer */}
+                        {rows.length > 0 && (
+                            <div className="flex justify-between items-center mt-3 text-sm">
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                                        disabled={currentPage === 1}
+                                        className="px-3 py-1 rounded bg-gray-100 disabled:opacity-50"
+                                    >
+                                        Prev
+                                    </button>
+                                    <span>
+                    Page {currentPage} of{" "}
+                                        {Math.max(1, Math.ceil(rows.length / pageSize))}
+                  </span>
+                                    <button
+                                        onClick={() =>
+                                            setCurrentPage((p) =>
+                                                p < Math.ceil(rows.length / pageSize) ? p + 1 : p
+                                            )
+                                        }
+                                        disabled={currentPage >= Math.ceil(rows.length / pageSize)}
+                                        className="px-3 py-1 rounded bg-gray-100 disabled:opacity-50"
+                                    >
+                                        Next
+                                    </button>
+                                </div>
+
+                                <div className="flex items-center gap-3">
+                  <span>
+                    Showing{" "}
+                      {rows.length === 0
+                          ? "0"
+                          : `${(currentPage - 1) * pageSize + 1}–${Math.min(
+                              currentPage * pageSize,
+                              rows.length
+                          )}`}{" "}
+                      of {rows.length}
+                  </span>
+                                    <select
+                                        value={pageSize}
+                                        onChange={(e) => {
+                                            setCurrentPage(1);
+                                            setPageSize(Number(e.target.value));
+                                        }}
+                                        className="border rounded px-2 py-1"
+                                    >
+                                        {[10, 20, 50, 100].map((size) => (
+                                            <option key={size} value={size}>
+                                                {size}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                         )}
                     </>
                 ) : (
-                    <TemplateManagement/>
+                    <TemplateManagement />
                 )}
             </div>
 
@@ -624,8 +634,35 @@ export default function MessagingPage() {
                 <div className="fixed inset-0 z-[99999] grid place-items-center bg-black/40 p-4">
                     <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
                         <h2 className="text-lg font-semibold mb-4">
-                            Reply to {replyingTo.sender}
+                            Reply to {replyingTo.recipient}
                         </h2>
+
+                        <div className="mb-3 text-sm text-gray-700">
+                            <p>
+                                <strong>From (Provider):</strong>{" "}
+                                {providers.find((p) => String(p.id) === selectedProviderId)
+                                    ? `${providers.find(
+                                        (p) => String(p.id) === selectedProviderId
+                                    )?.identification?.firstName || ""} ${
+                                        providers.find(
+                                            (p) => String(p.id) === selectedProviderId
+                                        )?.identification?.lastName || ""
+                                    }`.trim()
+                                    : "Not selected"}
+                            </p>
+                            <p>
+                                <strong>To (Patient):</strong>{" "}
+                                {patients.find((p) => String(p.id) === selectedPatientId)
+                                    ? `${patients.find(
+                                        (p) => String(p.id) === selectedPatientId
+                                    )?.firstName || ""} ${
+                                        patients.find((p) => String(p.id) === selectedPatientId)
+                                            ?.lastName || ""
+                                    }`.trim()
+                                    : "Not selected"}
+                            </p>
+                        </div>
+
                         <textarea
                             rows={5}
                             value={replyBody}
@@ -633,6 +670,7 @@ export default function MessagingPage() {
                             placeholder="Type your reply..."
                             className="w-full p-2 border rounded"
                         />
+
                         <div className="flex justify-end gap-2 mt-3">
                             <button
                                 onClick={() => {
@@ -658,6 +696,8 @@ export default function MessagingPage() {
                     </div>
                 </div>
             )}
+
+
 
             {/* Compose Modal */}
             {isCreating && (
@@ -754,7 +794,6 @@ export default function MessagingPage() {
                             <div className="flex justify-between items-center gap-2">
                                 <div className="flex items-center gap-2">
                                     <label className="px-4 py-2 rounded bg-gray-100 cursor-pointer text-sm">
-                                        Attach
                                         <input
                                             type="file"
                                             multiple
@@ -765,7 +804,8 @@ export default function MessagingPage() {
                                                     [...prev, ...files].slice(0, 5)
                                                 );
                                             }}
-                                        />
+                                        /> Attach
+
                                     </label>
                                     <button
                                         onClick={() => setIsCreating(false)}
