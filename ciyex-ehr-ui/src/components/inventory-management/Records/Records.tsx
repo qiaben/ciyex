@@ -1,23 +1,25 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import AdminLayout from "@/app/(admin)/layout";
+import { fetchWithAuth } from "@/utils/fetchWithAuth";
 
-/** Types & Seed */
-type Order = {
-    id: string;
-    supplier: string;
-    date: string;
-    status: "Pending" | "Received" | "Cancelled";
-    itemsCount: number;
-    amount: number;
+const API_URL = process.env.NEXT_PUBLIC_API_URL!;
+
+type WeeklyRecord = {
+    day?: string;
+    label?: string;
+    stock?: number;
+    value?: number;
 };
 
-const seedOrders: Order[] = [
-    { id: "PO-1001", supplier: "MediSupply Co.", date: "2025-08-05", status: "Pending", itemsCount: 12, amount: 48500 },
-    { id: "PO-1002", supplier: "HealthPro Distributors", date: "2025-08-12", status: "Received", itemsCount: 7, amount: 19250 },
-    { id: "PO-1003", supplier: "Clinic Essentials", date: "2025-08-28", status: "Pending", itemsCount: 5, amount: 7600 },
-];
+type MonthlyRecord = {
+    month?: string;
+    label?: string;
+    count?: number;
+    value?: number;
+};
+
 
 /** UI */
 function Panel({ title, children }: { title?: string; children: React.ReactNode }) {
@@ -67,32 +69,73 @@ function SimpleBarChart<T extends Record<string, unknown>>({
 
 /** Component */
 export default function Records() {
-    const trend = [
-        { day: "Mon", stock: 820 },
-        { day: "Tue", stock: 790 },
-        { day: "Wed", stock: 770 },
-        { day: "Thu", stock: 760 },
-        { day: "Fri", stock: 740 },
-        { day: "Sat", stock: 735 },
-        { day: "Sun", stock: 730 },
-    ];
+    const [weekly, setWeekly] = useState<{ label: string; value: number }[]>([]);
+    const [monthly, setMonthly] = useState<{ label: string; value: number }[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    // ✅ Safe JSON helper
+    async function safeJson(res: Response) {
+        const text = await res.text();
+        if (!text) return null;
+        try {
+            return JSON.parse(text);
+        } catch (err) {
+            console.error("Invalid JSON:", err);
+            return null;
+        }
+    }
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const [weeklyRes, monthlyRes] = await Promise.all([
+                    fetchWithAuth(`${API_URL}/api/inventory/records/weekly-consumption`),
+                    fetchWithAuth(`${API_URL}/api/inventory/records/monthly-orders`),
+                ]);
+
+                const weeklyJson = await safeJson(weeklyRes);
+                const monthlyJson = await safeJson(monthlyRes);
+
+                setWeekly(
+                    (weeklyJson?.data as WeeklyRecord[] || []).map((d) => ({
+                        label: d.day || d.label || "N/A",
+                        value: d.stock || d.value || 0,
+                    }))
+                );
+
+                setMonthly(
+                    (monthlyJson?.data as MonthlyRecord[] || []).map((d) => ({
+                        label: d.month || d.label || "N/A",
+                        value: d.count || d.value || 0,
+                    }))
+                );
+            } catch (e) {
+                console.error("Error loading records", e);
+            } finally {
+                setLoading(false);
+            }
+        })();
+    }, []);
 
     return (
         <AdminLayout>
-            <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
-                Records
-            </h1>
-            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+            <div className="text-2xl font-semibold text-slate-900 dark:text-slate-100"></div>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                 Maintain records of past stock movements and audit history.
             </p>
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <Panel title="Weekly Stock Consumption">
-                <SimpleBarChart data={trend} valueKey="stock" labelKey="day" />
-            </Panel>
-            <Panel title="Monthly Orders (count)">
-                <SimpleBarChart data={[{ month: "Aug", value: seedOrders.length }]} valueKey="value" labelKey="month" />
-            </Panel>
-        </div>
+
+            {loading ? (
+                <p className="mt-4 text-slate-500 dark:text-slate-400">Loading...</p>
+            ) : (
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 mt-4">
+                    <Panel title="Weekly Stock Consumption">
+                        <SimpleBarChart data={weekly} valueKey="value" labelKey="label" />
+                    </Panel>
+                    <Panel title="Monthly Orders (count)">
+                        <SimpleBarChart data={monthly} valueKey="value" labelKey="label" />
+                    </Panel>
+                </div>
+            )}
         </AdminLayout>
     );
 }
