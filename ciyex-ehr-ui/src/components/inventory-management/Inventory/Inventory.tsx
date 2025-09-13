@@ -439,7 +439,6 @@ export default function Inventory() {
 
 
 
-
     async function deleteItem(id: string) {
         if (!confirm("Are you sure you want to delete this item?")) {
             return;
@@ -740,7 +739,7 @@ export default function Inventory() {
                                             >
                                                 <option value="" disabled>Select supplier</option>
                                                 {supplierOptions.map(s => (
-                                                    <option key={s.id} value={s.id}>
+                                                    <option key={s.id} value={s.name}>
                                                         {s.name}
                                                     </option>
                                                 ))}
@@ -829,7 +828,7 @@ export default function Inventory() {
                                             >
                                                 <option value="" disabled>Select supplier</option>
                                                 {supplierOptions.map(s => (
-                                                    <option key={s.id} value={s.id}>
+                                                    <option key={s.id} value={s.name}>
                                                         {s.name}
                                                     </option>
                                                 ))}
@@ -902,16 +901,18 @@ export default function Inventory() {
                                         <Button type="button" onClick={() => setEditMode(true)}>
                                             Edit
                                         </Button>
-                                        <Button
-                                            type="button"
-                                            className="rounded-2xl bg-emerald-600 text-white hover:bg-emerald-700"
-                                            onClick={() => {
-                                                setReorderMode(true);
-                                                setEditMode(false);
-                                            }}
-                                        >
-                                            Reorder
-                                        </Button>
+                                        {selected.status === "Active" && (
+                                            <Button
+                                                type="button"
+                                                className="rounded-2xl bg-emerald-600 text-white hover:bg-emerald-700"
+                                                onClick={() => {
+                                                    setReorderMode(true);
+                                                    setEditMode(false);
+                                                }}
+                                            >
+                                                Reorder
+                                            </Button>
+                                        )}
                                         <Button
                                             type="button"
                                             className="rounded-2xl bg-rose-600 text-white hover:bg-rose-700"

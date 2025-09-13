@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import Alert from "@/components/ui/alert/Alert";
 import { fetchWithAuth } from "@/utils/fetchWithAuth";
 
+
+
 function Panel({ title, children }: { title?: string; children: React.ReactNode }) {
     return (
         <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:shadow-none">
@@ -107,6 +109,7 @@ export default function Settings() {
         })();
     }, [orgId]);
 
+
     // ✅ Save settings
     async function saveSettings(
         updates: Partial<{
@@ -158,6 +161,7 @@ export default function Settings() {
             });
         }
     }
+
 
     if (loading) return <div className="p-6">Loading...</div>;
 
