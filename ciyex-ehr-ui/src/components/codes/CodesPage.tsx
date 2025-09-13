@@ -14,7 +14,7 @@ interface Code {
   diagnosisReporting?: boolean;
   serviceReporting?: boolean;
   relateTo?: string;
-  feeStandard?: number;
+  feeStandard?: number | string; // allow string input; sanitize before send
 }
 
 const codeTypes = [
@@ -24,10 +24,23 @@ const codeTypes = [
   { value: "ICD10", label: "ICD10 Diagnosis" },
   { value: "ICD9", label: "ICD9 Diagnosis" },
   { value: "CUSTOM", label: "Custom" },
-];
+] as const;
 
-// Keep env-based absolute URL as requested
-const API_URL = `${process.env.NEXT_PUBLIC_API_URL}/api/codes`;
+type CodeType = (typeof codeTypes)[number]["value"];
+
+// Runtime guard to check if a string matches our CodeType union
+const isCodeType = (v: string): v is CodeType =>
+  (codeTypes as readonly { value: CodeType }[]).some((t) => t.value === v);
+
+// --- Safe base URL builder (avoid double slashes) ---
+const BASE_API = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/+$/, "");
+const API_URL = `${BASE_API}/api/codes`;
+
+// Detect https-page → http-api mixed-content (blocked by browsers)
+const isHttpsMixedContent = () =>
+  typeof window !== "undefined" &&
+  window.location.protocol === "https:" &&
+  API_URL.startsWith("http:");
 
 type ApiResponse<T = unknown> = { data?: T; message?: string; error?: string };
 
@@ -57,9 +70,15 @@ export default function CodesPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  // Org identifier from localStorage
-  const rawOrgId = typeof window !== "undefined" ? localStorage.getItem("orgId") : null;
-  const orgId = rawOrgId && /^\d+$/.test(rawOrgId) ? rawOrgId : null;
+  // --- Robust orgId resolution (staging-safe). Fall back to env -> default '1' ---
+  const resolveOrgId = (): string | null => {
+    if (typeof window === "undefined") return null;
+    const fromLS = (localStorage.getItem("orgId") || "").trim();
+    const fromEnv = (process.env.NEXT_PUBLIC_ORG_ID || "").trim();
+    const candidate = fromLS || fromEnv || "1";
+    return /^\d+$/.test(candidate) ? candidate : null;
+  };
+  const [orgId] = useState<string | null>(() => resolveOrgId());
 
   // Build headers for every request
   const makeHeaders = useCallback((): Record<string, string> => {
@@ -67,10 +86,10 @@ export default function CodesPage() {
       Accept: "application/json",
       "Content-Type": "application/json",
     };
-    if (orgId) h["orgId"] = orgId;
+    if (orgId) h["orgId"] = orgId.trim();
     if (typeof window !== "undefined") {
-      const facilityId = localStorage.getItem("facilityId");
-      const role = localStorage.getItem("role");
+      const facilityId = (localStorage.getItem("facilityId") || "").trim();
+      const role = (localStorage.getItem("role") || "").trim();
       if (facilityId) h["facilityId"] = facilityId;
       if (role) h["role"] = role;
     }
@@ -84,6 +103,13 @@ export default function CodesPage() {
         setError("Missing orgId. Please sign in again.");
         return;
       }
+      if (isHttpsMixedContent()) {
+        setError(
+          "Blocked by browser: NEXT_PUBLIC_API_URL is http while the page is https. Use an https API URL."
+        );
+        return;
+      }
+
       try {
         setError(null);
         let url = API_URL;
@@ -95,7 +121,7 @@ export default function CodesPage() {
           if (fText) params.append("codeType", fText);
           url = `${API_URL}/search?${params.toString()}`;
         }
-        const res = await fetchWithAuth(url, { headers: makeHeaders() });
+        const res = await fetchWithAuth(url, { headers: makeHeaders(), mode: "cors" as const });
         const bodyText = await res.text();
         let parsed: ApiResponse<Code[]> | null = null;
         try {
@@ -113,7 +139,11 @@ export default function CodesPage() {
             `Failed to load codes (status ${res.status})`;
           setCodes([]);
           setError(msg);
-          console.error("/api/codes error", { status: res.status, body: bodyText });
+          console.error("/api/codes error", {
+            status: res.status,
+            requestId: res.headers.get("x-request-id"),
+            body: bodyText,
+          });
         }
       } catch (err) {
         console.error("Error loading codes:", err);
@@ -140,6 +170,23 @@ export default function CodesPage() {
     window.setTimeout(() => setToast(null), 2500);
   };
 
+  // Ensure payload aligns with backend expectations
+  const sanitizePayload = (form: Partial<Code>): Partial<Code> => {
+    const upper = (form.codeType || "").toUpperCase();
+    const normalized = isCodeType(upper) ? upper : undefined;
+
+    const payload: Partial<Code> = {
+      ...form,
+      codeType: normalized ?? form.codeType, // keep original if not in list
+    };
+
+    if (typeof payload.feeStandard === "string") {
+      const n = Number(payload.feeStandard);
+      payload.feeStandard = Number.isFinite(n) ? n : undefined;
+    }
+    return payload;
+  };
+
   // POST/PUT using fetchWithAuth + orgId header
   const saveCode = async (form: Partial<Code>) => {
     if (!orgId) {
@@ -153,14 +200,20 @@ export default function CodesPage() {
     if (!form.id && typeof form.active === "undefined") {
       form.active = true;
     }
+    if (isHttpsMixedContent()) {
+      showToast("Blocked: API is http on an https page. Set NEXT_PUBLIC_API_URL to https.", "error");
+      return;
+    }
 
     try {
-      const url = form.id ? `${API_URL}/${form.id}` : API_URL;
-      const method = form.id ? "PUT" : "POST";
+      const payload = sanitizePayload(form);
+      const url = payload.id ? `${API_URL}/${payload.id}` : API_URL;
+      const method = payload.id ? "PUT" : "POST";
       const res = await fetchWithAuth(url, {
         method,
         headers: makeHeaders(),
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
+        mode: "cors" as const,
       });
 
       const text = await res.text();
@@ -177,8 +230,17 @@ export default function CodesPage() {
         setShowEdit(false);
         showToast(parsed?.message || "Saved successfully", "success");
       } else {
+        const reqId = res.headers.get("x-request-id");
         const msg = parsed?.error || parsed?.message || text || "Save failed";
-        showToast(msg, "error");
+        const decorated = reqId ? `${msg} (req ${reqId})` : msg;
+        console.error("Save failed", {
+          status: res.status,
+          requestId: reqId,
+          url,
+          method,
+          response: text,
+        });
+        showToast(decorated, "error");
       }
     } catch (e) {
       console.error("Save error", e);
@@ -187,10 +249,16 @@ export default function CodesPage() {
   };
 
   const deleteCode = async (id: number) => {
+    if (isHttpsMixedContent()) {
+      showToast("Blocked: API is http on an https page. Set NEXT_PUBLIC_API_URL to https.", "error");
+      return;
+    }
+
     try {
       const res = await fetchWithAuth(`${API_URL}/${id}`, {
         method: "DELETE",
         headers: makeHeaders(),
+        mode: "cors" as const,
       });
       const text = await res.text();
       let parsed: ApiResponse | null = null;
@@ -203,7 +271,11 @@ export default function CodesPage() {
         await loadCodes();
         showToast(parsed?.message || "Deleted successfully", "success");
       } else {
-        showToast(parsed?.error || parsed?.message || "Delete failed", "error");
+        const reqId = res.headers.get("x-request-id");
+        const msg = parsed?.error || parsed?.message || text || "Delete failed";
+        const decorated = reqId ? `${msg} (req ${reqId})` : msg;
+        console.error("Delete failed", { status: res.status, requestId: reqId, response: text });
+        showToast(decorated, "error");
       }
     } catch (e) {
       console.error("Delete error", e);
@@ -268,9 +340,7 @@ export default function CodesPage() {
 
       {/* Error */}
       {error && (
-        <div className="p-3 rounded bg-red-50 text-red-700 border border-red-200 text-sm">
-          {error}
-        </div>
+        <div className="p-3 rounded bg-red-50 text-red-700 border border-red-200 text-sm">{error}</div>
       )}
 
       {/* Table */}
@@ -311,10 +381,7 @@ export default function CodesPage() {
           <tbody>
             {paginated.length === 0 ? (
               <tr>
-                <td
-                  colSpan={12}
-                  className="text-center py-4 text-gray-500 dark:text-gray-400 text-sm"
-                >
+                <td colSpan={12} className="text-center py-4 text-gray-500 dark:text-gray-400 text-sm">
                   No codes found.
                 </td>
               </tr>
@@ -343,7 +410,7 @@ export default function CodesPage() {
                   </td>
                   <td className="px-3 py-2 text-center">{c.diagnosisReporting ? "Y" : "N"}</td>
                   <td className="px-3 py-2 text-center">{c.serviceReporting ? "Y" : "N"}</td>
-                  <td className="px-3 py-2 text-right">{c.feeStandard}</td>
+                  <td className="px-3 py-2 text-right">{c.feeStandard as number}</td>
                   <td className="px-3 py-2 text-center space-x-2">
                     <button
                       onClick={() => {
@@ -380,20 +447,16 @@ export default function CodesPage() {
           >
             Prev
           </button>
-          <span>
-            Page {page} of {totalPages || 1}
-          </span>
-          <button
-            disabled={page === totalPages}
-            onClick={() => setPage((p) => p + 1)}
-            className="px-3 py-1 border rounded disabled:opacity-50 dark:border-gray-600"
-          >
-            Next
-          </button>
+        </div>
+
+        <div>
+          Page {page} of {totalPages || 1}
         </div>
 
         <div className="ml-auto flex items-center gap-3">
-          <div>Showing {paginated.length} of {codes.length}</div>
+          <div>
+            Showing {paginated.length} of {codes.length}
+          </div>
           <select
             value={pageSize}
             onChange={(e) => {
@@ -448,7 +511,9 @@ function CodeModal({
       <div className="bg-white dark:bg-gray-900 rounded-lg w-[650px] p-6 space-y-4">
         <div className="flex justify-between items-center">
           <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">{title}</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            ✕
+          </button>
         </div>
         <p className="text-gray-500 dark:text-gray-400 text-sm">Fill out the code details below.</p>
 
