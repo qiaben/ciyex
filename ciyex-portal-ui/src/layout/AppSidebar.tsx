@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useRef, useState,useCallback } from "react";
 import Link from "next/link";
-import Image from "next/image";
+
 import { usePathname } from "next/navigation";
 import { useSidebar } from "../context/SidebarContext";
 import {
@@ -308,33 +308,68 @@ const AppSidebar: React.FC = () => {
           !isExpanded && !isHovered ? "lg:justify-center" : "justify-start"
         }`}
       >
-        <Link href="/">
-          {isExpanded || isHovered || isMobileOpen ? (
-            <>
-              <Image
-                className="dark:hidden"
-                src="/images/logo/logo.svg"
-                alt="Logo"
-                width={150}
-                height={40}
-              />
-              <Image
-                className="hidden dark:block"
-                src="/images/logo/logo-dark.svg"
-                alt="Logo"
-                width={150}
-                height={40}
-              />
-            </>
-          ) : (
-            <Image
-              src="/images/logo/logo-icon.svg"
-              alt="Logo"
-              width={32}
-              height={32}
-            />
-          )}
-        </Link>
+          <Link href="/">
+              {isExpanded || isHovered || isMobileOpen ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="200" height="80" viewBox="0 0 200 80">
+                      <defs>
+                          <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                              <stop offset="0%" stopColor="#2563eb" />
+                              <stop offset="100%" stopColor="#3b82f6" />
+                          </linearGradient>
+                      </defs>
+
+                      <text
+                          x="50%"
+                          y="40%"
+                          dominantBaseline="middle"
+                          textAnchor="middle"
+                          fontFamily="Poppins, Arial, sans-serif"
+                          fontSize="34"
+                          fontWeight="800"
+                          fill="#1e3a8a"
+                      >
+                          Ciyex
+                      </text>
+
+                      <text
+                          x="50%"
+                          y="75%"
+                          dominantBaseline="middle"
+                          textAnchor="middle"
+                          fontFamily="Poppins, Arial, sans-serif"
+                          fontSize="24"
+                          fontWeight="600"
+                          fill="url(#grad)"
+                      >
+                          Connect
+                      </text>
+                  </svg>
+              ) : (
+                  // Collapsed view = CC
+                  <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+                      <defs>
+                          <linearGradient id="gradSmall" x1="0%" y1="0%" x2="100%" y2="0%">
+                              <stop offset="0%" stopColor="#2563eb" />
+                              <stop offset="100%" stopColor="#3b82f6" />
+                          </linearGradient>
+                      </defs>
+                      <rect width="40" height="40" rx="8" fill="url(#gradSmall)" />
+                      <text
+                          x="50%"
+                          y="55%"
+                          dominantBaseline="middle"
+                          textAnchor="middle"
+                          fontFamily="Poppins, Arial, sans-serif"
+                          fontSize="16"
+                          fontWeight="700"
+                          fill="white"
+                      >
+                          CC
+                      </text>
+                  </svg>
+              )}
+          </Link>
+
       </div>
       <div className="flex flex-col overflow-y-auto duration-300 ease-linear no-scrollbar">
         <nav className="mb-6">

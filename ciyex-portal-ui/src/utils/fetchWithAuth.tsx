@@ -1,38 +1,45 @@
+// src/utils/fetchWithAuth.tsx
 
 export async function fetchWithAuth(
-    input: RequestInfo,
+    input: RequestInfo | URL,
     init?: RequestInit
 ): Promise<Response> {
-    const token = localStorage.getItem("token");
-    const orgId = localStorage.getItem("orgId");
-    const facilityId = localStorage.getItem("facilityId");
-    const role = localStorage.getItem("role");
+    const token =
+        typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
-    const authHeaders: Record<string, string> = {
-        "Content-Type": "application/json",
-        "Accept": "application/json",   // 👈 add here
-        ...(token && { Authorization: `Bearer ${token}` }),
-        ...(orgId && { "X-Org-Id": orgId }),
-        ...(facilityId && { "X-Facility-Id": facilityId }),
-        ...(role && { "X-Role": role }),
+    // Normalize input for debugging
+    const url = typeof input === "string" ? input : input.toString();
+    console.log("📡 fetchWithAuth ->", url);
 
+    // For login/register, skip token injection
+    const isAuthEndpoint =
+        url.includes("/api/auth/login") || url.includes("/api/auth/register");
+
+    // Cast to a plain object so we can safely index
+    const headers: Record<string, string> = {
+        ...(init?.headers as Record<string, string>),
     };
 
-    const headers = new Headers(init?.headers || {});
-    Object.entries(authHeaders).forEach(([key, value]) => headers.set(key, value));
+    if (token && !isAuthEndpoint) {
+        headers["Authorization"] = `Bearer ${token}`;
+    }
 
+    try {
+        const response = await fetch(url, {
+            ...init,
+            headers,
+        });
 
+        if (!response.ok) {
+            console.error(
+                `❌ Fetch failed (${response.status}):`,
+                await response.text()
+            );
+        }
 
-    /*import { fetchWithAuth } from '@/utils/fetchWithAuth';
-
-    const handleFetchData = async () => {
-        const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/example`);
-        const data = await res.json();
-        console.log(data);
-    };*/
-
-    return fetch(input, {
-        ...init,
-        headers,
-    });
+        return response;
+    } catch (err) {
+        console.error("🔥 fetchWithAuth error:", err);
+        throw err;
+    }
 }
