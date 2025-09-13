@@ -29,7 +29,7 @@ const codeTypes = [
 // Keep env-based absolute URL as requested
 const API_URL = `${process.env.NEXT_PUBLIC_API_URL}/api/codes`;
 
-type ApiResponse<T = any> = { data?: T; message?: string; error?: string };
+type ApiResponse<T = unknown> = { data?: T; message?: string; error?: string };
 
 export default function CodesPage() {
   const [codes, setCodes] = useState<Code[]>([]);
