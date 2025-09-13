@@ -113,7 +113,7 @@ const navItems: NavItem[] = [
             {name:"Insurance companies", path:"/settings/insurance"},
             {
                 name: "Codes",
-                path: "settings/codes",
+                path: "/settings/codes",
             },
 
             {
