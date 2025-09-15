@@ -28,7 +28,7 @@ function Icon({ path, className = 'w-5 h-5' }: { path: string; className?: strin
     );
 }
 const paths = {
-    cog: 'M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm8.5-3.5a6.5 6.5 0 0 0-.13-1.3l2-1.55-2-3.46-2.45 1a6.7 6.7 0 0 0-2.25-1.3l-.38-2.6h-4l-.38 2.6a6.7 6.7 0 0 0-2.25 1.3l-2.45-1-2 3.46 2 1.55c-.06.42-.1.85-.1 1.3s.04.88.1 1.3l-2 1.55 2 3.46 2.45-1c.82.55 1.43.99 2.25 1.3l.38 2.6h4l.38-2.6c.82-.31 1.57-.75 2.25-1.3l2.45 1 2-3.46-2-1.55c.09-.42.13-.85.13-1.3Z',
+    cog: 'M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm8.5-3.5a6.5 6.5 0 0 0-.13-1.3l2-1.55-2-3.46-2.45 1a6.7 6.7 0 0 0-2.25-1.3l-.38-2.6h-4l-.38-2.6a6.7 6.7 0 0 0-2.25 1.3l-2.45-1-2 3.46 2 1.55c-.06.42-.1.85-.1 1.3s.04.88.1 1.3l-2 1.55 2 3.46 2.45-1c.82.55 1.43.99 2.25 1.3l.38 2.6h4l.38-2.6c.82-.31 1.57-.75 2.25-1.3l2.45 1 2-3.46-2-1.55c.09-.42.13-.85.13-1.3Z',
     db: 'M4 6c0-1.66 3.58-3 8-3s8 1.34 8 3-3.58 3-8 3-8-1.34-8-3Zm16 4c0 1.66-3.58 3-8 3s-8-1.34-8-3m16 4c0 1.66-3.58 3-8 3s-8-1.34-8-3m16 4c0 1.66-3.58 3-8 3s-8-1.34-8-3',
     med: 'M12 3v18M3 12h18',
     card: 'M3 7h18M3 11h18M6 15h6',
@@ -96,7 +96,7 @@ function useAutoHeight(isOpen: boolean) {
 /* ------------------------------ Data binding ----------------------------- */
 const S = (v: any): string => (v ?? '') + '';
 function deepGet(obj: any, path: string[]) {
-    return path.reduce((acc, k) => (acc ? acc[k] : undefined), obj);
+    return path.reduce((acc, k) => (acc ? (acc as any)[k] : undefined), obj);
 }
 function deepSetImmutable<T extends Record<string, any>>(obj: T, path: string[], value: any): T {
     const root = { ...obj } as any;
@@ -124,7 +124,7 @@ function getText(el: Element | null | undefined): string {
     return el?.textContent?.trim() ?? '';
 }
 
-/** ✅ FIXED: fully maps telehealth, ai, and document_storage for XML and JSON inputs */
+/** Parse org config from JSON or XML (includes google.oauth & recaptcha) */
 function parseOrgConfig(input: any) {
     try {
         if (typeof input === 'string') {
@@ -175,7 +175,6 @@ function parseOrgConfig(input: any) {
                         password: getText(integ?.querySelector('smtp > password')),
                     },
 
-                    /* ✅ telehealth */
                     telehealth: {
                         vendor: getText(integ?.querySelector('telehealth > vendor')),
                         twilio: {
@@ -186,7 +185,6 @@ function parseOrgConfig(input: any) {
                         },
                     },
 
-                    /* ✅ ai */
                     ai: {
                         vendor: getText(integ?.querySelector('ai > vendor')),
                         azure: {
@@ -204,7 +202,6 @@ function parseOrgConfig(input: any) {
                         },
                     },
 
-                    /* ✅ document storage */
                     document_storage: {
                         s3: {
                             bucket: getText(integ?.querySelector('document_storage > s3 > bucket')),
@@ -213,9 +210,26 @@ function parseOrgConfig(input: any) {
                             secretKey: getText(integ?.querySelector('document_storage > s3 > secretKey')),
                         },
                     },
+
+                    weno: {
+                        ezKey: getText(integ?.querySelector('weno > ezKey')),
+                        userMail: getText(integ?.querySelector('weno > userMail')),
+                        locationId: getText(integ?.querySelector('weno > locationId')),
+                    },
+
+                    recaptcha: {
+                        siteKey: getText(integ?.querySelector('recaptcha > siteKey')),
+                        secretKey: getText(integ?.querySelector('recaptcha > secretKey')),
+                    },
+
+                    google: {
+                        oauth: {
+                            clientId: getText(integ?.querySelector('google > oauth > clientId')),
+                            clientSecret: getText(integ?.querySelector('google > oauth > clientSecret')),
+                        },
+                    },
                 };
 
-                // Normalize to keep the exact shape the form expects
                 return normalizeIntegrations({ integrations: obj });
             }
         }
@@ -227,7 +241,7 @@ function parseOrgConfig(input: any) {
     }
 }
 
-/** ✅ FIXED: includes telehealth, ai, document_storage instead of empty shells */
+/** Normalizer: adds google.oauth + recaptcha */
 function normalizeIntegrations(obj: any) {
     const root = obj?.integrations ?? obj ?? {};
     return {
@@ -265,7 +279,6 @@ function normalizeIntegrations(obj: any) {
             password: S(root.smtp?.password),
         },
 
-        /* ✅ previously blank */
         telehealth: {
             vendor: S(root.telehealth?.vendor),
             twilio: {
@@ -299,6 +312,24 @@ function normalizeIntegrations(obj: any) {
                 region: S(root.document_storage?.s3?.region ?? root.documentStorage?.s3?.region),
                 accessKey: S(root.document_storage?.s3?.accessKey ?? root.documentStorage?.s3?.accessKey),
                 secretKey: S(root.document_storage?.s3?.secretKey ?? root.documentStorage?.s3?.secretKey),
+            },
+        },
+
+        weno: {
+            ezKey: S(root.weno?.ezKey),
+            userMail: S(root.weno?.userMail),
+            locationId: S(root.weno?.locationId),
+        },
+
+        recaptcha: {
+            siteKey: S(root.recaptcha?.siteKey),
+            secretKey: S(root.recaptcha?.secretKey),
+        },
+
+        google: {
+            oauth: {
+                clientId: S(root.google?.oauth?.clientId),
+                clientSecret: S(root.google?.oauth?.clientSecret),
             },
         },
     };
@@ -486,7 +517,7 @@ function Segmented({
                         aria-pressed={active}
                         className={cx(
                             'px-3 py-1 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-blue-400/60',
-                            active ? 'bg-blue-600 text-white shadow' : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-200 dark:hover:bg:white/5'
+                            active ? 'bg-blue-600 text-white shadow' : 'text-neutral-700  dark:text-neutral-200 dark:hover:bg-[#1b2437]'
                         )}
                     >
                         {opt.label}
@@ -524,14 +555,14 @@ function SettingsCard({
 
     let btnLabel = 'Edit';
     let btnClass =
-        'border border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50 dark:border-[#1b2437] dark:bg-[#0B1220] dark:text-neutral-200 dark:hover:bg:white/5';
+        'border border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50 dark:border-[#1b2437] dark:bg-[#0B1220] dark:text-neutral-200 dark:hover:bg-[#1b2437]';
     let btnIcon = paths.pencilSquare;
     let btnOnClick = onEdit;
 
     if (isEditing) {
         btnLabel = 'Done';
         btnClass =
-            'border border-neutral-300 bg:white text-neutral-700 hover:bg-neutral-50 dark:border-[#1b2437] dark:bg-[#0B1220] dark:text-neutral-200 dark:hover:bg:white/5';
+            'border border-neutral-300 bg:white text-neutral-700 hover:bg-neutral-50 dark:border-[#1b2437] dark:bg-[#0B1220] dark:text-neutral-200 dark:hover:bg-[#1b2437]';
         btnIcon = paths.checkCircle;
         btnOnClick = onDone;
     }
@@ -555,13 +586,13 @@ function SettingsCard({
                     type="button"
                     onClick={onToggle}
                     aria-expanded={isOpen}
-                    className="group flex flex-1 items-center gap-3 rounded-2xl px-2 py-2 text-left transition-colors hover:bg-neutral-50 dark:hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-blue-400/60"
+                    className="group flex flex-1 items-center gap-3 rounded-2xl px-2 py-2 text-left transition-colors hover:bg-neutral-50 dark:hover:bg-[#1b2437] focus:outline-none focus:ring-2 focus:ring-blue-400/60"
                 >
           <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-blue-600/10 text-blue-700 transition-colors group-hover:bg-blue-600/15 dark:bg-blue-500/15 dark:text-blue-300">
             <Icon path={iconPath} className="h-5 w-5" />
           </span>
                     <span className="text-base font-semibold text-neutral-900 dark:text-neutral-100">{title}</span>
-                    <span className="ml-auto inline-flex h-8 w-8 items-center justify-center rounded-2xl border border-neutral-200 bg-white transition-all duration-200 ease-out group-hover:border-blue-200 group-hover:bg-blue-50 dark:border-[#1b2437] dark:bg-[#0B1220] dark:group-hover:bg:white/5">
+                    <span className="ml-auto inline-flex h-8 w-8 items-center justify-center rounded-2xl border border-neutral-200 bg-white transition-all duration-200 ease-out group-hover:border-blue-200 group-hover:bg-blue-50 dark:border-[#1b2437] dark:bg-[#0B1220] dark:group-hover:bg-[#1b2437]">
             <Icon path={isOpen ? paths.chevronUp : paths.chevronDown} className="h-4 w-4 text-neutral-600 dark:text-neutral-300" />
           </span>
                 </button>
@@ -661,7 +692,17 @@ function ToastPortal({ children }: { children: ReactNode }) {
 /* ========================== /TOASTS ========================== */
 
 /* -------- Page -------- */
-type SectionId = 'core' | 'fhir' | 'payments' | 'messaging' | 'telehealth' | 'ai' | 'documents';
+type SectionId =
+    | 'core'
+    | 'fhir'
+    | 'payments'
+    | 'twilio'
+    | 'smtp'
+    | 'weno'
+    | 'google'      // NEW combined card (Google Auth / reCAPTCHA)
+    | 'telehealth'
+    | 'ai'
+    | 'documents';
 
 export default function Page() {
     const [open, setOpen] = useState<SectionId | null>(null);
@@ -669,7 +710,10 @@ export default function Page() {
         core: false,
         fhir: false,
         payments: false,
-        messaging: false,
+        twilio: false,
+        smtp: false,
+        weno: false,
+        google: false,
         telehealth: false,
         ai: false,
         documents: false,
@@ -678,15 +722,18 @@ export default function Page() {
         core: false,
         fhir: false,
         payments: false,
-        messaging: false,
+        twilio: false,
+        smtp: false,
+        weno: false,
+        google: false,
         telehealth: false,
         ai: false,
         documents: false,
     });
 
-    // Provider selections (visual only; design unchanged)
+    // Provider selections
     const [paymentProvider, setPaymentProvider] = useState<'stripe' | 'sphere'>('stripe');
-    const [messagingProvider, setMessagingProvider] = useState<'twilio' | 'smtp'>('twilio');
+    const [googleMode, setGoogleMode] = useState<'auth' | 'recaptcha'>('auth'); // NEW
 
     // Single config state powering all fields (empty by default)
     const [cfg, setCfg] = useState(EMPTY_CONFIG());
@@ -711,7 +758,10 @@ export default function Page() {
         core: 'Core Data & Practice DB',
         fhir: 'FHIR Server',
         payments: 'Payments',
-        messaging: 'Messaging',
+        twilio: 'Twilio SMS Settings',
+        smtp: 'SMTP Email Settings',
+        weno: 'Weno Integration',
+        google: 'Google Settings',
         telehealth: 'Telehealth',
         ai: 'AI & LLM Settings',
         documents: 'Document Storage',
@@ -752,7 +802,7 @@ export default function Page() {
                 twilio: {
                     accountSid: cfg.twilio?.accountSid,
                     authToken: cfg.twilio?.authToken,
-                    ...(cfg.twilio?.phoneNumber ? { phoneNumber: cfg.twilio.phoneNumber } : {}),
+                    phoneNumber: cfg.twilio?.phoneNumber,
                 },
                 smtp: {
                     server: cfg.smtp?.server,
@@ -792,6 +842,23 @@ export default function Page() {
                         region: cfg.document_storage?.s3?.region,
                     },
                 },
+                weno: {
+                    ezKey: cfg.weno?.ezKey,
+                    userMail: cfg.weno?.userMail,
+                    locationId: cfg.weno?.locationId,
+                },
+                // Keep reCAPTCHA top-level in DB, UI toggled under Google card
+                recaptcha: {
+                    siteKey: cfg.recaptcha?.siteKey,
+                    secretKey: cfg.recaptcha?.secretKey,
+                },
+                // New Google OAuth section
+                google: {
+                    oauth: {
+                        clientId: cfg.google?.oauth?.clientId,
+                        clientSecret: cfg.google?.oauth?.clientSecret,
+                    },
+                },
             };
 
             // OrgConfig wrapper body expected by controller
@@ -816,9 +883,32 @@ export default function Page() {
             setMeta((m) => ({ ...m, ...extractMeta(data) }));
 
             // flash "Saved" on all sections briefly
-            setFlashBtn({ core: true, fhir: true, payments: true, messaging: true, telehealth: true, ai: true, documents: true });
+            setFlashBtn({
+                core: true,
+                fhir: true,
+                payments: true,
+                twilio: true,
+                smtp: true,
+                weno: true,
+                google: true,
+                telehealth: true,
+                ai: true,
+                documents: true,
+            });
             setTimeout(
-                () => setFlashBtn({ core: false, fhir: false, payments: false, messaging: false, telehealth: false, ai: false, documents: false }),
+                () =>
+                    setFlashBtn({
+                        core: false,
+                        fhir: false,
+                        payments: false,
+                        twilio: false,
+                        smtp: false,
+                        weno: false,
+                        google: false,
+                        telehealth: false,
+                        ai: false,
+                        documents: false,
+                    }),
                 1200
             );
 
@@ -1040,7 +1130,7 @@ export default function Page() {
                                             <PasswordField id="stripe.apiKey" name="stripe[apiKey]" editable={editing.payments} {...bind(['stripe', 'apiKey'])} />
                                         </div>
                                         <div>
-                                            <label htmlFor="stripe.webhookSecret" className="mb-1 block text.sm font-medium text-neutral-700 dark:text-neutral-300">
+                                            <label htmlFor="stripe.webhookSecret" className="mb-1 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
                                                 Stripe Webhook Secret
                                             </label>
                                             <PasswordField
@@ -1078,96 +1168,211 @@ export default function Page() {
                                 )}
                             </SettingsCard>
 
-                            {/* 4) Messaging (SMS & Email) with provider switch */}
+                            {/* 4) Twilio SMS Settings */}
                             <SettingsCard
-                                title="Messaging (SMS & Email)"
+                                title="Twilio SMS Settings"
                                 iconPath={paths.sms}
-                                isOpen={open === 'messaging'}
-                                isEditing={editing.messaging}
-                                savedFlash={flashBtn.messaging}
-                                onToggle={() => toggleOpen('messaging')}
-                                onEdit={() => startEdit('messaging')}
-                                onDone={() => endEdit('messaging')}
+                                isOpen={open === 'twilio'}
+                                isEditing={editing.twilio}
+                                savedFlash={flashBtn.twilio}
+                                onToggle={() => toggleOpen('twilio')}
+                                onEdit={() => startEdit('twilio')}
+                                onDone={() => endEdit('twilio')}
+                            >
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    <div>
+                                        <label htmlFor="twilio.accountSid" className="mb-1 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                                            Twilio Account SID
+                                        </label>
+                                        <TextInput
+                                            id="twilio.accountSid"
+                                            name="twilio[accountSid]"
+                                            placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                                            icon={paths.badge}
+                                            editable={editing.twilio}
+                                            {...bind(['twilio', 'accountSid'])}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label htmlFor="twilio.authToken" className="mb-1 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                                            Twilio Auth Token
+                                        </label>
+                                        <PasswordField id="twilio.authToken" name="twilio[authToken]" placeholder="••••••••" editable={editing.twilio} {...bind(['twilio', 'authToken'])} />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <label htmlFor="twilio.phoneNumber" className="mb-1 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                                            Twilio Phone Number
+                                        </label>
+                                        <TextInput
+                                            id="twilio.phoneNumber"
+                                            name="twilio[phoneNumber]"
+                                            placeholder="+1234567898"
+                                            icon={paths.sms}
+                                            editable={editing.twilio}
+                                            {...bind(['twilio', 'phoneNumber'])}
+                                        />
+                                    </div>
+                                </div>
+                            </SettingsCard>
+
+                            {/* 5) SMTP Email Settings */}
+                            <SettingsCard
+                                title="SMTP Email Settings"
+                                iconPath={paths.mail}
+                                isOpen={open === 'smtp'}
+                                isEditing={editing.smtp}
+                                savedFlash={flashBtn.smtp}
+                                onToggle={() => toggleOpen('smtp')}
+                                onEdit={() => startEdit('smtp')}
+                                onDone={() => endEdit('smtp')}
+                            >
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    <div>
+                                        <label htmlFor="smtp.server" className="mb-1 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                                            SMTP Server
+                                        </label>
+                                        <TextInput
+                                            id="smtp.server"
+                                            name="smtp[server]"
+                                            placeholder="smtp.sendgrid.net"
+                                            icon={paths.server}
+                                            editable={editing.smtp}
+                                            {...bind(['smtp', 'server'])}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label htmlFor="smtp.username" className="mb-1 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                                            SMTP Username
+                                        </label>
+                                        <TextInput id="smtp.username" name="smtp[username]" placeholder="apikey" icon={paths.user} editable={editing.smtp} {...bind(['smtp', 'username'])} />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <label htmlFor="smtp.password" className="mb-1 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                                            SMTP Password
+                                        </label>
+                                        <PasswordField id="smtp.password" name="smtp[password]" placeholder="••••••••" editable={editing.smtp} {...bind(['smtp', 'password'])} />
+                                    </div>
+                                </div>
+                            </SettingsCard>
+
+                            {/* 6) Weno Integration */}
+                            <SettingsCard
+                                title="Weno Integration"
+                                iconPath={paths.table}
+                                isOpen={open === 'weno'}
+                                isEditing={editing.weno}
+                                savedFlash={flashBtn.weno}
+                                onToggle={() => toggleOpen('weno')}
+                                onEdit={() => startEdit('weno')}
+                                onDone={() => endEdit('weno')}
+                            >
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    <div>
+                                        <label htmlFor="weno.ezKey" className="mb-1 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                                            Ez_Encryption_key
+                                        </label>
+                                        <PasswordField id="weno.ezKey" name="weno[ezKey]" placeholder="••••••••" editable={editing.weno} {...bind(['weno', 'ezKey'])} />
+                                    </div>
+                                    <div>
+                                        <label htmlFor="weno.userMail" className="mb-1 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                                            Weno_Default_Usermail
+                                        </label>
+                                        <TextInput id="weno.userMail" name="weno[userMail]" placeholder="prescriber@example.com" icon={paths.mail} editable={editing.weno} {...bind(['weno', 'userMail'])} />
+                                    </div>
+                                    <div>
+                                        <label htmlFor="weno.locationId" className="mb-1 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                                            Weno_Default_Location_ID
+                                        </label>
+                                        <TextInput id="weno.locationId" name="weno[locationId]" placeholder="LOC-001" icon={paths.id} editable={editing.weno} {...bind(['weno', 'locationId'])} />
+                                    </div>
+                                </div>
+                            </SettingsCard>
+
+                            {/* 7) Google Settings (Auth / reCAPTCHA) */}
+                            <SettingsCard
+                                title="Google Settings"
+                                iconPath={paths.globe}
+                                isOpen={open === 'google'}
+                                isEditing={editing.google}
+                                savedFlash={flashBtn.google}
+                                onToggle={() => toggleOpen('google')}
+                                onEdit={() => startEdit('google')}
+                                onDone={() => endEdit('google')}
                                 headerRight={
                                     <Segmented
                                         options={[
-                                            { value: 'twilio', label: 'Twilio (SMS)' },
-                                            { value: 'smtp', label: 'SMTP (Email)' },
+                                            { value: 'auth', label: 'Google Auth' },
+                                            { value: 'recaptcha', label: 'reCAPTCHA' },
                                         ]}
-                                        value={messagingProvider}
-                                        onChange={(v) => setMessagingProvider(v as 'twilio' | 'smtp')}
+                                        value={googleMode}
+                                        onChange={(v) => setGoogleMode(v as 'auth' | 'recaptcha')}
                                     />
                                 }
                             >
-                                {messagingProvider === 'twilio' && (
+                                {/* Google Auth mode */}
+                                {googleMode === 'auth' && (
                                     <div className="grid gap-4 md:grid-cols-2">
-                                        <div>
-                                            <label htmlFor="twilio.accountSid" className="mb-1 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                                                Twilio Account SID
+                                        <div className="md:col-span-2">
+                                            <label htmlFor="google.oauth.clientId" className="mb-1 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                                                Google OAuth Client ID
                                             </label>
                                             <TextInput
-                                                id="twilio.accountSid"
-                                                name="twilio[accountSid]"
-                                                placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                                                icon={paths.badge}
-                                                editable={editing.messaging}
-                                                {...bind(['twilio', 'accountSid'])}
+                                                id="google.oauth.clientId"
+                                                name="google[oauth][clientId]"
+                                                placeholder="7691...apps.googleusercontent.com"
+                                                icon={paths.id}
+                                                editable={editing.google}
+                                                {...bind(['google', 'oauth', 'clientId'])}
                                             />
                                         </div>
-                                        <div>
-                                            <label htmlFor="twilio.authToken" className="mb-1 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                                                Twilio Auth Token
-                                            </label>
-                                            <PasswordField id="twilio.authToken" name="twilio[authToken]" editable={editing.messaging} {...bind(['twilio', 'authToken'])} />
-                                        </div>
                                         <div className="md:col-span-2">
-                                            <label htmlFor="twilio.phoneNumber" className="mb-1 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                                                Twilio Phone Number
+                                            <label htmlFor="google.oauth.clientSecret" className="mb-1 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                                                Google OAuth Client Secret
                                             </label>
-                                            <TextInput
-                                                id="twilio.phoneNumber"
-                                                name="twilio[phoneNumber]"
-                                                placeholder="+1 555 123 4567"
-                                                icon={paths.sms}
-                                                editable={editing.messaging}
-                                                {...bind(['twilio', 'phoneNumber'])}
+                                            <PasswordField
+                                                id="google.oauth.clientSecret"
+                                                name="google[oauth][clientSecret]"
+                                                placeholder="••••••••"
+                                                editable={editing.google}
+                                                {...bind(['google', 'oauth', 'clientSecret'])}
                                             />
                                         </div>
                                     </div>
                                 )}
 
-                                {messagingProvider === 'smtp' && (
+                                {/* reCAPTCHA mode (kept in top-level recaptcha in DB) */}
+                                {googleMode === 'recaptcha' && (
                                     <div className="grid gap-4 md:grid-cols-2">
                                         <div>
-                                            <label htmlFor="smtp.server" className="mb-1 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                                                SMTP Server
+                                            <label htmlFor="recaptcha.siteKey" className="mb-1 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                                                reCAPTCHA V2 Site Key
                                             </label>
                                             <TextInput
-                                                id="smtp.server"
-                                                name="smtp[server]"
-                                                placeholder="smtp.sendgrid.net"
-                                                icon={paths.server}
-                                                editable={editing.messaging}
-                                                {...bind(['smtp', 'server'])}
+                                                id="recaptcha.siteKey"
+                                                name="recaptcha[siteKey]"
+                                                placeholder="6Lcxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                                                icon={paths.key}
+                                                editable={editing.google}
+                                                {...bind(['recaptcha', 'siteKey'])}
                                             />
                                         </div>
                                         <div>
-                                            <label htmlFor="smtp.username" className="mb-1 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                                                SMTP Username
+                                            <label htmlFor="recaptcha.secretKey" className="mb-1 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                                                reCAPTCHA V2 Secret Key
                                             </label>
-                                            <TextInput id="smtp.username" name="smtp[username]" icon={paths.user} editable={editing.messaging} {...bind(['smtp', 'username'])} />
-                                        </div>
-                                        <div className="md:col-span-2">
-                                            <label htmlFor="smtp.password" className="mb-1 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                                                SMTP Password
-                                            </label>
-                                            <PasswordField id="smtp.password" name="smtp[password]" editable={editing.messaging} {...bind(['smtp', 'password'])} />
+                                            <PasswordField
+                                                id="recaptcha.secretKey"
+                                                name="recaptcha[secretKey]"
+                                                placeholder="••••••••"
+                                                editable={editing.google}
+                                                {...bind(['recaptcha', 'secretKey'])}
+                                            />
                                         </div>
                                     </div>
                                 )}
                             </SettingsCard>
 
-                            {/* 5) Telehealth */}
+                            {/* 8) Telehealth */}
                             <SettingsCard
                                 title="Telehealth"
                                 iconPath={paths.crosshair}
@@ -1206,12 +1411,7 @@ export default function Page() {
                                                     <label htmlFor="telehealth.twilio.authToken" className="mb-1 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
                                                         Twilio Auth Token
                                                     </label>
-                                                    <PasswordField
-                                                        id="telehealth.twilio.authToken"
-                                                        name="telehealth[twilio][authToken]"
-                                                        editable={editing.telehealth}
-                                                        {...bind(['telehealth', 'twilio', 'authToken'])}
-                                                    />
+                                                    <PasswordField id="telehealth.twilio.authToken" name="telehealth[twilio][authToken]" editable={editing.telehealth} {...bind(['telehealth', 'twilio', 'authToken'])} />
                                                 </div>
                                                 <div>
                                                     <label htmlFor="telehealth.twilio.apiKeySid" className="mb-1 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
@@ -1223,12 +1423,7 @@ export default function Page() {
                                                     <label htmlFor="telehealth.twilio.apiKeySecret" className="mb-1 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
                                                         API Key Secret
                                                     </label>
-                                                    <PasswordField
-                                                        id="telehealth.twilio.apiKeySecret"
-                                                        name="telehealth[twilio][apiKeySecret]"
-                                                        editable={editing.telehealth}
-                                                        {...bind(['telehealth', 'twilio', 'apiKeySecret'])}
-                                                    />
+                                                    <PasswordField id="telehealth.twilio.apiKeySecret" name="telehealth[twilio][apiKeySecret]" editable={editing.telehealth} {...bind(['telehealth', 'twilio', 'apiKeySecret'])} />
                                                 </div>
                                             </div>
                                         </div>
@@ -1236,7 +1431,7 @@ export default function Page() {
                                 </div>
                             </SettingsCard>
 
-                            {/* 6) AI & LLM Settings */}
+                            {/* 9) AI & LLM Settings */}
                             <SettingsCard
                                 title="AI & LLM Settings"
                                 iconPath={paths.globe}
@@ -1274,7 +1469,7 @@ export default function Page() {
                                                 </div>
 
                                                 <div>
-                                                    <label htmlFor="ai.azure.apiVersion" className="mb-1 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                                                    <label htmlFor="ai.azure.apiVersion" className="mb-1 block text.sm font-medium text-neutral-700 dark:text-neutral-300">
                                                         API Version
                                                     </label>
                                                     <TextInput id="ai.azure.apiVersion" name="ai[azure][apiVersion]" editable={editing.ai} {...bind(['ai', 'azure', 'apiVersion'])} />
@@ -1338,7 +1533,7 @@ export default function Page() {
                                 </div>
                             </SettingsCard>
 
-                            {/* 7) Document Storage */}
+                            {/* 10) Document Storage */}
                             <SettingsCard
                                 title="Document Storage"
                                 iconPath={paths.server}
