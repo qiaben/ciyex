@@ -1,4 +1,4 @@
-import PlanList from "@/components/encounter/plan/PlanList";
+
 
 type Props = { params: Promise<{ patientId: string; encounterId: string }> };
 
@@ -11,7 +11,7 @@ export default async function PlanPage({ params }: Props) {
 
     return (
         <div className="mx-auto max-w-3xl p-6">
-            <PlanList patientId={patientId} encounterId={encounterId} />
+
         </div>
     );
 }

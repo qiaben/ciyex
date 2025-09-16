@@ -1,4 +1,3 @@
-import ProviderNoteList from "@/components/encounter/providernote/ProviderNoteList";
 
 type Props = { params: Promise<{ patientId: string; encounterId: string }> };
 
@@ -11,7 +10,7 @@ export default async function ProviderNotesPage({ params }: Props) {
 
     return (
         <div className="mx-auto max-w-3xl p-6">
-            <ProviderNoteList patientId={patientId} encounterId={encounterId} />
+
         </div>
     );
 }

@@ -1,4 +1,4 @@
-import ChiefComplaintList from "@/components/encounter/cc/ChiefComplaintList";
+
 
 export const metadata = { title: "Chief Complaint" };
 
@@ -11,10 +11,7 @@ export default async function ChiefComplaintPage({
 
     return (
         <div className="mx-auto max-w-3xl p-6">
-            <ChiefComplaintList
-                patientId={Number(patientId)}
-                encounterId={Number(encounterId)}
-            />
+
         </div>
     );
 }

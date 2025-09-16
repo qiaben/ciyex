@@ -1,4 +1,4 @@
-import ROSList from "@/components/encounter/ros/ROSList";
+
 
 type Props = { params: Promise<{ patientId: string; encounterId: string }> };
 
@@ -11,7 +11,7 @@ export default async function ROSPage({ params }: Props) {
 
     return (
         <div className="mx-auto max-w-3xl p-6">
-            <ROSList patientId={patientId} encounterId={encounterId} />
+
         </div>
     );
 }

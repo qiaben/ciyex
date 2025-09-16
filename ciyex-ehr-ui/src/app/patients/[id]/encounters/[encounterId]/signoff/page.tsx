@@ -1,4 +1,4 @@
-import SignoffCard from "@/components/encounter/signoff/SignoffCard";
+
 
 type Props = { params: Promise<{ patientId: string; encounterId: string }> };
 
@@ -11,7 +11,7 @@ export default async function SignoffPage({ params }: Props) {
 
     return (
         <div className="mx-auto max-w-3xl p-6">
-            <SignoffCard patientId={patientIdNum} encounterId={encounterIdNum} />
+
         </div>
     );
 }

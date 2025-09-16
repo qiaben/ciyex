@@ -1,4 +1,4 @@
-import FHList from "@/components/encounter/familyhistory/FHList";
+
 
 type Props = { params: Promise<{ patientId: string; encounterId: string }> };
 
@@ -11,7 +11,7 @@ export default async function FamilyHistoryPage({ params }: Props) {
 
     return (
         <div className="mx-auto max-w-3xl p-6">
-            <FHList patientId={patientId} encounterId={encounterId} />
+
         </div>
     );
 }

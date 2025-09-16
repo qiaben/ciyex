@@ -1,4 +1,4 @@
-import AssessmentList from "@/components/encounter/assessment/AssessmentList";
+
 
 type Props = { params: Promise<{ patientId: string; encounterId: string }> };
 
@@ -11,7 +11,7 @@ export default async function AssessmentPage({ params }: Props) {
 
     return (
         <div className="mx-auto max-w-3xl p-6">
-            <AssessmentList patientId={patientId} encounterId={encounterId} />
+
         </div>
     );
 }

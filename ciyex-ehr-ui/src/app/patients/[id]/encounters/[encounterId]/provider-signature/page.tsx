@@ -1,4 +1,3 @@
-import ProviderSignatureCard from "@/components/encounter/providersignature/ProviderSignatureCard";
 
 // Align with generated PageProps: params is a Promise
 type Props = { params: Promise<{ patientId: string; encounterId: string }> };
@@ -12,7 +11,7 @@ export default async function ProviderSignaturePage({ params }: Props) {
 
     return (
         <div className="mx-auto max-w-3xl p-6">
-            <ProviderSignatureCard patientId={patientIdNum} encounterId={encounterIdNum} />
+
         </div>
     );
 }

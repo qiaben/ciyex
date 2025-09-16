@@ -1,4 +1,4 @@
-import SHList from "@/components/encounter/socialhistory/SHList";
+
 
 type Props = { params: Promise<{ patientId: string; encounterId: string }> };
 
@@ -11,7 +11,7 @@ export default async function SocialHistoryPage({ params }: Props) {
 
     return (
         <div className="mx-auto max-w-3xl p-6">
-            <SHList patientId={patientId} encounterId={encounterId} />
+
         </div>
     );
 }

@@ -1,4 +1,4 @@
-import DateTimeFinalizedCard from "@/components/encounter/datetimefinalized/DateTimeFinalizedCard";
+
 
 type Props = { params: Promise<{ patientId: string; encounterId: string }> };
 
@@ -11,7 +11,7 @@ export default async function DateTimeFinalizedPage({ params }: Props) {
 
     return (
         <div className="mx-auto max-w-3xl p-6">
-            <DateTimeFinalizedCard patientId={patientIdNum} encounterId={encounterIdNum} />
+
         </div>
     );
 }

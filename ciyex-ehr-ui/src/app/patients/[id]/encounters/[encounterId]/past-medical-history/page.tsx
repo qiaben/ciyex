@@ -1,4 +1,4 @@
-import PEList from "@/components/encounter/physicalexam/PEList";
+
 
 type Props = { params: Promise<{ patientId: string; encounterId: string }> };
 
@@ -11,7 +11,7 @@ export default async function PhysicalExamPage({ params }: Props) {
 
     return (
         <div className="mx-auto max-w-3xl p-6">
-            <PEList patientId={patientId} encounterId={encounterId} />
+
         </div>
     );
 }

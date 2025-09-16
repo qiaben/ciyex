@@ -1,4 +1,4 @@
-import FeeScheduleCard from "@/components/encounter/fees/FeeScheduleCard";
+
 
 type Props = { params: Promise<{ patientId: string; encounterId: string }> };
 
@@ -11,7 +11,7 @@ export default async function FeeSchedulePage({ params }: Props) {
 
     return (
         <div className="mx-auto max-w-5xl p-6">
-            <FeeScheduleCard patientId={patientIdNum} encounterId={encounterIdNum} />
+
         </div>
     );
 }

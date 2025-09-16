@@ -1,4 +1,4 @@
-import AssignedProviderList from "@/components/encounter/assigned/AssignedProviderList";
+
 
 // NOTE: params is a Promise in your Next.js build
 type Props = { params: Promise<{ patientId: string; encounterId: string }> };
@@ -11,7 +11,7 @@ export default async function AssignedProvidersPage({ params }: Props) {
     const encounterIdNum = Number(encounterId);
     return (
         <div className="mx-auto max-w-3xl p-6">
-            <AssignedProviderList patientId={patientIdNum} encounterId={encounterIdNum} />
+
         </div>
     );
 }

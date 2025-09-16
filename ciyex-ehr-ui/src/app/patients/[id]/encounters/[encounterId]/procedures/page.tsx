@@ -1,4 +1,4 @@
-import ProcedureList from "@/components/encounter/procedure/ProcedureList";
+
 
 type Props = { params: Promise<{ patientId: string; encounterId: string }> };
 
@@ -11,7 +11,7 @@ export default async function ProceduresPage({ params }: Props) {
 
     return (
         <div className="mx-auto max-w-3xl p-6">
-            <ProcedureList patientId={patientIdNum} encounterId={encounterIdNum} />
+
         </div>
     );
 }

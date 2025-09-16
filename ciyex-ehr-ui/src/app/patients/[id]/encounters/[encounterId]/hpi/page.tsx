@@ -1,4 +1,4 @@
-import HPIList from "@/components/encounter/hpi/HPIList";
+
 
 export const metadata = { title: "History of Present Illness (HPI)" };
 
@@ -11,7 +11,7 @@ export default async function HPIPage({
 
     return (
         <div className="mx-auto max-w-3xl p-6">
-            <HPIList patientId={Number(patientId)} encounterId={Number(encounterId)} />
+
         </div>
     );
 }
