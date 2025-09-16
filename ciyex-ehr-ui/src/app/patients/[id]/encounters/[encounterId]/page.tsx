@@ -864,4 +864,5 @@ export default function EncounterTabsPage() {
             </div>
         </AdminLayout>
     );
+
 }

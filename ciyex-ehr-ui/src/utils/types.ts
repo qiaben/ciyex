@@ -562,5 +562,6 @@ export interface VitalsDto {
 
 
 
+
 // already in your project:
 // export type ApiResponse<T> = { success: boolean; message?: string; data?: T };

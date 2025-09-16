@@ -2244,4 +2244,5 @@ export default function PatientDashboardPage() {
             </div>
         </AdminLayout>
     );
+
 }
