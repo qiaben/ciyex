@@ -463,6 +463,8 @@
 //     );
 // }
 
+
+
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
@@ -495,6 +497,8 @@ import SignoffCard from "@/components/encounter/signoff/SignoffCard";
 //import FeeScheduleCard from "@/components/encounter/fees/FeeScheduleCard";
 import DateTimeFinalizedCard from "@/components/encounter/datetimefinalized/DateTimeFinalizedCard";
 import EncounterSummary from "@/components/encounter/summary/Encountersummary";
+import VitalsList from "@/components/encounter/Vitals/VitalsList";
+
 
 // (Optional) If you already have this component per your earlier share
 // import EncounterDropdown from "@/components/encounter/EncounterDropdown";
@@ -535,6 +539,7 @@ export default function EncounterTabsPage() {
             // { id: "fees", label: "Fee Schedule" },
             { id: "datetime", label: "Date/Time Finalized" },
             { id: "signoff", label: "Sign-off / Finalize" },
+            { id: "vitals", label: "vitals" },
             { id: "summary", label: "Summary" },
         ],
         []
@@ -791,6 +796,7 @@ export default function EncounterTabsPage() {
                         "notes",
                         "signature",
                         //"fees",
+                        "vitals",
                         "datetime",
                         "signoff",
                         "summary"
@@ -839,6 +845,10 @@ export default function EncounterTabsPage() {
                             {id === "datetime" && (
                                 <DateTimeFinalizedCard patientId={appointmentId} encounterId={encounterId} />
                             )}
+                            {id === "vitals" && (
+                                <VitalsList patientId={appointmentId} encounterId={encounterId} />
+                            )}
+
                             {id === "signoff" && <SignoffCard patientId={appointmentId} encounterId={encounterId} />}
                             {id === "summary" && (
                                 <EncounterSummary

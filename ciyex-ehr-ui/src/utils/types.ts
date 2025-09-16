@@ -528,5 +528,37 @@ export type FeeScheduleDto = {
     };
 };
 
+// types.ts
+
+export interface VitalsDto {
+    id?: number;
+    orgId?: number;
+    patientId?: number;
+    encounterId?: number;
+
+    weightKg?: number;
+    weightLbs?: number;
+    heightCm?: number;
+    heightIn?: number;
+
+    bpSystolic?: number;
+    bpDiastolic?: number;
+    pulse?: number;
+    respiration?: number;
+
+    temperatureC?: number;
+    temperatureF?: number;
+
+    oxygenSaturation?: number;
+    bmi?: number;
+
+    notes?: string;
+    signed?: boolean;
+    recordedAt?: string | null;
+    createdDate?: string | null;
+    lastModifiedDate?: string | null;
+}
+
+
 // already in your project:
 // export type ApiResponse<T> = { success: boolean; message?: string; data?: T };
