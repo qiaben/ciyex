@@ -68,6 +68,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         "/inventory-management/suppliers": "Inventory Suppliers",
         "/inventory-management/maintenance": "Inventory Maintenance",
         "/inventory-management/settings": "Inventory Settings",
+        "/patient_education": "Patient Education",
     };
 
     const pageTitle =

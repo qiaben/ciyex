@@ -80,11 +80,7 @@ export function useLowStockNotifications(
             }
         };
 
-        // Run immediately
+        // Run immediately only once
         checkLowStock();
-
-        // Run every 5 minutes
-        const interval = setInterval(checkLowStock, 5 * 60 * 1000);
-        return () => clearInterval(interval);
     }, [orgId, threshold, enabled]); // 👈 watch enabled
 }

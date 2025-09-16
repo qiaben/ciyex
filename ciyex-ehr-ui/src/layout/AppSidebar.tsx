@@ -72,10 +72,12 @@ const navItems: NavItem[] = [
                     d="M12 2C10.343 2 9 3.343 9 5C9 6.657 10.343 8 12 8C13.657 8 15 6.657 15 5C15 3.343 13.657 2 12 2zM12 4C12.553 4 13 4.447 13 5C13 5.553 12.553 6 12 6C11.447 6 11 5.553 11 5C11 4.447 11.447 4 12 4zM6 14C6 13.447 6.447 13 7 13H17C17.553 13 18 13.447 18 14V19C18 19.553 17.553 20 17 20H7C6.447 20 6 19.553 6 19V14zM8 14V18H16V14H8z"
                 />
             </svg>
-        ), // Inline SVG for "Patients"
+        ),
         name: "Patients", // New menu item for Patients
-        path: "/patients", // Path for Patients
-    },
+        subItems: [
+            { name: "Patients List", path: "/patients" },
+            { name: "Education", path: "/patient_education" },
+        ],    },
 
 
     {
