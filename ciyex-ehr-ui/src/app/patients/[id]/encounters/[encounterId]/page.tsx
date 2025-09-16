@@ -13,24 +13,24 @@
 // import AdminLayout from "@/app/(admin)/layout";
 //
 // // Sections
-// import AssignedProviderList from "@/components/encounter/assigned/AssignedProviderList";
-// import ChiefComplaintList from "@/components/encounter/cc/ChiefComplaintList";
-// import HPIList from "@/components/encounter/hpi/HPIList";
-// import PatientMHList from "@/components/encounter/pmh/PatientMHList";
-// import PMHList from "@/components/encounter/pastmh/PMHList";
-// import FHList from "@/components/encounter/familyhistory/FHList";
-// import SHList from "@/components/encounter/socialhistory/SHList";
-// import PEList from "@/components/encounter/physicalexam/PEList";
-// import ROSList from "@/components/encounter/ros/ROSList";
-// import ProcedureList from "@/components/encounter/procedure/ProcedureList";
-// import CodeList from "@/components/encounter/coding/CodeList";
-// import AssessmentList from "@/components/encounter/assessment/AssessmentList";
-// import PlanList from "@/components/encounter/plan/PlanList";
-// import ProviderNoteList from "@/components/encounter/providernote/ProviderNoteList";
-// import ProviderSignatureCard from "@/components/encounter/providersignature/ProviderSignatureCard";
-// import SignoffCard from "@/components/encounter/signoff/SignoffCard";
-// //import FeeScheduleCard from "@/components/encounter/fees/FeeScheduleCard";
-// import DateTimeFinalizedCard from "@/components/encounter/datetimefinalized/DateTimeFinalizedCard";
+// import AssignedProviderlist from "@/components/encounter/assigned/AssignedProviderlist";
+// import Chiefcomplaintlist from "@/components/encounter/cc/Chiefcomplaintlist";
+// import Hpilist from "@/components/encounter/hpi/Hpilist";
+// import Patientmhlist from "@/components/encounter/pmh/Patientmhlist";
+// import Pmhlist from "@/components/encounter/pastmh/Pmhlist";
+// import FHlist from "@/components/encounter/familyhistory/FHlist";
+// import Shlist from "@/components/encounter/socialhistory/Shlist";
+// import Pelist from "@/components/encounter/physicalexam/Pelist";
+// import Roslist from "@/components/encounter/ros/Roslist";
+// import Procedurelist from "@/components/encounter/procedure/Procedurelist";
+// import Codelist from "@/components/encounter/coding/Codelist";
+// import Assessmentlist from "@/components/encounter/assessment/Assessmentlist";
+// import Planlist from "@/components/encounter/plan/Planlist";
+// import Providernotelist from "@/components/encounter/providernote/Providernotelist";
+// import Providersignaturecard from "@/components/encounter/providersignature/Providersignaturecard";
+// import Signoffcard from "@/components/encounter/signoff/Signoffcard";
+// //import Feeschedulecard from "@/components/encounter/fees/Feeschedulecard";
+// import DatetimefinalizedCard from "@/components/encounter/datetimefinalized/DatetimefinalizedCard";
 // import EncounterSummary from "@/components/encounter/summary/Encountersummary";
 //
 //
@@ -357,41 +357,41 @@
 //                             }`}
 //                         >
 //                             {id === "assigned-providers" && (
-//                                 <AssignedProviderList patientId={appointmentId} encounterId={encounterId} />
+//                                 <AssignedProviderlist patientId={appointmentId} encounterId={encounterId} />
 //                             )}
 //                             {id === "chief-complaint" && (
-//                                 <ChiefComplaintList patientId={appointmentId} encounterId={encounterId} />
+//                                 <Chiefcomplaintlist patientId={appointmentId} encounterId={encounterId} />
 //                             )}
-//                             {id === "hpi" && <HPIList patientId={appointmentId} encounterId={encounterId} />}
-//                             {id === "pmh" && <PatientMHList patientId={appointmentId} encounterId={encounterId} />}
-//                             {id === "pastpmh" && <PMHList patientId={appointmentId} encounterId={encounterId} />}
+//                             {id === "hpi" && <Hpilist patientId={appointmentId} encounterId={encounterId} />}
+//                             {id === "pmh" && <Patientmhlist patientId={appointmentId} encounterId={encounterId} />}
+//                             {id === "pastpmh" && <Pmhlist patientId={appointmentId} encounterId={encounterId} />}
 //                             {id === "fh" && (
-//                                 <FHList patientId={appointmentId} encounterId={encounterId} />
+//                                 <FHlist patientId={appointmentId} encounterId={encounterId} />
 //                             )}
-//                             {id === "sh" && <SHList patientId={appointmentId} encounterId={encounterId} />}
-//                             {id === "pe" && <PEList patientId={appointmentId} encounterId={encounterId} />}
-//                             {id === "ros" && <ROSList patientId={appointmentId} encounterId={encounterId} />}
+//                             {id === "sh" && <Shlist patientId={appointmentId} encounterId={encounterId} />}
+//                             {id === "pe" && <Pelist patientId={appointmentId} encounterId={encounterId} />}
+//                             {id === "ros" && <Roslist patientId={appointmentId} encounterId={encounterId} />}
 //                             {id === "procedures" && (
-//                                 <ProcedureList patientId={appointmentId} encounterId={encounterId} />
+//                                 <Procedurelist patientId={appointmentId} encounterId={encounterId} />
 //                             )}
-//                             {id === "codes" && <CodeList patientId={appointmentId} encounterId={encounterId} />}
+//                             {id === "codes" && <Codelist patientId={appointmentId} encounterId={encounterId} />}
 //                             {id === "assessment" && (
-//                                 <AssessmentList patientId={appointmentId} encounterId={encounterId} />
+//                                 <Assessmentlist patientId={appointmentId} encounterId={encounterId} />
 //                             )}
-//                             {id === "plan" && <PlanList patientId={appointmentId} encounterId={encounterId} />}
+//                             {id === "plan" && <Planlist patientId={appointmentId} encounterId={encounterId} />}
 //                             {id === "notes" && (
-//                                 <ProviderNoteList patientId={appointmentId} encounterId={encounterId} />
+//                                 <Providernotelist patientId={appointmentId} encounterId={encounterId} />
 //                             )}
 //                             {id === "signature" && (
-//                                 <ProviderSignatureCard patientId={appointmentId} encounterId={encounterId} />
+//                                 <Providersignaturecard patientId={appointmentId} encounterId={encounterId} />
 //                             )}
 //                             {/*{id === "fees" && (*/}
-//                             {/*    <FeeScheduleCard patientId={appointmentId} encounterId={encounterId} />*/}
+//                             {/*    <Feeschedulecard patientId={appointmentId} encounterId={encounterId} />*/}
 //                             {/*)}*/}
 //                             {id === "datetime" && (
-//                                 <DateTimeFinalizedCard patientId={appointmentId} encounterId={encounterId} />
+//                                 <DatetimefinalizedCard patientId={appointmentId} encounterId={encounterId} />
 //                             )}
-//                             {id === "signoff" && <SignoffCard patientId={appointmentId} encounterId={encounterId} />}
+//                             {id === "signoff" && <Signoffcard patientId={appointmentId} encounterId={encounterId} />}
 //                             {id === "summary" && (
 //                                 <EncounterSummary
 //                                     patientId={appointmentId}
@@ -480,26 +480,26 @@ import {fetchWithOrg} from "@/utils/fetchWithOrg";
 import AdminLayout from "@/app/(admin)/layout";
 
 // Sections
-import AssignedProviderList from "@/components/encounter/assigned/AssignedProviderList";
-import ChiefComplaintList from "@/components/encounter/cc/ChiefComplaintList";
-import HPIList from "@/components/encounter/hpi/HPIList";
-import PatientMHList from "@/components/encounter/pmh/PatientMHList";
-import PMHList from "@/components/encounter/pastmh/PMHList";
-import FHList from "@/components/encounter/familyhistory/FHList";
-import SHList from "@/components/encounter/socialhistory/SHList";
-import PEList from "@/components/encounter/physicalexam/PEList";
-import ROSList from "@/components/encounter/ros/ROSList";
-import ProcedureList from "@/components/encounter/procedure/ProcedureList";
-import CodeList from "@/components/encounter/coding/CodeList";
-import AssessmentList from "@/components/encounter/assessment/AssessmentList";
-import PlanList from "@/components/encounter/plan/PlanList";
-import ProviderNoteList from "@/components/encounter/providernote/ProviderNoteList";
-import ProviderSignatureCard from "@/components/encounter/providersignature/ProviderSignatureCard";
-import SignoffCard from "@/components/encounter/signoff/SignoffCard";
-//import FeeScheduleCard from "@/components/encounter/fees/FeeScheduleCard";
-import DateTimeFinalizedCard from "@/components/encounter/datetimefinalized/DateTimeFinalizedCard";
+import AssignedProviderlist from "@/components/encounter/assigned/AssignedProviderlist";
+import Chiefcomplaintlist from "@/components/encounter/cc/Chiefcomplaintlist";
+import Hpilist from "@/components/encounter/hpi/Hpilist";
+import Patientmhlist from "@/components/encounter/pmh/Patientmhlist";
+import Pmhlist from "@/components/encounter/pastmh/Pmhlist";
+import FHlist from "@/components/encounter/familyhistory/FHlist";
+import Shlist from "@/components/encounter/socialhistory/Shlist";
+import Pelist from "@/components/encounter/physicalexam/Pelist";
+import Roslist from "@/components/encounter/ros/Roslist";
+import Procedurelist from "@/components/encounter/procedure/Procedurelist";
+import Codelist from "@/components/encounter/coding/Codelist";
+import Assessmentlist from "@/components/encounter/assessment/Assessmentlist";
+import Planlist from "@/components/encounter/plan/Planlist";
+import Providernotelist from "@/components/encounter/providernote/Providernotelist";
+import Providersignaturecard from "@/components/encounter/providersignature/Providersignaturecard";
+import Signoffcard from "@/components/encounter/signoff/Signoffcard";
+//import Feeschedulecard from "@/components/encounter/fees/Feeschedulecard";
+import DatetimefinalizedCard from "@/components/encounter/datetimefinalized/DatetimefinalizedCard";
 import EncounterSummary from "@/components/encounter/summary/Encountersummary";
-import VitalsList from "@/components/encounter/Vitals/VitalsList";
+import Vitalslist from "@/components/encounter/Vitals/Vitalslist";
 
 
 // (Optional) If you already have this component per your earlier share
@@ -813,45 +813,45 @@ export default function EncounterTabsPage() {
                             ref={id === "summary" ? summaryRef : undefined}
                         >
                             {id === "assigned-providers" && (
-                                <AssignedProviderList patientId={appointmentId} encounterId={encounterId} />
+                                <AssignedProviderlist patientId={appointmentId} encounterId={encounterId} />
                             )}
                             {id === "chief-complaint" && (
-                                <ChiefComplaintList patientId={appointmentId} encounterId={encounterId} />
+                                <Chiefcomplaintlist patientId={appointmentId} encounterId={encounterId} />
                             )}
-                            {id === "hpi" && <HPIList patientId={appointmentId} encounterId={encounterId} />}
-                            {id === "pmh" && <PatientMHList patientId={appointmentId} encounterId={encounterId} />}
-                            {id === "pastpmh" && <PMHList patientId={appointmentId} encounterId={encounterId} />}
+                            {id === "hpi" && <Hpilist patientId={appointmentId} encounterId={encounterId} />}
+                            {id === "pmh" && <Patientmhlist patientId={appointmentId} encounterId={encounterId} />}
+                            {id === "pastpmh" && <Pmhlist patientId={appointmentId} encounterId={encounterId} />}
                             {id === "fh" && (
-                                <FHList patientId={appointmentId} encounterId={encounterId} />
+                                <FHlist patientId={appointmentId} encounterId={encounterId} />
                             )}
-                            {id === "sh" && <SHList patientId={appointmentId} encounterId={encounterId} />}
-                            {id === "pe" && <PEList patientId={appointmentId} encounterId={encounterId} />}
-                            {id === "ros" && <ROSList patientId={appointmentId} encounterId={encounterId} />}
+                            {id === "sh" && <Shlist patientId={appointmentId} encounterId={encounterId} />}
+                            {id === "pe" && <Pelist patientId={appointmentId} encounterId={encounterId} />}
+                            {id === "ros" && <Roslist patientId={appointmentId} encounterId={encounterId} />}
                             {id === "procedures" && (
-                                <ProcedureList patientId={appointmentId} encounterId={encounterId} />
+                                <Procedurelist patientId={appointmentId} encounterId={encounterId} />
                             )}
-                            {id === "codes" && <CodeList patientId={appointmentId} encounterId={encounterId} />}
+                            {id === "codes" && <Codelist patientId={appointmentId} encounterId={encounterId} />}
                             {id === "assessment" && (
-                                <AssessmentList patientId={appointmentId} encounterId={encounterId} />
+                                <Assessmentlist patientId={appointmentId} encounterId={encounterId} />
                             )}
-                            {id === "plan" && <PlanList patientId={appointmentId} encounterId={encounterId} />}
+                            {id === "plan" && <Planlist patientId={appointmentId} encounterId={encounterId} />}
                             {id === "notes" && (
-                                <ProviderNoteList patientId={appointmentId} encounterId={encounterId} />
+                                <Providernotelist patientId={appointmentId} encounterId={encounterId} />
                             )}
                             {id === "signature" && (
-                                <ProviderSignatureCard patientId={appointmentId} encounterId={encounterId} />
+                                <Providersignaturecard patientId={appointmentId} encounterId={encounterId} />
                             )}
                             {/*{id === "fees" && (*/}
-                            {/*    <FeeScheduleCard patientId={appointmentId} encounterId={encounterId} />*/}
+                            {/*    <Feeschedulecard patientId={appointmentId} encounterId={encounterId} />*/}
                             {/*)}*/}
                             {id === "datetime" && (
-                                <DateTimeFinalizedCard patientId={appointmentId} encounterId={encounterId} />
+                                <DatetimefinalizedCard patientId={appointmentId} encounterId={encounterId} />
                             )}
                             {id === "vitals" && (
-                                <VitalsList patientId={appointmentId} encounterId={encounterId} />
+                                <Vitalslist patientId={appointmentId} encounterId={encounterId} />
                             )}
 
-                            {id === "signoff" && <SignoffCard patientId={appointmentId} encounterId={encounterId} />}
+                            {id === "signoff" && <Signoffcard patientId={appointmentId} encounterId={encounterId} />}
                             {id === "summary" && (
                                 <EncounterSummary
                                     patientId={appointmentId}
@@ -865,5 +865,7 @@ export default function EncounterTabsPage() {
             </div>
         </AdminLayout>
     );
+
+
 
 }

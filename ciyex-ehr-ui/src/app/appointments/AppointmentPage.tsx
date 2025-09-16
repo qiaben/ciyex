@@ -270,17 +270,15 @@
 // }
 
 
-
-
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
 import AdminLayout from "@/app/(admin)/layout";
 import { fetchWithAuth } from "@/utils/fetchWithAuth";
 import EncounterTableExpandable from "@/components/encounter/EncounterTableExpandable";
-import ProcedureList from "@/components/encounter/procedure/ProcedureList";
-import VitalsList from "@/components/encounter/Vitals/VitalsList";
-import ProviderNoteList from "@/components/encounter/providernote/ProviderNoteList";
+import Procedurelist from "@/components/encounter/procedure/Procedurelist";
+import Vitalslist from "@/components/encounter/Vitals/Vitalslist";
+import Providernotelist from "@/components/encounter/providernote/Providernotelist";
 
 export type AppointmentRow = {
     id: number;
@@ -536,9 +534,9 @@ export default function AppointmentPage() {
                                 Appointment #{selectedRow.id} — Patient {selectedRow.patientId}
                             </h2>
                             {/*<EncounterTableExpandable patientId={selectedRow.patientId} />*/}
-                            <ProviderNoteList patientId={selectedRow.patientId} encounterId={selectedRow.id} />
-                            <ProcedureList patientId={selectedRow.patientId} encounterId={selectedRow.id} />
-                            <VitalsList patientId={selectedRow.patientId} encounterId={selectedRow.id} />
+                            <Providernotelist patientId={selectedRow.patientId} encounterId={selectedRow.id} />
+                            <Procedurelist patientId={selectedRow.patientId} encounterId={selectedRow.id} />
+                            <Vitalslist patientId={selectedRow.patientId} encounterId={selectedRow.id} />
                         </>
                     )}
                 </Drawer>
