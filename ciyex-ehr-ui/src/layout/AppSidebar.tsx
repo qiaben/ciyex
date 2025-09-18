@@ -91,8 +91,7 @@ const navItems: NavItem[] = [
     {
         icon:<MessagingIcon/>,
         name:"Messaging",
-        subItems: [
-            { name: "Inbox", path: "/messaging/inbox" },],
+        
     },
 
 
@@ -122,27 +121,25 @@ const navItems: NavItem[] = [
     },
 
     {
-        icon: <SettingsIcon />,
-        name: "Settings",
-        subItems: [
-            { name: "Providers", path: "/settings/providers" },
-            {name:"Insurance companies", path:"/settings/insurance"},
-            {
-                name: "Codes",
-                path: "/settings/codes",
-            },
-            { name: "Integration", path: "/settings/config" },
-            {
-                name: "Forms",
-                subItems: [
-                    { name: "Lists", path: "/settings/forms/lists" },
-                    { name: "Form Admin", path: "/settings/forms/admin" },
-                ],
-            },
-
-
-        ],
+      icon: <SettingsIcon />,
+      name: "Settings",
+      subItems: [
+        { name: "Providers", path: "/settings/providers" },
+        { name: "Insurance companies", path: "/settings/insurance" },
+        { name: "Codes", path: "/settings/codes" },
+        { name: "Integration", path: "/settings/config" },
+        { name: "Billing", path: "/settings/billing" },   // <-- Added
+        { name: "Service", path: "/settings/service" },   // <-- Added
+        {
+          name: "Forms",
+          subItems: [
+            { name: "Lists", path: "/settings/forms/lists" },
+            { name: "Form Admin", path: "/settings/forms/admin" },
+          ],
+        },
+      ],
     },
+
 
     {
         name: "Forms",
