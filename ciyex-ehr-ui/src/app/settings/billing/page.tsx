@@ -36,7 +36,9 @@ type CardDetails = {
     expMonth?: number;
     expYear?: number;
     stripePaymentMethodId?: string;
+    gpsCustomerVaultId?: string;
     isDefault?: boolean;
+    paymentProcessor?: "stripe" | "gps";
 };
 
 /* ------------ Helpers ------------ */
@@ -212,6 +214,236 @@ const CardForm = ({
     );
 };
 
+/* ------------ GPS Card Form ------------ */
+const GpsCardFormInline = ({
+    onSaved,
+    onCancel,
+    showToast,
+}: {
+    onSaved: () => void;
+    onCancel: () => void;
+    showToast: (message: string, type: "success" | "error") => void;
+}) => {
+    const [firstName, setFirstName] = useState("");
+    const [lastName, setLastName] = useState("");
+    const [street, setStreet] = useState("");
+    const [city, setCity] = useState("");
+    const [state, setState] = useState("");
+    const [zip, setZip] = useState("");
+    const [cardNumber, setCardNumber] = useState("");
+    const [expMonth, setExpMonth] = useState("");
+    const [expYear, setExpYear] = useState("");
+    const [cvv, setCvv] = useState("");
+    const [isLoading, setIsLoading] = useState(false);
+
+    const handleSaveCard = async () => {
+        if (!firstName || !lastName || !cardNumber || !expMonth || !expYear || !cvv) {
+            showToast("Please fill in all required fields", "error");
+            return;
+        }
+
+        setIsLoading(true);
+        
+        try {
+            // Determine card brand from card number
+            const getCardBrand = (cardNumber: string): string => {
+                const cleaned = cardNumber.replace(/\s/g, "");
+                if (cleaned.startsWith("4")) return "visa";
+                if (cleaned.startsWith("5") || cleaned.startsWith("2")) return "mastercard";
+                if (cleaned.startsWith("3")) return "amex";
+                if (cleaned.startsWith("6")) return "discover";
+                return "unknown";
+            };
+
+            const brand = getCardBrand(cardNumber);
+            const last4 = cardNumber.replace(/\s/g, "").slice(-4);
+
+            // Create GPS billing card
+            const cardData = {
+                firstName,
+                lastName,
+                street,
+                city,
+                state,
+                zip,
+                brand,
+                last4,
+                expMonth: parseInt(expMonth),
+                expYear: parseInt(expYear),
+                userId: 1, // This should come from user context
+            };
+
+            const res = await fetchWithAuth(
+                `${process.env.NEXT_PUBLIC_API_URL}/api/gps/billing/tokenize`,
+                {
+                    method: "POST",
+                    headers: { 
+                        "Content-Type": "application/json", 
+                        "x-org-id": "1" 
+                    },
+                    body: JSON.stringify(cardData),
+                }
+            );
+
+            const json = await safeJson(res);
+            if (json?.success) {
+                showToast("GPS card saved successfully!", "success");
+                onSaved();
+            } else {
+                showToast(
+                    "Failed to save GPS card: " + (json?.message ?? "Unknown error"),
+                    "error"
+                );
+            }
+        } catch (error) {
+            console.error("GPS card save error:", error);
+            showToast("Failed to save GPS card", "error");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const formatCardNumber = (value: string) => {
+        const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
+        const matches = v.match(/\d{4,16}/g);
+        const match = matches && matches[0] || '';
+        const parts = [];
+        for (let i = 0, len = match.length; i < len; i += 4) {
+            parts.push(match.substring(i, i + 4));
+        }
+        if (parts.length) {
+            return parts.join(' ');
+        } else {
+            return v;
+        }
+    };
+
+    const handleCardNumberChange = (e: any) => {
+        const formatted = formatCardNumber(e.target.value);
+        if (formatted.replace(/\s/g, '').length <= 16) {
+            setCardNumber(formatted);
+        }
+    };
+
+    return (
+        <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+                <input
+                    placeholder="First Name *"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    className="w-full p-2 border rounded"
+                    disabled={isLoading}
+                />
+                <input
+                    placeholder="Last Name *"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    className="w-full p-2 border rounded"
+                    disabled={isLoading}
+                />
+            </div>
+            
+            <input
+                placeholder="Street Address"
+                value={street}
+                onChange={(e) => setStreet(e.target.value)}
+                className="w-full p-2 border rounded"
+                disabled={isLoading}
+            />
+            
+            <div className="grid grid-cols-3 gap-3">
+                <input
+                    placeholder="City"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    className="w-full p-2 border rounded"
+                    disabled={isLoading}
+                />
+                <input
+                    placeholder="State"
+                    value={state}
+                    onChange={(e) => setState(e.target.value)}
+                    className="w-full p-2 border rounded"
+                    disabled={isLoading}
+                />
+                <input
+                    placeholder="ZIP Code"
+                    value={zip}
+                    onChange={(e) => setZip(e.target.value)}
+                    className="w-full p-2 border rounded"
+                    disabled={isLoading}
+                />
+            </div>
+
+            <input
+                placeholder="Card Number *"
+                value={cardNumber}
+                onChange={handleCardNumberChange}
+                className="w-full p-2 border rounded"
+                disabled={isLoading}
+                maxLength={19} // 16 digits + 3 spaces
+            />
+            
+            <div className="grid grid-cols-3 gap-3">
+                <select
+                    value={expMonth}
+                    onChange={(e) => setExpMonth(e.target.value)}
+                    className="w-full p-2 border rounded"
+                    disabled={isLoading}
+                >
+                    <option value="">Month *</option>
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
+                        <option key={month} value={month.toString().padStart(2, '0')}>
+                            {month.toString().padStart(2, '0')}
+                        </option>
+                    ))}
+                </select>
+                
+                <select
+                    value={expYear}
+                    onChange={(e) => setExpYear(e.target.value)}
+                    className="w-full p-2 border rounded"
+                    disabled={isLoading}
+                >
+                    <option value="">Year *</option>
+                    {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() + i).map(year => (
+                        <option key={year} value={year.toString()}>
+                            {year}
+                        </option>
+                    ))}
+                </select>
+                
+                <input
+                    placeholder="CVV *"
+                    value={cvv}
+                    onChange={(e) => setCvv(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                    className="w-full p-2 border rounded"
+                    disabled={isLoading}
+                    maxLength={4}
+                />
+            </div>
+
+            <div className="flex justify-end gap-2 mt-3">
+                <button
+                    onClick={onCancel}
+                    className="px-4 py-2 rounded bg-gray-300 text-gray-700 hover:bg-gray-400"
+                    disabled={isLoading}
+                >
+                    Cancel
+                </button>
+                <button
+                    onClick={handleSaveCard}
+                    className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
+                    disabled={isLoading}
+                >
+                    {isLoading ? "Saving..." : "Save GPS Card"}
+                </button>
+            </div>
+        </div>
+    );
+};
+
 const stripePromise = loadStripe("pk_test_51S5UPvJSxIy1fnkK6dpKKhcedyuGTeD6IyZE4UtJ02MCHGyR28wFoCO9397j2JF31WGYLMLCH7cokGRkRDcugN2500tQtAXCJV");
 /* ------------ Billing Page ------------ */
 const BillingPage = () => {
@@ -223,6 +455,7 @@ const BillingPage = () => {
     const [history, setHistory] = useState<BillingHistory[]>([]);
     const [cards, setCards] = useState<CardDetails[]>([]);
     const [showCardForm, setShowCardForm] = useState(false);
+    const [showGpsCardForm, setShowGpsCardForm] = useState(false);
     const [showPayModal, setShowPayModal] = useState(false);
     const [selectedCardId, setSelectedCardId] = useState<number | null>(null);
 
@@ -255,11 +488,32 @@ const BillingPage = () => {
 
     async function loadCards() {
         try {
+            // Load Stripe cards
             const cardRes = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/billing/cards/1`, {
                 headers: { "x-org-id": "1" },
             });
             const cardJson = await safeJson<CardDetails[]>(cardRes);
-            if (cardJson?.success) setCards(cardJson.data);
+            let allCards: CardDetails[] = [];
+            
+            if (cardJson?.success) {
+                allCards = cardJson.data.map(card => ({ ...card, paymentProcessor: "stripe" as const }));
+            }
+
+            // Load GPS cards
+            try {
+                const gpsCardRes = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/gps/billing/cards/user/1`, {
+                    headers: { "x-org-id": "1" },
+                });
+                const gpsCardJson = await safeJson<CardDetails[]>(gpsCardRes);
+                if (gpsCardJson?.success) {
+                    const gpsCards = gpsCardJson.data.map(card => ({ ...card, paymentProcessor: "gps" as const }));
+                    allCards = [...allCards, ...gpsCards];
+                }
+            } catch (e) {
+                console.log("GPS cards not available or not configured");
+            }
+
+            setCards(allCards);
         } catch {}
     }
 
@@ -364,9 +618,14 @@ const BillingPage = () => {
                         </button>
                     )}
                     {currentTab === "cards" && (
-                        <button onClick={() => setShowCardForm(true)} className="px-3 py-1.5 rounded bg-blue-600 text-white text-sm">
-                            Add Card
-                        </button>
+                        <>
+                            <button onClick={() => setShowCardForm(true)} className="px-3 py-1.5 rounded bg-blue-600 text-white text-sm mr-2">
+                                Add Stripe Card
+                            </button>
+                            <button onClick={() => setShowGpsCardForm(true)} className="px-3 py-1.5 rounded bg-green-600 text-white text-sm">
+                                Add GPS Card
+                            </button>
+                        </>
                     )}
                 </div>
             </div>
@@ -572,6 +831,29 @@ const BillingPage = () => {
                                 showToast={showToast}
                             />
                         </Elements>
+                    </div>
+                </div>
+            )}
+
+            {/* Add GPS Card Modal */}
+            {showGpsCardForm && (
+                <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl relative">
+                        <button
+                            onClick={() => setShowGpsCardForm(false)}
+                            className="absolute top-3 right-3 text-gray-500 hover:text-gray-700"
+                        >
+                            ✕
+                        </button>
+                        <h2 className="text-lg font-semibold mb-4">Add GPS Card</h2>
+                        <GpsCardFormInline
+                            onSaved={() => {
+                                setShowGpsCardForm(false);
+                                loadCards();
+                            }}
+                            onCancel={() => setShowGpsCardForm(false)}
+                            showToast={showToast}
+                        />
                     </div>
                 </div>
             )}
