@@ -256,7 +256,7 @@ const AppointmentModal: React.FC = () => {
     useEffect(() => {
         (async () => {
             try {
-                const res = await fetchWithAuth(`${apiUrl}/api/list-options/list/Visit Type`);
+                const res = await fetchWithAuth(`${apiUrl}/api/list-options/list/VisitType`);
                 const json = await res.json();
                 if (Array.isArray(json)) {
                     const opts = json

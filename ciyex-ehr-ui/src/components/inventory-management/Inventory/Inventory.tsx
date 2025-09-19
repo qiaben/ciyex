@@ -174,7 +174,7 @@ export default function Inventory() {
     useEffect(() => {
         (async () => {
             try {
-                const res = await fetchWithAuth(`${API_URL}/api/list-options/list/inventory_type`);
+                const res = await fetchWithAuth(`${API_URL}/api/list-options/list/inventorytype`);
                 const json = await res.json();
                 if (res.ok && Array.isArray(json)) {
                     setTypeOptions(
