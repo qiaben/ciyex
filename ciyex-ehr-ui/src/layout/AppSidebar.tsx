@@ -91,6 +91,7 @@ const navItems: NavItem[] = [
     {
         icon:<MessagingIcon/>,
         name:"Messaging",
+        path:"/messaging",
         
     },
 
