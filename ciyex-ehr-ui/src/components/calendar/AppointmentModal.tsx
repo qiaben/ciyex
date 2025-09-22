@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { fetchWithAuth } from "@/utils/fetchWithAuth";
 import Alert from "@/components/ui/alert/Alert";
+import VideoCallButton from "@/components/telehealth/VideoCallButton";
 
 /* =========================
  * Types
@@ -624,6 +625,28 @@ const AppointmentModal: React.FC = () => {
                     <DialogTitle className="mb-1 text-xl font-semibold">Add Appointment</DialogTitle>
                     <DialogDescription>Schedule or edit an appointment to stay on track</DialogDescription>
                 </DialogHeader>
+
+                {/* Video Call Section - Show for existing appointments */}
+                {selectedEvent && selectedPatientId && providerId && (
+                    <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h4 className="font-medium text-blue-900 text-sm">Telehealth Options</h4>
+                                <p className="text-blue-700 text-xs mt-1">
+                                    Start a video call for this appointment
+                                </p>
+                            </div>
+                            <VideoCallButton
+                                appointmentId={selectedEvent.id ? Number(selectedEvent.id) : undefined}
+                                patientId={Number(selectedPatientId)}
+                                providerId={Number(providerId)}
+                                patientName={selectedPatientName}
+                                variant="primary"
+                                size="sm"
+                            />
+                        </div>
+                    </div>
+                )}
 
                 <div className="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
                     {/* Visit Type */}
