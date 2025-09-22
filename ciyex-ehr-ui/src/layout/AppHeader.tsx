@@ -1,5 +1,4 @@
 "use client";
-import { ThemeToggleButton } from "@/components/common/ThemeToggleButton";
 import NotificationDropdown from "@/components/header/NotificationDropdown";
 import UserDropdown from "@/components/header/UserDropdown";
 import { useSidebar } from "@/context/SidebarContext";
@@ -157,6 +156,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({ pageTitle }) => {
     return (
         <header className="sticky top-0 flex w-full bg-white border-b border-gray-200 z-50 dark:bg-gray-900">
             <div className="flex items-center justify-between w-full px-4 py-2">
+                {/* Left section: sidebar + title */}
                 <div className="flex items-center gap-3">
                     <button
                         onClick={toggleSidebar}
@@ -175,41 +175,44 @@ const AppHeader: React.FC<AppHeaderProps> = ({ pageTitle }) => {
                     {pageTitle && <h1 className="text-lg font-semibold">{pageTitle}</h1>}
                 </div>
 
-                <div className="flex-1 max-w-md mx-8">
-                    <div className="relative">
-                        <span className="absolute inset-y-0 left-3 flex items-center">
-                            <svg
-                                className="w-4 h-4 text-gray-400"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                viewBox="0 0 24 24"
+                {/* Right section: search + actions grouped together */}
+                <div className="flex items-center gap-3 flex-1 justify-end">
+                    {/* Search box */}
+                    <div className="max-w-md w-full">
+                        <div className="relative">
+        <span className="absolute inset-y-0 left-3 flex items-center">
+          <svg
+              className="w-4 h-4 text-gray-400"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+          >
+            <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M21 21l-4.35-4.35M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16z"
+            />
+          </svg>
+        </span>
+                            <input
+                                ref={inputRef}
+                                type="text"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                placeholder="Search or type command..."
+                                className="h-11 w-full rounded-lg border border-gray-200 pl-9 pr-14 text-sm text-gray-800 shadow-sm focus:ring-2 focus:ring-blue-500"
+                            />
+                            <button
+                                onClick={runSearch}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-500"
                             >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M21 21l-4.35-4.35M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16z"
-                                />
-                            </svg>
-                        </span>
-                        <input
-                            ref={inputRef}
-                            type="text"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            placeholder="Search or type command..."
-                            className="h-11 w-full rounded-lg border border-gray-200 pl-9 pr-14 text-sm text-gray-800 shadow-sm focus:ring-2 focus:ring-blue-500"
-                        />
-                        <button
-                            onClick={runSearch}
-                            className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-500"
-                        >
-                            ⌘ K
-                        </button>
+                                ⌘ K
+                            </button>
+                        </div>
                     </div>
-                </div>
 
-                <div className="flex items-center gap-3">
+                    {/* Patient button */}
                     <button
                         onClick={() => {
                             resetForm();
@@ -225,10 +228,29 @@ const AppHeader: React.FC<AppHeaderProps> = ({ pageTitle }) => {
                             />
                             <circle className="fill-[#6EBAFF]" cx="15" cy="9" r="6" />
                         </svg>
-                        {/*<span className="text-xl font-bold">+</span>*/}
-
                     </button>
-                    <ThemeToggleButton />
+
+                    {/* Appointment button */}
+                    <button
+                        onClick={() => window.dispatchEvent(new Event("open-appointment-modal"))}
+                        className="inline-flex items-center gap-1.5 rounded-md bg-blue-100 text-blue-700 px-3 py-1.5 text-sm font-medium hover:bg-blue-200"
+                    >
+                        <span className="text-xl font-bold">+</span>
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-7 w-7"
+                            viewBox="0 0 26 26"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                        >
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                            <line x1="3" y1="10" x2="21" y2="10" />
+                            <line x1="8" y1="2" x2="8" y2="6" />
+                            <line x1="16" y1="2" x2="16" y2="6" />
+                        </svg>
+                    </button>
+
                     <NotificationDropdown />
                     <UserDropdown />
                 </div>

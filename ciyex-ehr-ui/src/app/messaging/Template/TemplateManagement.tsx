@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { fetchWithAuth } from "@/utils/fetchWithAuth";
 
 /* ------------ Types ------------ */
@@ -49,6 +49,10 @@ const TemplateManagement = () => {
     const [isEditMode, setIsEditMode] = useState(false);
     const [editId, setEditId] = useState<number | null>(null);
 
+    // pagination
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
+
     // 🔑 Listen for "openAddTemplate" trigger from MessagingPage
     useEffect(() => {
         const handler = () => {
@@ -84,6 +88,12 @@ const TemplateManagement = () => {
         }
         load();
     }, []);
+
+    // derive paginated rows
+    const paginatedTemplates = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return templates.slice(start, start + pageSize);
+    }, [templates, currentPage, pageSize]);
 
     async function saveTemplate() {
         if (!tplName.trim() || !tplSubject.trim() || !tplBody.trim()) return;
@@ -185,6 +195,7 @@ const TemplateManagement = () => {
             <table className="w-full text-sm border rounded bg-white shadow-sm">
                 <thead className="bg-gray-100 text-left">
                 <tr>
+                    <th className="px-3 py-2">No.</th>
                     <th className="px-3 py-2">Template Name</th>
                     <th className="px-3 py-2">Subject</th>
                     <th className="px-3 py-2">Body</th>
@@ -193,9 +204,13 @@ const TemplateManagement = () => {
                 </tr>
                 </thead>
                 <tbody>
-                {templates.length ? (
-                    templates.map((t) => (
+                {paginatedTemplates.length ? (
+                    paginatedTemplates.map((t, idx) => (
                         <tr key={t.id} className="border-t hover:bg-gray-50 align-top">
+                            {/* ✅ Serial Number column */}
+                            <td className="px-3 py-3">
+                                {(currentPage - 1) * pageSize + idx + 1}
+                            </td>
                             <td className="px-3 py-3">{t.templateName}</td>
                             <td className="px-3 py-3">{t.subject}</td>
                             <td
@@ -221,13 +236,69 @@ const TemplateManagement = () => {
                     ))
                 ) : (
                     <tr>
-                        <td colSpan={5} className="px-3 py-6 text-center text-gray-500">
+                        <td colSpan={6} className="px-3 py-6 text-center text-gray-500">
                             No templates found.
                         </td>
                     </tr>
                 )}
                 </tbody>
             </table>
+
+            {/* ✅ Pagination Footer */}
+            {templates.length > 0 && (
+                <div className="flex justify-between items-center mt-3 text-sm">
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                            disabled={currentPage === 1}
+                            className="px-3 py-1 rounded bg-gray-100 disabled:opacity-50"
+                        >
+                            Prev
+                        </button>
+                        <span>
+                            Page {currentPage} of{" "}
+                            {Math.max(1, Math.ceil(templates.length / pageSize))}
+                        </span>
+                        <button
+                            onClick={() =>
+                                setCurrentPage((p) =>
+                                    p < Math.ceil(templates.length / pageSize) ? p + 1 : p
+                                )
+                            }
+                            disabled={currentPage >= Math.ceil(templates.length / pageSize)}
+                            className="px-3 py-1 rounded bg-gray-100 disabled:opacity-50"
+                        >
+                            Next
+                        </button>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <span>
+                            Showing{" "}
+                            {templates.length === 0
+                                ? "0"
+                                : `${(currentPage - 1) * pageSize + 1}–${Math.min(
+                                    currentPage * pageSize,
+                                    templates.length
+                                )}`}{" "}
+                            of {templates.length}
+                        </span>
+                        <select
+                            value={pageSize}
+                            onChange={(e) => {
+                                setCurrentPage(1);
+                                setPageSize(Number(e.target.value));
+                            }}
+                            className="border rounded px-2 py-1"
+                        >
+                            {[5, 10, 20, 50].map((size) => (
+                                <option key={size} value={size}>
+                                    {size}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+            )}
 
             {/* Add/Edit Template Modal */}
             {isAddTemplateOpen && (

@@ -187,7 +187,7 @@ const ProviderList = () => {
             <div className="container mx-auto p-6 overflow-x-hidden">
                 {/* Heading */}
                 <div className="flex items-center justify-between mb-4">
-                    <h1 className="text-3xl font-semibold text-gray-800">Providers</h1>
+                    <div className="text-3xl font-semibold text-gray-800"></div>
                     <Button size="md" variant="primary" onClick={() => router.push("/settings")}>
                         Add Provider
                     </Button>

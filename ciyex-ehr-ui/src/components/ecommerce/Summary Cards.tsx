@@ -6,6 +6,8 @@ import { fetchWithAuth } from "@/utils/fetchWithAuth";
 
 export const SummaryCards = () => {
     const [patientCount, setPatientCount] = useState<number | null>(null);
+    const [appointmentCount, setAppointmentCount] = useState<number | null>(null);
+
 
     useEffect(() => {
         const getPatientCount = async () => {
@@ -32,6 +34,27 @@ export const SummaryCards = () => {
         };
 
         getPatientCount();
+    }, []);
+
+    // fetch appointment count
+    useEffect(() => {
+        const getAppointmentCount = async () => {
+            try {
+                const res = await fetchWithAuth(
+                    `${process.env.NEXT_PUBLIC_API_URL}/api/appointments/count`
+                );
+                if (!res.ok) throw new Error("Failed to fetch appointment count");
+
+                const result = await res.json();
+                console.log("📊 Appointment count response:", result);
+
+                if (result.success) setAppointmentCount(result.data);
+                else console.error("❌ Appointment count error:", result.message);
+            } catch (err) {
+                console.error("❌ Error fetching appointment count:", err);
+            }
+        };
+        getAppointmentCount();
     }, []);
 
     return (
@@ -81,7 +104,7 @@ export const SummaryCards = () => {
                     </svg>
                 }
                 label="Appointments"
-                value="0"
+                value={appointmentCount !== null ? String(appointmentCount) : "Loading..."}
                 badgeColor="error"
                 badgeText="9.05%"
                 badgeIcon={<div className="w-3 h-3 bg-red-400 rounded-full" />}
