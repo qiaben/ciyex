@@ -33,6 +33,12 @@ importers:
       '@react-jvectormap/world':
         specifier: ^1.1.2
         version: 1.1.2
+      '@stripe/react-stripe-js':
+        specifier: ^2.7.1
+        version: 2.9.0(@stripe/stripe-js@1.54.2)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@stripe/stripe-js':
+        specifier: ^1.54.1
+        version: 1.54.2
       '@tailwindcss/forms':
         specifier: ^0.5.9
         version: 0.5.10(tailwindcss@4.1.11)
@@ -71,7 +77,7 @@ importers:
         version: 1.7.0(apexcharts@4.7.0)(react@18.3.1)
       react-dnd:
         specifier: ^16.0.1
-        version: 16.0.1(@types/node@20.19.9)(@types/react@18.3.23)(react@18.3.1)
+        version: 16.0.1(@types/node@20.19.9)(@types/react@18.3.24)(react@18.3.1)
       react-dnd-html5-backend:
         specifier: ^16.0.1
         version: 16.0.1
@@ -104,14 +110,14 @@ importers:
         specifier: ^20
         version: 20.19.9
       '@types/react':
-        specifier: ^18
-        version: 18.3.23
+        specifier: ^18.3.24
+        version: 18.3.24
       '@types/react-dom':
-        specifier: ^18
-        version: 18.3.7(@types/react@18.3.23)
+        specifier: ^18.3.7
+        version: 18.3.7(@types/react@18.3.24)
       '@types/react-transition-group':
         specifier: ^4.4.12
-        version: 4.4.12(@types/react@18.3.23)
+        version: 4.4.12(@types/react@18.3.24)
       '@types/styled-jsx':
         specifier: ^2.2.9
         version: 2.2.9
@@ -1067,6 +1073,16 @@ packages:
   '@rushstack/eslint-patch@1.12.0':
     resolution: {integrity: sha512-5EwMtOqvJMMa3HbmxLlF74e+3/HhwBTMcvt3nqVJgGCozO6hzIPOBlwm8mGVNR9SN2IJpxSnlxczyDjcn7qIyw==}
 
+  '@stripe/react-stripe-js@2.9.0':
+    resolution: {integrity: sha512-+/j2g6qKAKuWSurhgRMfdlIdKM+nVVJCy/wl0US2Ccodlqx0WqfIIBhUkeONkCG+V/b+bZzcj4QVa3E/rXtT4Q==}
+    peerDependencies:
+      '@stripe/stripe-js': ^1.44.1 || ^2.0.0 || ^3.0.0 || ^4.0.0
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0
+      react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0
+
+  '@stripe/stripe-js@1.54.2':
+    resolution: {integrity: sha512-R1PwtDvUfs99cAjfuQ/WpwJ3c92+DAMy9xGApjqlWQMj0FKQabUAys2swfTRNzuYAYJh7NqK2dzcYVNkKLEKUg==}
+
   '@svgdotjs/svg.draggable.js@3.0.6':
     resolution: {integrity: sha512-7iJFm9lL3C40HQcqzEfezK2l+dW2CpoVY3b77KQGqc8GXWa6LhhmX5Ckv7alQfUXBuZbjpICZ+Dvq1czlGx7gA==}
     peerDependencies:
@@ -1317,8 +1333,8 @@ packages:
     peerDependencies:
       '@types/react': '*'
 
-  '@types/react@18.3.23':
-    resolution: {integrity: sha512-/LDXMQh55EzZQ0uVAZmKKhfENivEvWz6E+EYzh+/MCjMhNsotd+ZHhBGIjFDTi6+fz0OhQQQLbTgdQIxxCsC0w==}
+  '@types/react@18.3.24':
+    resolution: {integrity: sha512-0dLEBsA1kI3OezMBF8nSsb7Nk19ZnsyE1LLhB8r27KbgU5H4pvuqZLdtE+aUkJVoXgTVuA+iLIwmZ0TuK4tx6A==}
 
   '@types/styled-jsx@2.2.9':
     resolution: {integrity: sha512-W/iTlIkGEyTBGTEvZCey8EgQlQ5l0DwMqi3iOXlLs2kyBwYTXHKEiU6IZ5EwoRwngL8/dGYuzezSup89ttVHLw==}
@@ -4704,6 +4720,15 @@ snapshots:
 
   '@rushstack/eslint-patch@1.12.0': {}
 
+  '@stripe/react-stripe-js@2.9.0(@stripe/stripe-js@1.54.2)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+    dependencies:
+      '@stripe/stripe-js': 1.54.2
+      prop-types: 15.8.1
+      react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
+
+  '@stripe/stripe-js@1.54.2': {}
+
   '@svgdotjs/svg.draggable.js@3.0.6(@svgdotjs/svg.js@3.2.4)':
     dependencies:
       '@svgdotjs/svg.js': 3.2.4
@@ -4927,7 +4952,7 @@ snapshots:
       '@types/next-server': 9.0.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@types/node': 20.19.9
       '@types/node-fetch': 2.6.13
-      '@types/react': 18.3.23
+      '@types/react': 18.3.24
     transitivePeerDependencies:
       - jimp
       - lru-cache
@@ -4951,22 +4976,22 @@ snapshots:
   '@types/raf@3.4.3':
     optional: true
 
-  '@types/react-dom@18.3.7(@types/react@18.3.23)':
+  '@types/react-dom@18.3.7(@types/react@18.3.24)':
     dependencies:
-      '@types/react': 18.3.23
+      '@types/react': 18.3.24
 
-  '@types/react-transition-group@4.4.12(@types/react@18.3.23)':
+  '@types/react-transition-group@4.4.12(@types/react@18.3.24)':
     dependencies:
-      '@types/react': 18.3.23
+      '@types/react': 18.3.24
 
-  '@types/react@18.3.23':
+  '@types/react@18.3.24':
     dependencies:
       '@types/prop-types': 15.7.15
       csstype: 3.1.3
 
   '@types/styled-jsx@2.2.9':
     dependencies:
-      '@types/react': 18.3.23
+      '@types/react': 18.3.24
 
   '@types/trusted-types@2.0.7':
     optional: true
@@ -6959,7 +6984,7 @@ snapshots:
     dependencies:
       dnd-core: 16.0.1
 
-  react-dnd@16.0.1(@types/node@20.19.9)(@types/react@18.3.23)(react@18.3.1):
+  react-dnd@16.0.1(@types/node@20.19.9)(@types/react@18.3.24)(react@18.3.1):
     dependencies:
       '@react-dnd/invariant': 4.0.2
       '@react-dnd/shallowequal': 4.0.2
@@ -6969,7 +6994,7 @@ snapshots:
       react: 18.3.1
     optionalDependencies:
       '@types/node': 20.19.9
-      '@types/react': 18.3.23
+      '@types/react': 18.3.24
 
   react-dom@18.3.1(react@18.3.1):
     dependencies:
