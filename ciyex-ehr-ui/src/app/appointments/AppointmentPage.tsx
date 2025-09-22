@@ -39,6 +39,7 @@ interface FullscreenElement extends HTMLElement {
   msRequestFullscreen?: () => Promise<void>;
 }
 
+
 const pad = (n: number) => n.toString().padStart(2, "0");
 
 function formatToMMDDYYYY(iso: string): string {

@@ -70,6 +70,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         "/inventory-management/settings": "Inventory Settings",
         "/patient_education": "Patient Education",
         "/all-encounters": "All Encounters",
+      
         
     };
 

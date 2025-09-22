@@ -1001,6 +1001,7 @@ const fmt = (d?: string) => (d ? new Date(d).toLocaleDateString() : "");
 //   })();
 // }, [patientId, encounterId, base, withOrgId, safeJson]);
 
+
 useEffect(() => {
   if (!patientId || !encounterId) return;
 

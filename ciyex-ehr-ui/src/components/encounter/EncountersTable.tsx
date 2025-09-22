@@ -239,7 +239,9 @@
 // }
 
 
+
 // components/encounter/EncountersTable.tsx
+
 "use client";
 
 import { useEffect, useMemo, useState, MouseEvent } from "react";

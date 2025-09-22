@@ -1603,6 +1603,7 @@ export default function PatientDashboardPage() {
                         ? await parseXmlResponse(text)
                         : JSON.parse(text);
 
+                        
                 if (!res.ok) throw new Error(data.message || `HTTP error! status: ${res.status}`);
                 if (data.success) {
                     const fetched = data.data as Patient;
