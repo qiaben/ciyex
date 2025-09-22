@@ -1,5 +1,6 @@
 "use client";
 
+
 import React, { useEffect, useState } from "react";
 import { useSidebar } from "@/context/SidebarContext";
 import AppHeader from "@/layout/AppHeader";
@@ -69,6 +70,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         "/inventory-management/maintenance": "Inventory Maintenance",
         "/inventory-management/settings": "Inventory Settings",
         "/patient_education": "Patient Education",
+        "/all-encounters": "All Encounters",
+      
+        
     };
 
     const pageTitle =

@@ -1,8 +1,6 @@
 
 
 
-
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -72,7 +70,7 @@ const ROS_SYSTEMS = [
     "Endocrine","Hematologic/Lymphatic","Allergic/Immunologic",
 ];
 
-export default function Rosform({ patientId, encounterId, editing, onSaved, onCancel }: Props) {
+export default function ROSForm({ patientId, encounterId, editing, onSaved, onCancel }: Props) {
     const [system, setSystem] = useState(ROS_SYSTEMS[0]);
     const [status, setStatus] = useState<"Positive" | "Negative" | "NotAsked">("Negative");
     const [finding, setFinding] = useState("");

@@ -1,5 +1,7 @@
 // "use client";
 //
+
+
 // import { useEffect, useRef, useState } from "react";
 // import { useParams, useRouter } from "next/navigation";
 // import { fetchWithAuth } from "@/utils/fetchWithAuth";
@@ -1603,6 +1605,7 @@ export default function PatientDashboardPage() {
                         ? await parseXmlResponse(text)
                         : JSON.parse(text);
 
+                        
                 if (!res.ok) throw new Error(data.message || `HTTP error! status: ${res.status}`);
                 if (data.success) {
                     const fetched = data.data as Patient;
@@ -1788,11 +1791,11 @@ export default function PatientDashboardPage() {
         });
     }
 
-    const handleOpenEncounter = () => {
-        setShowEncounterForm(true);
-        setHighlightedTab("appointments");
-        setViewMode("appointments");
-    };
+    // const handleOpenEncounter = () => {
+    //     setShowEncounterForm(true);
+    //     setHighlightedTab("appointments");
+    //     setViewMode("appointments");
+    // };
 
     const handleCloseEncounter = () => {
         setShowEncounterForm(false);
@@ -2245,7 +2248,7 @@ export default function PatientDashboardPage() {
                             </div>
                         </div>
                         <div className="flex items-center gap-3 shrink-0">
-                            <button
+                            {/* <button
                                 className="h-8 px-3 rounded bg-blue-600 hover:bg-blue-700 text-xs font-medium text-white shadow-sm inline-flex items-center"
                                 onClick={handleOpenEncounter}
                             >
@@ -2262,8 +2265,8 @@ export default function PatientDashboardPage() {
                                         d="M12 6v6m0 0v6m0-6h6m-6 0H6"
                                     />
                                 </svg>
-                                New Encounter
-                            </button>
+                              {/* //  New Encounter */}
+                            {/* </button> */} 
                         </div>
                     </div>
                     <div className="mt-1.5">
