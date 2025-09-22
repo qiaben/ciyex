@@ -1,5 +1,6 @@
+
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState,useCallback } from "react";
 import Image from "next/image";
 import { fetchWithOrg } from "@/utils/fetchWithOrg";
 
@@ -233,159 +234,316 @@ export default function Encountersummary({
     const [signoff, setSignoff] = useState<Signoff | null>(null);
     const [dateTimeFinalized, setDateTimeFinalized] = useState<DateTimeFinalized | null>(null);
 
+    // const summaryRef = useRef<HTMLDivElement | null>(null);
+
+    // useEffect(() => {
+    //     let alive = true;
+    //     (async () => {
+    //         try {
+    //             setLoading(true);
+    //             setTopErr(null);
+
+    //             // Encounter meta
+    //             const meta =
+    //                 (await tryMany<EncounterMeta>([
+    //                     `/api/encounters/${patientId}/${encounterId}/summary`,
+    //                     `/api/encounters/${patientId}/${encounterId}`,
+    //                 ])) || null;
+
+    //             // Load sections (try multiple endpoint variants where teams used different paths)
+    //             const [
+    //                 ap,
+    //                 cc,
+    //                 hp,
+    //                 pm,
+    //                 pm2,
+    //                 fam,
+    //                 socRaw,
+    //                 rs,
+    //                 px,
+    //                 pr,
+    //                 cd,
+    //                 asmt,
+    //                 pl,
+    //                 pnotes,
+    //                 sig,
+    //                 so,
+    //                 dtf,
+    //             ] = await Promise.all([
+    //                 tryMany<AssignedProvider[]>([
+    //                     `/api/assigned-providers/${patientId}/${encounterId}`,
+    //                     `/api/assigned/${patientId}/${encounterId}`,
+    //                 ]),
+    //                 tryMany<ChiefComplaint[]>([
+    //                     `/api/chief-complaint/${patientId}/${encounterId}`,
+    //                     `/api/chief-complaints/${patientId}/${encounterId}`,
+    //                     `/api/cc/${patientId}/${encounterId}`,
+    //                 ]),
+    //                 tryMany<HPIEntry[]>([
+    //                     `/api/history-of-present-illness/${patientId}/${encounterId}`,
+    //                     `/api/hpi/${patientId}/${encounterId}`,
+    //                 ]),
+    //                 tryMany<PMHEntry[]>([
+    //                     `/api/pmh/${patientId}/${encounterId}`,
+    //                     `/api/past-medical-history/${patientId}/${encounterId}`,
+    //                 ]),
+    //                 tryMany<PatientMHEntry[]>([
+    //                     `/api/patient-medical-history/${patientId}/${encounterId}`,
+    //                     `/api/patient-mh/${patientId}/${encounterId}`,
+    //                 ]),
+    //                 tryMany<FamilyHistory[]>([
+    //                     `/api/family-history/${patientId}/${encounterId}`,
+    //                     `/api/fh/${patientId}/${encounterId}`,
+    //                 ]),
+    //                 tryMany<SocialHistory | SocialHistoryEntry[]>([
+    //                     `/api/social-history/${patientId}/${encounterId}`,
+    //                     `/api/socialhistory/${patientId}/${encounterId}`,
+    //                     `/api/sh/${patientId}/${encounterId}`,
+    //                 ]),
+    //                 tryMany<ROSEntry[]>([
+    //                     `/api/reviewofsystems/${patientId}/${encounterId}`,
+    //                     `/api/ros/${patientId}/${encounterId}`,
+    //                 ]),
+    //                 tryMany<PhysicalExam[]>([
+    //                     `/api/physical-exam/${patientId}/${encounterId}`,
+    //                     `/api/pe/${patientId}/${encounterId}`,
+    //                 ]),
+    //                 tryMany<Procedure[]>([
+    //                     `/api/procedures/${patientId}/${encounterId}`,
+    //                     `/api/procedure/${patientId}/${encounterId}`,
+    //                 ]),
+    //                 tryMany<Code[]>([`/api/codes/${patientId}/${encounterId}`]),
+    //                 tryMany<Assessment[]>([
+    //                     `/api/assessment/${patientId}/${encounterId}`,
+    //                     `/api/assessments/${patientId}/${encounterId}`,
+    //                 ]),
+    //                 tryMany<Plan[]>([`/api/plan/${patientId}/${encounterId}`, `/api/plans/${patientId}/${encounterId}`]),
+    //                 tryMany<ProviderNote[]>([`/api/provider-notes/${patientId}/${encounterId}`, `/api/soap/${patientId}/${encounterId}`]),
+    //                 tryMany<ProviderSignature>([`/api/provider-signatures/${patientId}/${encounterId}`, `/api/signatures/${patientId}/${encounterId}`]),
+    //                 tryMany<Signoff>([`/api/signoffs/${patientId}/${encounterId}`, `/api/sign-off/${patientId}/${encounterId}`]),
+    //                 tryMany<DateTimeFinalized>([`/api/datetime-finalized/${patientId}/${encounterId}`, `/api/finalized/${patientId}/${encounterId}`]),
+    //             ]);
+
+    //             if (!alive) return;
+
+    //             // Normalize Social History: accept array or object-with-entries
+    //             let soc: SocialHistory | null = null;
+    //             if (Array.isArray(socRaw)) soc = { entries: socRaw };
+    //             else if (socRaw && typeof socRaw === "object") soc = socRaw as SocialHistory;
+
+    //             setEncMeta(meta);
+    //             setAssignedProviders(ap || null);
+    //             setChiefComplaints(cc || null);
+    //             setHpi(hp || null);
+    //             setPmh(pm || null);
+    //             setPatientMH(pm2 || null);
+    //             setFh(fam || null);
+    //             setSh(soc || null);
+    //             setRos(rs || null);
+    //             setPe(px || null);
+    //             setProcedures(pr || null);
+    //             setCodes(cd || null);
+    //             setAssessment(asmt || null);
+    //             setPlan(pl || null);
+    //             setProviderNotes(pnotes || null);
+    //             setProviderSignature(sig || null);
+    //             setSignoff(so || null);
+    //             setDateTimeFinalized(dtf || null);
+    //         } catch (e: unknown) {
+    //             if (!alive) return;
+    //             setTopErr(e instanceof Error ? e.message : "Failed to load summary");
+    //         } finally {
+    //             if (alive) setLoading(false);
+    //         }
+    //     })();
+    //     return () => { alive = false; };
+    // }, [patientId, encounterId]);
+
+
+
+
+
     const summaryRef = useRef<HTMLDivElement | null>(null);
 
-    useEffect(() => {
-        let alive = true;
-        (async () => {
-            try {
-                setLoading(true);
-                setTopErr(null);
+// ⬇️ NEW: the loader we can call anytime
+const loadAll = useCallback(async () => {
+  //let alive = true;
+  const alive = true;
 
-                // Encounter meta
-                const meta =
-                    (await tryMany<EncounterMeta>([
-                        `/api/encounters/${patientId}/${encounterId}/summary`,
-                        `/api/encounters/${patientId}/${encounterId}`,
-                    ])) || null;
+  try {
+    setLoading(true);
+    setTopErr(null);
 
-                // Load sections (try multiple endpoint variants where teams used different paths)
-                const [
-                    ap,
-                    cc,
-                    hp,
-                    pm,
-                    pm2,
-                    fam,
-                    socRaw,
-                    rs,
-                    px,
-                    pr,
-                    cd,
-                    asmt,
-                    pl,
-                    pnotes,
-                    sig,
-                    so,
-                    dtf,
-                ] = await Promise.all([
-                    tryMany<AssignedProvider[]>([
-                        `/api/assigned-providers/${patientId}/${encounterId}`,
-                        `/api/assigned/${patientId}/${encounterId}`,
-                    ]),
-                    tryMany<ChiefComplaint[]>([
-                        `/api/chief-complaint/${patientId}/${encounterId}`,
-                        `/api/chief-complaints/${patientId}/${encounterId}`,
-                        `/api/cc/${patientId}/${encounterId}`,
-                    ]),
-                    tryMany<HPIEntry[]>([
-                        `/api/history-of-present-illness/${patientId}/${encounterId}`,
-                        `/api/hpi/${patientId}/${encounterId}`,
-                    ]),
-                    tryMany<PMHEntry[]>([
-                        `/api/pmh/${patientId}/${encounterId}`,
-                        `/api/past-medical-history/${patientId}/${encounterId}`,
-                    ]),
-                    tryMany<PatientMHEntry[]>([
-                        `/api/patient-medical-history/${patientId}/${encounterId}`,
-                        `/api/patient-mh/${patientId}/${encounterId}`,
-                    ]),
-                    tryMany<FamilyHistory[]>([
-                        `/api/family-history/${patientId}/${encounterId}`,
-                        `/api/fh/${patientId}/${encounterId}`,
-                    ]),
-                    tryMany<SocialHistory | SocialHistoryEntry[]>([
-                        `/api/social-history/${patientId}/${encounterId}`,
-                        `/api/socialhistory/${patientId}/${encounterId}`,
-                        `/api/sh/${patientId}/${encounterId}`,
-                    ]),
-                    tryMany<ROSEntry[]>([
-                        `/api/reviewofsystems/${patientId}/${encounterId}`,
-                        `/api/ros/${patientId}/${encounterId}`,
-                    ]),
-                    tryMany<PhysicalExam[]>([
-                        `/api/physical-exam/${patientId}/${encounterId}`,
-                        `/api/pe/${patientId}/${encounterId}`,
-                    ]),
-                    tryMany<Procedure[]>([
-                        `/api/procedures/${patientId}/${encounterId}`,
-                        `/api/procedure/${patientId}/${encounterId}`,
-                    ]),
-                    tryMany<Code[]>([`/api/codes/${patientId}/${encounterId}`]),
-                    tryMany<Assessment[]>([
-                        `/api/assessment/${patientId}/${encounterId}`,
-                        `/api/assessments/${patientId}/${encounterId}`,
-                    ]),
-                    tryMany<Plan[]>([`/api/plan/${patientId}/${encounterId}`, `/api/plans/${patientId}/${encounterId}`]),
-                    tryMany<ProviderNote[]>([`/api/provider-notes/${patientId}/${encounterId}`, `/api/soap/${patientId}/${encounterId}`]),
-                    tryMany<ProviderSignature>([`/api/provider-signatures/${patientId}/${encounterId}`, `/api/signatures/${patientId}/${encounterId}`]),
-                    tryMany<Signoff>([`/api/signoffs/${patientId}/${encounterId}`, `/api/sign-off/${patientId}/${encounterId}`]),
-                    tryMany<DateTimeFinalized>([`/api/datetime-finalized/${patientId}/${encounterId}`, `/api/finalized/${patientId}/${encounterId}`]),
-                ]);
+    // ---- Encounter meta ----
+    const meta =
+      (await tryMany<EncounterMeta>([
+        `/api/encounters/${patientId}/${encounterId}/summary`,
+        `/api/encounters/${patientId}/${encounterId}`,
+      ])) || null;
 
-                if (!alive) return;
+    // ---- Sections (same list you already had) ----
+    const [
+      ap, cc, hp, pm, pm2, fam, socRaw, rs, px, pr, cd, asmt, pl, pnotes, sig, so, dtf,
+    ] = await Promise.all([
+      tryMany<AssignedProvider[]>([
+        `/api/assigned-providers/${patientId}/${encounterId}`,
+        `/api/assigned/${patientId}/${encounterId}`,
+      ]),
+      tryMany<ChiefComplaint[]>([
+        `/api/chief-complaint/${patientId}/${encounterId}`,
+        `/api/chief-complaints/${patientId}/${encounterId}`,
+        `/api/cc/${patientId}/${encounterId}`,
+      ]),
+      tryMany<HPIEntry[]>([
+        `/api/history-of-present-illness/${patientId}/${encounterId}`,
+        `/api/hpi/${patientId}/${encounterId}`,
+      ]),
+      tryMany<PMHEntry[]>([
+        `/api/pmh/${patientId}/${encounterId}`,
+        `/api/past-medical-history/${patientId}/${encounterId}`,
+      ]),
+      tryMany<PatientMHEntry[]>([
+        `/api/patient-medical-history/${patientId}/${encounterId}`,
+        `/api/patient-mh/${patientId}/${encounterId}`,
+      ]),
+      tryMany<FamilyHistory[]>([
+        `/api/family-history/${patientId}/${encounterId}`,
+        `/api/fh/${patientId}/${encounterId}`,
+      ]),
+      tryMany<SocialHistory | SocialHistoryEntry[]>([
+        `/api/social-history/${patientId}/${encounterId}`,
+        `/api/socialhistory/${patientId}/${encounterId}`,
+        `/api/sh/${patientId}/${encounterId}`,
+      ]),
+      tryMany<ROSEntry[]>([
+        `/api/reviewofsystems/${patientId}/${encounterId}`,
+        `/api/ros/${patientId}/${encounterId}`,
+      ]),
+      tryMany<PhysicalExam[]>([
+        `/api/physical-exam/${patientId}/${encounterId}`,
+        `/api/pe/${patientId}/${encounterId}`,
+      ]),
+      tryMany<Procedure[]>([
+        `/api/procedures/${patientId}/${encounterId}`,
+        `/api/procedure/${patientId}/${encounterId}`,
+      ]),
+      tryMany<Code[]>([`/api/codes/${patientId}/${encounterId}`]),
+      tryMany<Assessment[]>([
+        `/api/assessment/${patientId}/${encounterId}`,
+        `/api/assessments/${patientId}/${encounterId}`,
+      ]),
+      tryMany<Plan[]>([
+        `/api/plan/${patientId}/${encounterId}`,
+        `/api/plans/${patientId}/${encounterId}`,
+      ]),
+      tryMany<ProviderNote[]>([
+        `/api/provider-notes/${patientId}/${encounterId}`,
+        `/api/soap/${patientId}/${encounterId}`,
+      ]),
+      tryMany<ProviderSignature>([
+        `/api/provider-signatures/${patientId}/${encounterId}`,
+        `/api/signatures/${patientId}/${encounterId}`,
+      ]),
+      tryMany<Signoff>([
+        `/api/signoffs/${patientId}/${encounterId}`,
+        `/api/sign-off/${patientId}/${encounterId}`,
+      ]),
+      tryMany<DateTimeFinalized>([
+        `/api/datetime-finalized/${patientId}/${encounterId}`,
+        `/api/finalized/${patientId}/${encounterId}`,
+      ]),
+    ]);
 
-                // Normalize Social History: accept array or object-with-entries
-                let soc: SocialHistory | null = null;
-                if (Array.isArray(socRaw)) soc = { entries: socRaw };
-                else if (socRaw && typeof socRaw === "object") soc = socRaw as SocialHistory;
+    // normalize & set
+    let soc: SocialHistory | null = null;
+    if (Array.isArray(socRaw)) soc = { entries: socRaw };
+    else if (socRaw && typeof socRaw === "object") soc = socRaw as SocialHistory;
 
-                setEncMeta(meta);
-                setAssignedProviders(ap || null);
-                setChiefComplaints(cc || null);
-                setHpi(hp || null);
-                setPmh(pm || null);
-                setPatientMH(pm2 || null);
-                setFh(fam || null);
-                setSh(soc || null);
-                setRos(rs || null);
-                setPe(px || null);
-                setProcedures(pr || null);
-                setCodes(cd || null);
-                setAssessment(asmt || null);
-                setPlan(pl || null);
-                setProviderNotes(pnotes || null);
-                setProviderSignature(sig || null);
-                setSignoff(so || null);
-                setDateTimeFinalized(dtf || null);
-            } catch (e: unknown) {
-                if (!alive) return;
-                setTopErr(e instanceof Error ? e.message : "Failed to load summary");
-            } finally {
-                if (alive) setLoading(false);
-            }
-        })();
-        return () => { alive = false; };
-    }, [patientId, encounterId]);
+    if (!alive) return;
+    setEncMeta(meta);
+    setAssignedProviders(ap || null);
+    setChiefComplaints(cc || null);
+    setHpi(hp || null);
+    setPmh(pm || null);
+    setPatientMH(pm2 || null);
+    setFh(fam || null);
+    setSh(soc || null);
+    setRos(rs || null);
+    setPe(px || null);
+    setProcedures(pr || null);
+    setCodes(cd || null);
+    setAssessment(asmt || null);
+    setPlan(pl || null);
+    setProviderNotes(pnotes || null);
+    setProviderSignature(sig || null);
+    setSignoff(so || null);
+    setDateTimeFinalized(dtf || null);
+  } catch (e: unknown) {
+    setTopErr(e instanceof Error ? e.message : "Failed to load summary");
+  } finally {
+    setLoading(false);
+  }
+}, [patientId, encounterId]);
 
-    function downloadPdf() {
-        if (!summaryRef.current) return;
-        const html = summaryRef.current.innerHTML;
-        const win = window.open("", "_blank", "noopener,noreferrer");
-        if (!win) { window.alert("Popup blocked. Please allow popups to download."); return; }
-        win.document.write(`<!doctype html>
-<html>
-<head>
-<meta charset="utf-8" />
-<title>Encounter Summary</title>
-<style>
-  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; padding: 24px; }
-  h1 { font-size: 22px; margin: 0 0 12px; }
-  h2 { font-size: 16px; margin: 0 0 8px; }
-  .grid { display: grid; gap: 12px; }
-  .card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; }
-  .row { margin: 6px 0; }
-  .muted { color: #6b7280; }
-  @media print { @page { margin: 12mm } }
-</style>
-</head>
-<body>
-  ${html}
-  <script>window.onload = () => { window.print(); };</script>
-</body>
-</html>`);
-        win.document.close();
+
+// A. initial load (and when ids change)
+useEffect(() => {
+  loadAll();
+}, [loadAll]);
+
+// B. auto-refresh: on focus/visibility + gentle polling while visible
+useEffect(() => {
+  const onFocus = () => loadAll();
+  const onVis = () => { if (!document.hidden) loadAll(); };
+  window.addEventListener("focus", onFocus);
+  document.addEventListener("visibilitychange", onVis);
+
+  const POLL_MS = 6000; // 6s; adjust if you like
+  const timer = setInterval(() => {
+    if (!document.hidden) loadAll();
+  }, POLL_MS);
+
+  return () => {
+    window.removeEventListener("focus", onFocus);
+    document.removeEventListener("visibilitychange", onVis);
+    clearInterval(timer);
+  };
+}, [loadAll]);
+
+
+
+   
+// Client-side PDF download using html2pdf.js (no API dependency)
+async function downloadPdf() {
+    if (!summaryRef.current) {
+        window.alert("Summary not loaded");
+        return;
     }
+    try {
+        // Dynamically import html2pdf.js
+       // const html2pdf = (await import("html2pdf.js"))?.default || (window as any).html2pdf;
+       const html2pdf =
+  (await import("html2pdf.js"))?.default ||
+  (window as unknown as { html2pdf?: unknown }).html2pdf; 
+       if (!html2pdf) {
+            window.alert("html2pdf.js not found. Please install it via npm/yarn/pnpm.");
+            return;
+        }
+        html2pdf()
+            .set({
+                margin: 0.5,
+                filename: `encounter-${encounterId}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+            })
+            .from(summaryRef.current)
+            .save();
+    } catch (e) {
+        window.alert("Failed to generate PDF: " + (e instanceof Error ? e.message : "Unknown error"));
+    }
+}
+
 
     const hasAnyData = useMemo(() => {
         return [
@@ -409,7 +567,7 @@ export default function Encountersummary({
                         className="inline-flex items-center gap-2 rounded-md bg-blue-600 text-white text-sm px-3 py-1.5 hover:bg-blue-700"
                         title="Download PDF"
                     >
-                        Download PDF
+                       Print
                     </button>
                 </div>
             )}
