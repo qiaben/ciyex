@@ -53,8 +53,9 @@ import MoreDotIcon from "./more-dot.svg";
 import BellIcon from "./bell.svg";
 import MessagingIcon from "./MessagingIcon.svg"
 import SettingsIcon from "./settings.svg";
-import RecallIcon from "./Reacll.svg"
+import RecallIcon from "./Recall.svg"
 import AppointmentIcon from "./appointments.svg";
+import InventoryIcon from "./Inventory.svg"
 
 export {
   DownloadIcon,
@@ -114,4 +115,6 @@ export {
     SettingsIcon,
     AppointmentIcon,
     MessagingIcon,
+    InventoryIcon,
+
 };

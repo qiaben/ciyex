@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import AdminLayout from "@/app/(admin)/layout";
 import Button from "@/components/ui/button/Button";
 import { fetchWithAuth } from "@/utils/fetchWithAuth";
+import Alert from "@/components/ui/alert/Alert";
 
 type Provider = {
     id: number;
@@ -190,7 +191,11 @@ const Page = () => {
     const [locationId, setLocationId] = useState<number | "">(""); // <- instead of location: string
 
 
-    const [alertState, setAlertState] = useState<{ type: "success" | "warning" | "error"; message: string } | null>(null);
+    const [alertData, setAlertData] = useState<{
+        variant: "success" | "error" | "warning" | "info";
+        title: string;
+        message: string;
+    } | null>(null);
 
 
     // one-time schedules
@@ -229,18 +234,26 @@ const Page = () => {
         })();
     }, [apiUrl, id]);
 
+    useEffect(() => {
+        if (alertData) {
+            const timer = setTimeout(() => setAlertData(null), 4000);
+            return () => clearTimeout(timer);
+        }
+    }, [alertData]);
+
+
 // Preview calculation (recurrence + one-time)
     const preview = useMemo<PreviewOccurrence[]>(() => {
         try {
             const recurrences: PreviewOccurrence[] = [];
 
-            // ✅ Skip preview if recurrence or endTime is invalid
+            // ✅ Skip recurrence preview if disabled or inputs are invalid
             if (
                 !showRecurrence ||
                 !startDate ||
                 !startTime ||
-                !endTime || // check for empty or invalid endTime
-                !endTime.includes(":") // ensure endTime has a valid time format
+                !endTime ||
+                !endTime.includes(":")
             ) {
                 return oneTimeSchedules.map((s) => {
                     const base = new Date(s.date);
@@ -252,44 +265,80 @@ const Page = () => {
                 });
             }
 
-            // Generate recurrence preview only if recurrence fields are set and valid
+            // ✅ Base validation
             const start = parseTimeToDate(new Date(startDate), startTime);
+            const endCheck = parseTimeToDate(start, endTime);
+            if (
+                isNaN(start.getTime()) ||
+                isNaN(endCheck.getTime()) ||
+                endCheck <= start
+            ) {
+                return oneTimeSchedules.map((s) => {
+                    const base = new Date(s.date);
+                    return {
+                        start: parseTimeToDate(base, s.startTime),
+                        end: parseTimeToDate(base, s.endTime),
+                        isOneTime: true,
+                    };
+                });
+            }
+
             const endLimit = endDate ? new Date(endDate) : null;
             let cursor = new Date(start);
 
+            // === DAILY ===
             if (freq === "DAILY") {
-                while (recurrences.length < maxOccurrences) {
+                let guard = 0;
+                const MAX_GUARD = 1000;
+                while (recurrences.length < maxOccurrences && guard < MAX_GUARD) {
+                    guard++;
                     if (!endLimit || cursor <= addDays(endLimit, 1)) {
                         const s = new Date(cursor);
                         const e = parseTimeToDate(s, endTime);
                         if (!isNaN(e.getTime()) && e > s) {
                             recurrences.push({ start: s, end: e });
                         }
-                        cursor = addDays(cursor, interval);
+                        const next = addDays(cursor, interval);
+                        if (next <= cursor) break;
+                        cursor = next;
                     } else break;
                 }
-            } else if (freq === "WEEKLY") {
+            }
+
+            // === WEEKLY ===
+            else if (freq === "WEEKLY") {
                 let guard = 0;
-                while (recurrences.length < maxOccurrences && guard < 10000) {
+                const MAX_GUARD = 2000;
+                while (recurrences.length < maxOccurrences && guard < MAX_GUARD) {
                     guard++;
                     for (let dow = 0; dow < 7 && recurrences.length < maxOccurrences; dow++) {
                         const d = addDays(cursor, dow);
                         if (weeklyDays[d.getDay()]) {
                             const s = parseTimeToDate(d, startTime);
                             const e = parseTimeToDate(d, endTime);
-                            if ((!endLimit || s <= addDays(endLimit, 1)) && !isNaN(e.getTime()) && e > s) {
+                            if (
+                                (!endLimit || s <= addDays(endLimit, 1)) &&
+                                !isNaN(e.getTime()) &&
+                                e > s
+                            ) {
                                 recurrences.push({ start: s, end: e });
                             }
                         }
                     }
-                    cursor = addDays(cursor, 7 * interval);
+                    const next = addDays(cursor, 7 * interval);
+                    if (next <= cursor) break;
+                    cursor = next;
                     if (endLimit && cursor > addDays(endLimit, 1)) break;
                 }
-            } else if (freq === "MONTHLY") {
+            }
+
+            // === MONTHLY ===
+            else if (freq === "MONTHLY") {
                 const targetDay = new Date(startDate).getDate();
                 let monthCursor = new Date(start);
                 let guard = 0;
-                while (recurrences.length < maxOccurrences && guard < 1000) {
+                const MAX_GUARD = 1000;
+                while (recurrences.length < maxOccurrences && guard < MAX_GUARD) {
                     guard++;
                     if (!endLimit || monthCursor <= addDays(endLimit, 1)) {
                         const s = parseTimeToDate(monthCursor, startTime);
@@ -297,14 +346,15 @@ const Page = () => {
                         if (!isNaN(e.getTime()) && e > s) {
                             recurrences.push({ start: s, end: e });
                         }
-                        monthCursor = addMonths(monthCursor, interval);
-                        const fix = new Date(monthCursor);
+                        const nextMonth = addMonths(monthCursor, interval);
+                        const fix = new Date(nextMonth);
                         fix.setDate(
                             Math.min(
                                 targetDay,
                                 new Date(fix.getFullYear(), fix.getMonth() + 1, 0).getDate()
                             )
                         );
+                        if (fix <= monthCursor) break;
                         monthCursor = fix;
                     } else break;
                 }
@@ -338,8 +388,9 @@ const Page = () => {
         maxOccurrences,
         weeklyDays,
         oneTimeSchedules,
-        showRecurrence,   // ✅ include toggle in dependencies
+        showRecurrence,
     ]);
+
 
 
 
@@ -356,9 +407,7 @@ const Page = () => {
                 {/* Header */}
                 <div className="mb-6 flex items-center justify-between">
                     <div>
-                        <h2 className="text-3xl font-normal text-slate-900 dark:text-slate-100">
-                            Provider Schedule
-                        </h2>
+
                         <p className="text-sm text-slate-500 dark:text-slate-400">
                             {loading
                                 ? "Loading provider…"
@@ -369,19 +418,16 @@ const Page = () => {
                     </div>
                 </div>
 
-                {alertState && (
-                    <div
-                        className={`mb-4 rounded-md border p-4 text-sm ${
-                            alertState.type === "success"
-                                ? "border-green-200 bg-green-50 text-green-700"
-                                : alertState.type === "warning"
-                                    ? "border-yellow-200 bg-yellow-50 text-yellow-700"
-                                    : "border-red-200 bg-red-50 text-red-700"
-                        }`}
-                    >
-                        {alertState.message}
+                {alertData && (
+                    <div className="mb-4">
+                        <Alert
+                            variant={alertData.variant}
+                            title={alertData.title}
+                            message={alertData.message}
+                        />
                     </div>
                 )}
+
 
 
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
@@ -774,12 +820,17 @@ const Page = () => {
                                             return;
                                         }
 
-                                        setAlertState({ type: "success", message: `Created ${created.length} schedule(s) successfully.` });
+                                        setAlertData({
+                                            variant: "success",
+                                            title: "Schedule Saved",
+                                            message: `Created ${created.length} schedule(s) successfully.`,
+                                        });
                                         router.push(`/settings/providers/schedule/${id}`);
                                     } catch (e: unknown) {
                                         console.error(e);
-                                        setAlertState({
-                                            type: "error",
+                                        setAlertData({
+                                            variant: "error",
+                                            title: "Error",
                                             message: e instanceof Error ? e.message : "Failed to create schedule(s).",
                                         });
                                     }

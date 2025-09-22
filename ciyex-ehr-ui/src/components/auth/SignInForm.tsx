@@ -3,7 +3,7 @@ import Checkbox from "@/components/form/input/Checkbox";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import Button from "@/components/ui/button/Button";
-import { ChevronLeftIcon, EyeCloseIcon, EyeIcon } from "@/icons";
+import { EyeCloseIcon, EyeIcon } from "@/icons";
 import Link from "next/link";
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -26,7 +26,7 @@ interface LoginResponse {
     message: string;
     data?: {
         firstName: string;
-        LastName: string;
+        lastName: string;
         phone: string;
         dateOfBirth: number[];
         email: string;
@@ -101,14 +101,17 @@ export default function SignInForm() {
                     token,
                     email,
                     firstName,
-                    LastName,
-                    phone,
-                    dateOfBirth,
+                    lastName,
                     orgs,
                     orgIds,
                 } = data.data;
+                // Normalize here 👇
+                const normalizedUser = {
+                    ...data.data,
+                    lastName: data.data.lastName || (data.data as { LastName?: string }).LastName || "",
+                };
 
-                const fullName = `${firstName} ${LastName}`.trim();
+                const fullName = `${firstName} ${lastName}`.trim();
                 const org = orgs[0];
                 const role = org.roles?.[0] || "UNKNOWN";
 
@@ -122,26 +125,8 @@ export default function SignInForm() {
                 if (org.facilities?.length > 0) {
                     localStorage.setItem("facilityId", org.facilities[0].facilityId.toString());
                 }
+  localStorage.setItem("user", JSON.stringify(normalizedUser));
 
-                localStorage.setItem("user", JSON.stringify({
-                    firstName,
-                    lastName: LastName,
-                    email,
-                    phone,
-                    fullName,
-                    profileImage: "/images/user/owner.jpg",
-                    dateOfBirth,
-                    orgName: org.orgName,
-                    role,
-                    city: data.data.city,
-                    state: data.data.state,
-                    country: data.data.country,
-                    street: data.data.street,
-                    street2: data.data.street2,
-                    postalCode: data.data.postalCode,
-                    securityQuestion: data.data.securityQuestion,
-                    securityAnswer: data.data.securityAnswer,
-                }));
 
                 if (orgIds.length > 1) {
                     router.push("/practice-switch");
@@ -162,15 +147,6 @@ export default function SignInForm() {
 
     return (
         <div className="flex flex-col flex-1 lg:w-1/2 w-full">
-            <div className="w-full max-w-md sm:pt-10 mx-auto mb-5">
-                <Link
-                    href="/"
-                    className="inline-flex items-center text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                >
-                    <ChevronLeftIcon />
-                    Back to dashboard
-                </Link>
-            </div>
 
             <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto">
                 <div className="mb-5 sm:mb-8">
@@ -180,15 +156,6 @@ export default function SignInForm() {
                     <p className="text-sm text-gray-500 dark:text-gray-400">
                         Enter your email and password to sign in!
                     </p>
-                </div>
-
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-5">
-                    <button className="inline-flex items-center justify-center gap-3 py-3 text-sm font-normal text-gray-700 transition-colors bg-gray-100 rounded-lg px-7 hover:bg-gray-200 dark:bg-white/5 dark:text-white/90 dark:hover:bg-white/10">
-                        Sign in with Google
-                    </button>
-                    <button className="inline-flex items-center justify-center gap-3 py-3 text-sm font-normal text-gray-700 transition-colors bg-gray-100 rounded-lg px-7 hover:bg-gray-200 dark:bg-white/5 dark:text-white/90 dark:hover:bg-white/10">
-                        Sign in with X
-                    </button>
                 </div>
 
                 <div className="relative py-3 sm:py-5">
@@ -261,18 +228,6 @@ export default function SignInForm() {
                         </div>
                     </div>
                 </form>
-
-                <div className="mt-5">
-                    <p className="text-sm font-normal text-center text-gray-700 dark:text-gray-400 sm:text-start">
-                        Don&apos;t have an account?{" "}
-                        <Link
-                            href="/signup"
-                            className="text-brand-500 hover:text-brand-600 dark:text-brand-400"
-                        >
-                            Sign Up
-                        </Link>
-                    </p>
-                </div>
             </div>
         </div>
     );
