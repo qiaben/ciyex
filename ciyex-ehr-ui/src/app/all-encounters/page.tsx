@@ -9,6 +9,7 @@ export const metadata: Metadata = {
 
 
 
+
 export default function EncountersPage() {
   return (
     <div className="p-4">
