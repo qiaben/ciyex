@@ -37,7 +37,9 @@ interface Provider {
 
 const EditProvider = () => {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-    const { id } = useParams();
+    //const { id } = useParams();
+    const { id } = useParams() as { id: string };
+
     const router = useRouter();
 
     const [provider, setProvider] = useState<Provider | null>(null);

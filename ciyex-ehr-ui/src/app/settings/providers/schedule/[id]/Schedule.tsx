@@ -163,7 +163,8 @@ async function createSchedule(dto: ScheduleDto) {
 
 
 const Page = () => {
-    const { id } = useParams();
+  //  const { id } = useParams();
+   const { id } = useParams() as { id: string };
     const router = useRouter();
     const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
