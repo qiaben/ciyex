@@ -4,6 +4,7 @@ import EncountersTable from "@/components/encounter/EncountersTable";
 
 
 
+
 export const metadata: Metadata = {
     title: "All Encounters",
 };
