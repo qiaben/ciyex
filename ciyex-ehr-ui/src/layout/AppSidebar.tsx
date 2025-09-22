@@ -112,11 +112,12 @@ const navItems: NavItem[] = [
                 path: "settings/codes",
             },
             { name: "Config", path: "/settings/config" },
+            { name: "Documents", path: "/settings/Documents" },
             {
                 name: "Forms",
                 subItems: [
                     { name: "Lists", path: "/settings/forms/lists" },
-                    { name: "Form Admin", path: "/settings/forms/admin" },
+                    { name: "Encounter Section", path: "/settings/forms/admin" },
                 ],
             },
 

@@ -21,9 +21,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         // Settings and subroutes
         "/settings/providers": "Providers",
-        "/settings/forms/lists": "Forms",
+        "/settings/forms/lists": "Lists",
         "/settings/forms/admin": "Encounter Sections",
-        "/settings/forms/config": "Configuration Settings",
+        "/settings/config": "Integration",
+        "/settings/Documents": "Documents Settings",
         "/settings/insurance": "Insurance Companies",
         "/settings/codes": "Codes",
         "/settings": "Settings",
