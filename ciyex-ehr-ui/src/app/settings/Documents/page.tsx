@@ -302,7 +302,7 @@ export default function DocumentSettingsPage() {
 
             setEditing({ categories: false, filetypes: false, uploads: false });
         } catch (e: unknown) {
-            if (typeof e === "object" && e !== null && "name" in e && (e as any).name === "AbortError") {
+            if (e instanceof DOMException && e.name === "AbortError") {
                 setError("Save timed out — please try again.");
             } else if (e instanceof Error) {
                 setError(e.message || "Failed to save");
