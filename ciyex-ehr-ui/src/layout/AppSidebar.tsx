@@ -22,13 +22,16 @@ import {
 
 } from "../icons/index";
 
+
 // ===== Types (nested) =====
 type SubItem = {
     name: string;
     path?: string;
     pro?: boolean;
     new?: boolean;
-    subItems?: SubItem[]; // allow nesting
+    subItems?: SubItem[];
+    requiresPatient?: boolean;  // allow nesting
+    customComponent?: boolean;  // allow custom sidebar component
 };
 
 type NavItem = {
@@ -77,6 +80,10 @@ const navItems: NavItem[] = [
         subItems: [
             { name: "Patients List", path: "/patients" },
             { name: "Education", path: "/patient_education" },
+             { name: "All Encounters", path: "/all-encounters" },
+           // AppSidebar.tsx  (only the line below changes)
+          //  { name: "All Encounters", path: "/patients?view=all-encounters" },
+
         ],    },
 
 
@@ -91,8 +98,8 @@ const navItems: NavItem[] = [
     {
         icon:<MessagingIcon/>,
         name:"Messaging",
-        path:"/messaging",
-        
+        subItems: [
+            { name: "Inbox", path: "/messaging/inbox" },],
     },
 
 
@@ -111,6 +118,27 @@ const navItems: NavItem[] = [
         ],
     },
 
+{
+  // Simple credit-card icon (inline SVG, like your Patients item)
+  icon: (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24" height="24" viewBox="0 0 24 24"
+      fill="none" stroke="currentColor" strokeWidth="2"
+      className="h-6 w-6"
+    >
+      <rect x="3" y="5" width="18" height="14" rx="2" ry="2"></rect>
+      <line x1="3" y1="10" x2="21" y2="10"></line>
+      <line x1="7" y1="15" x2="11" y2="15"></line>
+    </svg>
+  ),
+//   name: "Invoice",
+//   path: "/bills", // this will open the wireframe page
+name: "Invoice",
+  path: "/billing",
+},
+
+
 
 
 
@@ -122,48 +150,28 @@ const navItems: NavItem[] = [
     },
 
     {
-
         icon: <SettingsIcon />,
         name: "Settings",
         subItems: [
             { name: "Providers", path: "/settings/providers" },
             {name:"Insurance companies", path:"/settings/insurance"},
+            { name: "Documents", path: "/settings/documents" },
             {
                 name: "Codes",
-                path: "settings/codes",
+                path: "/settings/codes",
             },
-            { name: "Config", path: "/settings/config" },
-            { name: "Documents", path: "/settings/Documents" },
+            { name: "Integration", path: "/settings/config" },
             {
                 name: "Forms",
                 subItems: [
                     { name: "Lists", path: "/settings/forms/lists" },
-                    { name: "Encounter Section", path: "/settings/forms/admin" },
+                    { name: "Encounters Section", path: "/settings/forms/admin" },
                 ],
             },
 
 
         ],
-
-      icon: <SettingsIcon />,
-      name: "Settings",
-      subItems: [
-        { name: "Providers", path: "/settings/providers" },
-        { name: "Insurance companies", path: "/settings/insurance" },
-        { name: "Codes", path: "/settings/codes" },
-        { name: "Integration", path: "/settings/config" },
-        { name: "Billing", path: "/settings/billing" },   // <-- Added
-        { name: "Service", path: "/settings/service" },   // <-- Added
-        {
-          name: "Forms",
-          subItems: [
-            { name: "Lists", path: "/settings/forms/lists" },
-            { name: "Form Admin", path: "/settings/forms/admin" },
-          ],
-        },
-      ],
     },
-
 
     {
         name: "Forms",
@@ -496,7 +504,7 @@ const AppSidebar: React.FC = () => {
 
     return (
         <aside
-            className={`fixed mt-16 flex flex-col lg:mt-0 top-0 px-5 left-0 bg-white dark:bg-gray-900 dark:border-gray-800 text-gray-900 h-screen transition-all duration-300 ease-in-out z-50 border-r border-gray-200 
+            className={`fixed mt-16 flex flex-col lg:mt-0 top-0 px-5 left-0 bg-white dark:bg-gray-900 dark:border-gray-800 text-gray-900 h-screen transition-all duration-300 ease-in-out z-50 border-r border-gray-200
         ${isExpanded || isMobileOpen ? "w-[290px]" : isHovered ? "w-[290px]" : "w-[90px]"}
         ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}
         lg:translate-x-0`}
