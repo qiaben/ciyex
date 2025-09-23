@@ -1,3 +1,5 @@
+
+
 "use client";
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
@@ -10,14 +12,8 @@ import {
     ChevronDownIcon,
     GridIcon,
     HorizontaLDots,
-    ListIcon,
-    PageIcon,
-    PieChartIcon,
-    PlugInIcon,
     SettingsIcon, // ensure this exists in ../icons/index
-    TableIcon,
-    RecallIcon,
-    AppointmentIcon, MessagingIcon, InventoryIcon,
+    AppointmentIcon, InventoryIcon,
 
 
 } from "../icons/index";
@@ -84,6 +80,10 @@ const navItems: NavItem[] = [
            // AppSidebar.tsx  (only the line below changes)
           //  { name: "All Encounters", path: "/patients?view=all-encounters" },
 
+
+            {name:"Recall",path:"/recall"},
+            {name:"Messaging",path: "/messaging"}
+
         ],    },
 
 
@@ -101,6 +101,9 @@ const navItems: NavItem[] = [
         subItems: [
             { name: "Inbox", path: "/messaging/inbox" },],
     },
+
+
+
 
 
 
@@ -135,7 +138,13 @@ const navItems: NavItem[] = [
 //   name: "Invoice",
 //   path: "/bills", // this will open the wireframe page
 name: "Invoice",
+
   path: "/billing",
+},
+
+
+
+  //path: "/billing/dashboard",
 },
 
 
@@ -143,11 +152,12 @@ name: "Invoice",
 
 
 
-    {
-        icon: <RecallIcon />,
-        name: "Recall",
-        path: "/recall",
-    },
+
+//     {
+//         icon: <RecallIcon />,
+//         name: "Recall",
+//         path: "/recall",
+//     },
 
     {
         icon: <SettingsIcon />,
@@ -173,24 +183,7 @@ name: "Invoice",
         ],
     },
 
-    {
-        name: "Forms",
-        icon: <ListIcon />,
-        subItems: [{ name: "Form Elements", path: "/form-elements", pro: false }],
-    },
-    {
-        name: "Tables",
-        icon: <TableIcon />,
-        subItems: [{ name: "Basic Tables", path: "/basic-tables", pro: false }],
-    },
-    {
-        name: "Pages",
-        icon: <PageIcon />,
-        subItems: [
-            { name: "Blank Page", path: "/blank", pro: false },
-            { name: "404 Error", path: "/error-404", pro: false },
-        ],
-    },
+
 
     {
         name: "Labs",
@@ -207,36 +200,6 @@ name: "Invoice",
 
 ];
 
-const othersItems: NavItem[] = [
-    {
-        icon: <PieChartIcon />,
-        name: "Charts",
-        subItems: [
-            { name: "Line Chart", path: "/line-chart", pro: false },
-            { name: "Bar Chart", path: "/bar-chart", pro: false },
-        ],
-    },
-    {
-        icon: <BoxCubeIcon />,
-        name: "UI Elements",
-        subItems: [
-            { name: "Alerts", path: "/alerts", pro: false },
-            { name: "Avatar", path: "/avatars", pro: false },
-            { name: "Badge", path: "/badge", pro: false },
-            { name: "Buttons", path: "/buttons", pro: false },
-            { name: "Images", path: "/images", pro: false },
-            { name: "Videos", path: "/videos", pro: false },
-        ],
-    },
-    {
-        icon: <PlugInIcon />,
-        name: "Authentication",
-        subItems: [
-            { name: "Sign In", path: "/signin", pro: false },
-            { name: "Sign Up", path: "/signup", pro: false },
-        ],
-    },
-];
 
 // ===== Component =====
 const AppSidebar: React.FC = () => {
@@ -275,7 +238,8 @@ const AppSidebar: React.FC = () => {
 
     // Auto-open parents when current route is inside them
     useEffect(() => {
-        let topFound = false;
+        // will be set to true when we find a matching descendant
+        let found = false;
 
         const checkDescActive = (items: SubItem[]): boolean => {
             for (const it of items) {
@@ -285,26 +249,15 @@ const AppSidebar: React.FC = () => {
             return false;
         };
 
-        (["main", "others"] as const).forEach((type) => {
-            const items = type === "main" ? navItems : othersItems;
-            items.forEach((nav, topIdx) => {
-                if (!nav.subItems) return;
-                if (checkDescActive(nav.subItems)) {
-                    setOpenTop({ type, index: topIdx });
-                    topFound = true;
-
-                    // open any level-2 that contains active descendant
-                    nav.subItems.forEach((sub, subIdx) => {
-                        if (sub.subItems && checkDescActive(sub.subItems)) {
-                            const k = keyL2(type, topIdx, subIdx);
-                            setOpenL2((prev) => ({ ...prev, [k]: true }));
-                        }
-                    });
-                }
-            });
+        // look through top-level navItems and open the parent when a descendant matches
+        navItems.forEach((nav, index) => {
+            if (nav.subItems && checkDescActive(nav.subItems)) {
+                setOpenTop({ type: "main", index });
+                found = true;
+            }
         });
 
-        if (!topFound) setOpenTop(null);
+        if (!found) setOpenTop(null);
     }, [pathname, isActive]);
 
     // Renderer
@@ -556,9 +509,7 @@ const AppSidebar: React.FC = () => {
                                     !isExpanded && !isHovered ? "lg:justify-center" : "justify-start"
                                 }`}
                             >
-                                {isExpanded || isHovered || isMobileOpen ? "Others" : <HorizontaLDots />}
                             </h2>
-                            {renderMenuItems(othersItems, "others")}
                         </div>
                     </div>
                 </nav>
@@ -568,4 +519,8 @@ const AppSidebar: React.FC = () => {
     );
 };
 
+
 export default AppSidebar;
+export default AppSidebar;
+
+
