@@ -112,7 +112,7 @@ const SettingsIcon = (
 const navItems: NavItem[] = [
   { name: "Dashboard", icon: DashboardIcon, path: "/dashboard" },
   // { name: "Profile", icon: ProfileIcon, path: "/profile" },
-  { name: "Demographics", icon: DemographicsIcon, path: "/demographics" },
+  { name: "Demographics", icon: DemographicsIcon, path: "/profile" },
   { name: "Appointments", icon: AppointmentIcon, path: "/appointments" },
   // { name: "Encounters", icon: EncounterIcon, path: "/encounters" },
   { name: "Vitals", icon: VitalsIcon, path: "/vitals" },

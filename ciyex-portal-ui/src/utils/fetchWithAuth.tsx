@@ -1,45 +1,30 @@
-// src/utils/fetchWithAuth.tsx
-
 export async function fetchWithAuth(
-    input: RequestInfo | URL,
-    init?: RequestInit
+  input: RequestInfo,
+  init: RequestInit = {}
 ): Promise<Response> {
-    const token =
-        typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : undefined;
+  const orgId = typeof window !== "undefined" ? localStorage.getItem("orgId") : undefined;
 
-    // Normalize input for debugging
-    const url = typeof input === "string" ? input : input.toString();
-    console.log("📡 fetchWithAuth ->", url);
+  const authHeaders: Record<string, string> = {
+    "Content-Type": "application/json",
+    "Accept": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(orgId ? { "X-Org-Id": orgId } : {}),   // ✅ add this
+  };
 
-    // For login/register, skip token injection
-    const isAuthEndpoint =
-        url.includes("/api/auth/login") || url.includes("/api/auth/register");
+  const mergedHeaders = new Headers(init.headers || {});
+  Object.entries(authHeaders).forEach(([key, value]) => {
+    if (!mergedHeaders.has(key)) mergedHeaders.set(key, value);
+  });
 
-    // Cast to a plain object so we can safely index
-    const headers: Record<string, string> = {
-        ...(init?.headers as Record<string, string>),
-    };
+  let url: string;
+  if (typeof input === "string") {
+    url = /^https?:\/\//i.test(input)
+      ? input
+      : `${process.env.NEXT_PUBLIC_API_URL}${input}`;
+  } else {
+    url = (input as Request).url;
+  }
 
-    if (token && !isAuthEndpoint) {
-        headers["Authorization"] = `Bearer ${token}`;
-    }
-
-    try {
-        const response = await fetch(url, {
-            ...init,
-            headers,
-        });
-
-        if (!response.ok) {
-            console.error(
-                `❌ Fetch failed (${response.status}):`,
-                await response.text()
-            );
-        }
-
-        return response;
-    } catch (err) {
-        console.error("🔥 fetchWithAuth error:", err);
-        throw err;
-    }
+  return fetch(url, { ...init, headers: mergedHeaders });
 }
