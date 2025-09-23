@@ -39,12 +39,12 @@ const AppHeader: React.FC = () => {
     }, []);
 
     return (
-        <header className="sticky top-0 flex w-full bg-white border-gray-200 z-99999 dark:border-gray-800 dark:bg-gray-900 lg:border-b">
+        <header className="sticky top-0 flex w-full bg-white border-gray-200 z-50 dark:border-gray-800 dark:bg-gray-900 lg:border-b">
             <div className="flex flex-col items-center justify-between grow lg:flex-row lg:px-6">
                 <div className="flex items-center justify-between w-full gap-2 px-3 py-3 border-b border-gray-200 dark:border-gray-800 sm:gap-4 lg:justify-normal lg:border-b-0 lg:px-0 lg:py-4">
                     {/* Sidebar Toggle */}
                     <button
-                        className="items-center justify-center w-10 h-10 text-gray-500 border-gray-200 rounded-lg z-99999 dark:border-gray-800 lg:flex dark:text-gray-400 lg:h-11 lg:w-11 lg:border"
+                        className="items-center justify-center w-10 h-10 text-gray-500 border-gray-200 rounded-lg dark:border-gray-800 lg:flex dark:text-gray-400 lg:h-11 lg:w-11 lg:border"
                         onClick={handleToggle}
                         aria-label="Toggle Sidebar"
                     >
@@ -78,7 +78,7 @@ const AppHeader: React.FC = () => {
                     {/* Mobile Menu Toggle */}
                     <button
                         onClick={toggleApplicationMenu}
-                        className="flex items-center justify-center w-10 h-10 text-gray-700 rounded-lg z-99999 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 lg:hidden"
+                        className="flex items-center justify-center w-10 h-10 text-gray-700 rounded-lg hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 lg:hidden"
                     >
                         <svg width="24" height="24" fill="none" viewBox="0 0 24 24">
                             <path
@@ -94,15 +94,15 @@ const AppHeader: React.FC = () => {
                     <div className="hidden lg:block">
                         <form>
                             <div className="relative">
-                <span className="absolute -translate-y-1/2 left-4 top-1/2 pointer-events-none">
-                  <svg className="fill-gray-500 dark:fill-gray-400" width="20" height="20" viewBox="0 0 20 20" fill="none">
-                    <path
-                        fillRule="evenodd"
-                        clipRule="evenodd"
-                        d="M3.04 9.37c0-3.5 2.83-6.33 6.33-6.33 3.5 0 6.33 2.83 6.33 6.33 0 3.5-2.83 6.33-6.33 6.33-3.5 0-6.33-2.83-6.33-6.33Zm6.33-7.83c-4.32 0-7.83 3.5-7.83 7.83 0 4.33 3.51 7.83 7.83 7.83 1.89 0 3.62-.67 4.98-1.79l2.82 2.82a.75.75 0 1 0 1.06-1.06l-2.82-2.82a7.8 7.8 0 0 0 1.79-4.98c0-4.33-3.51-7.83-7.83-7.83Z"
-                    />
-                  </svg>
-                </span>
+                                <span className="absolute -translate-y-1/2 left-4 top-1/2 pointer-events-none">
+                                    <svg className="fill-gray-500 dark:fill-gray-400" width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                        <path
+                                            fillRule="evenodd"
+                                            clipRule="evenodd"
+                                            d="M3.04 9.37c0-3.5 2.83-6.33 6.33-6.33 3.5 0 6.33 2.83 6.33 6.33 0 3.5-2.83 6.33-6.33 6.33-3.5 0-6.33-2.83-6.33-6.33Zm6.33-7.83c-4.32 0-7.83 3.5-7.83 7.83 0 4.33 3.51 7.83 7.83 7.83 1.89 0 3.62-.67 4.98-1.79l2.82 2.82a.75.75 0 1 0 1.06-1.06l-2.82-2.82a7.8 7.8 0 0 0 1.79-4.98c0-4.33-3.51-7.83-7.83-7.83Z"
+                                        />
+                                    </svg>
+                                </span>
                                 <input
                                     ref={inputRef}
                                     type="text"
