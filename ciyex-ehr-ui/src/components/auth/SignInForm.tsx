@@ -26,7 +26,7 @@ interface LoginResponse {
     message: string;
     data?: {
         firstName: string;
-        LastName: string;
+        lastName: string;
         phone: string;
         dateOfBirth: number[];
         email: string;
@@ -101,14 +101,17 @@ export default function SignInForm() {
                     token,
                     email,
                     firstName,
-                    LastName,
-                    phone,
-                    dateOfBirth,
+                    lastName,
                     orgs,
                     orgIds,
                 } = data.data;
+                // Normalize here 👇
+                const normalizedUser = {
+                    ...data.data,
+                    lastName: data.data.lastName || (data.data as { LastName?: string }).LastName || "",
+                };
 
-                const fullName = `${firstName} ${LastName}`.trim();
+                const fullName = `${firstName} ${lastName}`.trim();
                 const org = orgs[0];
                 const role = org.roles?.[0] || "UNKNOWN";
 
@@ -122,26 +125,8 @@ export default function SignInForm() {
                 if (org.facilities?.length > 0) {
                     localStorage.setItem("facilityId", org.facilities[0].facilityId.toString());
                 }
+  localStorage.setItem("user", JSON.stringify(normalizedUser));
 
-                localStorage.setItem("user", JSON.stringify({
-                    firstName,
-                    lastName: LastName,
-                    email,
-                    phone,
-                    fullName,
-                    profileImage: "/images/user/owner.jpg",
-                    dateOfBirth,
-                    orgName: org.orgName,
-                    role,
-                    city: data.data.city,
-                    state: data.data.state,
-                    country: data.data.country,
-                    street: data.data.street,
-                    street2: data.data.street2,
-                    postalCode: data.data.postalCode,
-                    securityQuestion: data.data.securityQuestion,
-                    securityAnswer: data.data.securityAnswer,
-                }));
 
                 if (orgIds.length > 1) {
                     router.push("/practice-switch");
