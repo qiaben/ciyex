@@ -1,38 +1,43 @@
-
 export async function fetchWithAuth(
-    input: RequestInfo,
-    init?: RequestInit
+  input: RequestInfo | URL,
+  init?: RequestInit
 ): Promise<Response> {
-    const token = localStorage.getItem("token");
-    const orgId = localStorage.getItem("orgId");
-    const facilityId = localStorage.getItem("facilityId");
-    const role = localStorage.getItem("role");
+  const get = (k: string) =>
+    typeof window !== "undefined" ? localStorage.getItem(k) : null;
 
-    const authHeaders: Record<string, string> = {
-        "Content-Type": "application/json",
-        "Accept": "application/json",   // 👈 add here
-        ...(token && { Authorization: `Bearer ${token}` }),
-        ...(orgId && { "X-Org-Id": orgId }),
-        ...(facilityId && { "X-Facility-Id": facilityId }),
-        ...(role && { "X-Role": role }),
+  const token = get("token") || get("authToken") || (typeof window !== "undefined" ? sessionStorage.getItem("token") : null);
+  const orgId = get("orgId");
+  const facilityId = get("facilityId");
+  const role = get("role");
 
-    };
+  const authHeaders: Record<string, string> = {
+    "Accept": "application/json",
+    ...(token && { Authorization: `Bearer ${token}` }),
+    ...(orgId && { "X-Org-Id": orgId, "orgId": orgId }), // keep both while migrating
+    ...(facilityId && { "X-Facility-Id": facilityId }),
+    ...(role && { "X-Role": role }),
+  };
 
-    const headers = new Headers(init?.headers || {});
-    Object.entries(authHeaders).forEach(([key, value]) => headers.set(key, value));
+  const headers = new Headers(init?.headers || {});
+  Object.entries(authHeaders).forEach(([k, v]) => headers.set(k, v));
 
+  const isFormData =
+    typeof FormData !== "undefined" && init?.body instanceof FormData;
 
+  if (isFormData) {
+    headers.delete("Content-Type"); // ← critical for multi-part uploads
+  } else if (!headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
 
-/*import { fetchWithAuth } from '@/utils/fetchWithAuth';
+  const res = await fetch(input, {
+    credentials: init?.credentials ?? "include",
+    ...init,
+    headers,
+  });
 
-const handleFetchData = async () => {
-    const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/example`);
-    const data = await res.json();
-    console.log(data);
-};*/
-
-    return fetch(input, {
-        ...init,
-        headers,
-    });
+  if (res.status === 401) {
+    console.warn("⚠️ 401 Unauthorized:", input);
+  }
+  return res;
 }
