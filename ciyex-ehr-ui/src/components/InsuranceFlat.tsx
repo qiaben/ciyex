@@ -1,324 +1,506 @@
 "use client";
-import { Input } from "@/components/ui/input";
+
+import { useEffect, useMemo, useState } from "react";
 import { fetchWithAuth } from "@/utils/fetchWithAuth";
-import { useEffect, useState } from "react";
 
-export type InsuranceLevel = "primary" | "secondary" | "tertiary";
-
-export interface InsuranceCompany {
-    id: number;
-    name: string;
-    payerId?: string;
-    status: "ACTIVE" | "ARCHIVED";
-}
-
-export interface Patient {
-    id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-    phoneNumber: string;
-    dateOfBirth: string;
-    [key: string]: string | number | boolean | string[] | undefined;
-}
-
-export interface InsurancePolicy {
-    providerId: number | null;
-    planName: string;
-    effectiveDate: string;
-    effectiveDateEnd: string;
-    policyNumber: string;
-    groupNumber: string;
-
-    subscriberEmployer: string;
-    seAddress1: string;
-    seAddress2: string;
-    seCity: string;
-    seState: string;
-    seZip: string;
-    seCountry: string;
-
-    relationship: string;
-    subscriberFirstName: string;
-    subscriberMiddleName: string;
-    subscriberLastName: string;
-    subscriberDob: string;
-    sex: "Male" | "Female" | "Other" | "";
-    ssn: string;
-    subAddress1: string;
-    subAddress2: string;
-    subCity: string;
-    subState: string;
-    subZip: string;
-    subCountry: string;
-    subscriberPhone: string;
-
-    copay: string;
-    acceptAssignment: "YES" | "NO";
-    secondaryMedicareType: "N/A" | "Part A" | "Part B";
-}
-
-export type InsuranceForm = Record<InsuranceLevel, InsurancePolicy>;
-
-export const initialPolicy: InsurancePolicy = {
-    providerId: null,
-    planName: "",
-    effectiveDate: "",
-    effectiveDateEnd: "",
-    policyNumber: "",
-    groupNumber: "",
-
-    subscriberEmployer: "",
-    seAddress1: "",
-    seAddress2: "",
-    seCity: "",
-    seState: "",
-    seZip: "",
-    seCountry: "",
-
-    relationship: "",
-    subscriberFirstName: "",
-    subscriberMiddleName: "",
-    subscriberLastName: "",
-    subscriberDob: "",
-    sex: "",
-    ssn: "",
-    subAddress1: "",
-    subAddress2: "",
-    subCity: "",
-    subState: "",
-    subZip: "",
-    subCountry: "",
-    subscriberPhone: "",
-
-    copay: "",
-    acceptAssignment: "YES",
-    secondaryMedicareType: "N/A",
+type ApiResponse<T> = {
+    success: boolean;
+    message?: string;
+    data?: T;
 };
 
-interface InsuranceFlatProps {
-    patient: Patient;
-    insuranceForm: InsuranceForm;
-    setInsuranceForm: React.Dispatch<React.SetStateAction<InsuranceForm>>;
+type InsuranceLevel = "primary" | "secondary" | "tertiary";
+
+type CoverageDto = {
+    id?: number;
+    externalId?: string | null;
+    coverageType?: string | null;
+    planName?: string | null;
+    policyNumber?: string | null;
+    coverageStartDate?: string | null;
+    coverageEndDate?: string | null;
+    patientId: number;
+    orgId?: number;
+
+    provider?: string | null;
+    effectiveDate?: string | null;
+    effectiveDateEnd?: string | null;
+    groupNumber?: string | null;
+
+    subscriberEmployer?: string | null;
+    subscriberAddressLine1?: string | null;
+    subscriberAddressLine2?: string | null;
+    subscriberCity?: string | null;
+    subscriberState?: string | null;
+    subscriberZipCode?: string | null;
+    subscriberCountry?: string | null;
+    subscriberPhone?: string | null;
+
+    byholderName?: string | null;
+    byholderRelation?: string | null;
+    byholderAddressLine1?: string | null;
+    byholderAddressLine2?: string | null;
+    byholderCity?: string | null;
+    byholderState?: string | null;
+    byholderZipCode?: string | null;
+    byholderCountry?: string | null;
+    byholderPhone?: string | null;
+
+    copayAmount?: number | null;
+};
+
+type Props = {
+    patient: { id: string; firstName: string; lastName: string; insuranceProvider?: string };
+    /** If not passed, we try localStorage("orgId") then NEXT_PUBLIC_ORG_ID then 1 */
+    orgId?: number;
+    // keep the outer page props for navigation consistency
     editInsurance: boolean;
     setEditInsurance: (v: boolean) => void;
     insuranceSubTab: InsuranceLevel;
     setInsuranceSubTab: (tab: InsuranceLevel) => void;
-    setPolicyField: (
-        level: InsuranceLevel,
-        field: keyof InsurancePolicy,
-        value: InsurancePolicy[keyof InsurancePolicy]
-    ) => void;
     setViewMode: (mode: string) => void;
     setHighlightedTab: (tab: string) => void;
-}
+    // not used anymore, but left in the signature so page code doesn’t break
+    insuranceForm?: any;
+    setInsuranceForm?: any;
+    saveInsurance?: any;
+    setPolicyField?: any;
+};
+
+const tabLabels: Record<InsuranceLevel, string> = {
+    primary: "Primary",
+    secondary: "Secondary",
+    tertiary: "Tertiary",
+};
 
 export default function InsuranceFlat({
-
-                                          insuranceForm,
-                                          setInsuranceForm,
+                                          patient,
+                                          orgId,
                                           editInsurance,
                                           setEditInsurance,
                                           insuranceSubTab,
                                           setInsuranceSubTab,
-                                          setPolicyField,
                                           setViewMode,
                                           setHighlightedTab,
-                                      }: InsuranceFlatProps) {
-    const [companies, setCompanies] = useState<InsuranceCompany[]>([]);
+                                      }: Props) {
+    const API = process.env.NEXT_PUBLIC_API_URL!;
+    const patientId = Number(patient.id);
+
+    // ✅ Resolve orgId same way across app
+    const resolvedOrgId = useMemo(() => {
+        if (orgId != null) return orgId;
+        if (typeof window !== "undefined") {
+            const fromLS = Number(localStorage.getItem("orgId"));
+            if (Number.isFinite(fromLS) && fromLS > 0) return fromLS;
+        }
+        return Number(process.env.NEXT_PUBLIC_ORG_ID) || 1;
+    }, [orgId]);
+
+    const commonHeaders = useMemo(
+        () => ({ "Content-Type": "application/json", orgId: String(resolvedOrgId) }),
+        [resolvedOrgId]
+    );
+
+    // we keep **one coverage per level**; backend doesn’t store “level”, so we tag it via coverageType
+    // convention: coverageType = "PRIMARY" | "SECONDARY" | "TERTIARY"
+    const [rows, setRows] = useState<Record<InsuranceLevel, CoverageDto | null>>({
+        primary: null,
+        secondary: null,
+        tertiary: null,
+    });
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [info, setInfo] = useState<string | null>(null);
+
+    const [form, setForm] = useState<CoverageDto>({
+        patientId,
+        coverageType: "PRIMARY",
+        planName: "",
+        policyNumber: "",
+        provider: "",
+        groupNumber: "",
+        coverageStartDate: "",
+        coverageEndDate: "",
+        effectiveDate: "",
+        effectiveDateEnd: "",
+        subscriberEmployer: "",
+        subscriberAddressLine1: "",
+        subscriberAddressLine2: "",
+        subscriberCity: "",
+        subscriberState: "",
+        subscriberZipCode: "",
+        subscriberCountry: "",
+        subscriberPhone: "",
+        byholderName: "",
+        byholderRelation: "",
+        byholderAddressLine1: "",
+        byholderAddressLine2: "",
+        byholderCity: "",
+        byholderState: "",
+        byholderZipCode: "",
+        byholderCountry: "",
+        byholderPhone: "",
+        copayAmount: undefined,
+    });
 
     useEffect(() => {
-        const loadCompanies = async () => {
-            try {
-                const res = await fetchWithAuth(
-                    `${process.env.NEXT_PUBLIC_API_URL}/api/insurance-companies`
-                );
-                const data = await res.json();
-                setCompanies(data.data ?? data);
-            } catch (err) {
-                console.error("Error loading companies:", err);
-            }
-        };
-        loadCompanies();
-    }, []);
-
-    const handleChange = (
-        e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
-        level: InsuranceLevel
-    ) => {
-        setInsuranceForm((prev) => ({
-            ...prev,
-            [level]: { ...prev[level], [e.target.name]: e.target.value },
-        }));
-    };
-
-    const handleSave = (level: InsuranceLevel) => {
-        if (!insuranceForm[level].providerId) {
-            alert("Provider is required.");
-            return;
-        }
-        console.log(`Saved ${level}`, insuranceForm[level]);
-
-        if (level === "primary") setInsuranceSubTab("secondary");
-        else if (level === "secondary") setInsuranceSubTab("tertiary");
-        else {
-            setEditInsurance(false);
-            setInsuranceSubTab("primary");
-            setViewMode("dashboard");
-            setHighlightedTab("insurance");
-        }
-    };
-
-    const renderForm = (level: InsuranceLevel) => {
-        const policy = insuranceForm[level];
-        return (
-            <form
-                onSubmit={(e) => {
-                    e.preventDefault();
-                    handleSave(level);
-                }}
-                className="bg-white shadow rounded-xl p-6 space-y-6"
-            >
-                <h2 className="text-lg font-semibold capitalize">{level} Insurance</h2>
-
-                {/* Policy Info */}
-                <fieldset>
-                    <legend className="font-semibold text-gray-700">Policy Information</legend>
-                    <div className="grid grid-cols-2 gap-4 mt-2">
-                        <div>
-                            <label className="text-sm font-medium">Provider *</label>
-                            <select
-                                name="providerId"
-                                value={policy.providerId ?? ""}
-                                onChange={(e) =>
-                                    setPolicyField(
-                                        level,
-                                        "providerId",
-                                        e.target.value ? Number(e.target.value) : null
-                                    )
-                                }
-                                required
-                                className="w-full rounded border-gray-300 shadow-sm"
-                            >
-                                <option value="">Select Provider</option>
-                                {companies
-                                    .filter((c) => c.status === "ACTIVE")
-                                    .map((c) => (
-                                        <option key={c.id} value={c.id}>
-                                            {c.name}
-                                        </option>
-                                    ))}
-                            </select>
-                        </div>
-                        <Input name="planName" placeholder="Plan Name" value={policy.planName} onChange={(e) => handleChange(e, level)} />
-                        <Input type="date" name="effectiveDate" value={policy.effectiveDate} onChange={(e) => handleChange(e, level)} />
-                        <Input type="date" name="effectiveDateEnd" value={policy.effectiveDateEnd} onChange={(e) => handleChange(e, level)} />
-                        <Input name="policyNumber" placeholder="Policy Number" value={policy.policyNumber} onChange={(e) => handleChange(e, level)} />
-                        <Input name="groupNumber" placeholder="Group Number" value={policy.groupNumber} onChange={(e) => handleChange(e, level)} />
-                    </div>
-                </fieldset>
-
-                {/* Employer Info */}
-                <fieldset>
-                    <legend className="font-semibold text-gray-700">Subscriber Employer Info</legend>
-                    <div className="grid grid-cols-2 gap-4 mt-2">
-                        <Input name="subscriberEmployer" placeholder="Employer" value={policy.subscriberEmployer} onChange={(e) => handleChange(e, level)} />
-                        <Input name="seAddress1" placeholder="SE Address 1" value={policy.seAddress1} onChange={(e) => handleChange(e, level)} />
-                        <Input name="seAddress2" placeholder="SE Address 2" value={policy.seAddress2} onChange={(e) => handleChange(e, level)} />
-                        <Input name="seCity" placeholder="City" value={policy.seCity} onChange={(e) => handleChange(e, level)} />
-                        <Input name="seState" placeholder="State" value={policy.seState} onChange={(e) => handleChange(e, level)} />
-                        <Input name="seZip" placeholder="Zip" value={policy.seZip} onChange={(e) => handleChange(e, level)} />
-                        <Input name="seCountry" placeholder="Country" value={policy.seCountry} onChange={(e) => handleChange(e, level)} />
-                    </div>
-                </fieldset>
-
-                {/* Subscriber Info */}
-                <fieldset>
-                    <legend className="font-semibold text-gray-700">Subscriber Info</legend>
-                    <div className="grid grid-cols-3 gap-4 mt-2">
-                        <Input name="subscriberFirstName" placeholder="First Name" value={policy.subscriberFirstName} onChange={(e) => handleChange(e, level)} />
-                        <Input name="subscriberMiddleName" placeholder="Middle Name" value={policy.subscriberMiddleName} onChange={(e) => handleChange(e, level)} />
-                        <Input name="subscriberLastName" placeholder="Last Name" value={policy.subscriberLastName} onChange={(e) => handleChange(e, level)} />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4 mt-2">
-                        <Input type="date" name="subscriberDob" value={policy.subscriberDob} onChange={(e) => handleChange(e, level)} />
-                        <select name="sex" value={policy.sex} onChange={(e) => handleChange(e, level)} className="rounded border-gray-300 shadow-sm">
-                            <option value="">Sex</option>
-                            <option value="Male">Male</option>
-                            <option value="Female">Female</option>
-                            <option value="Other">Other</option>
-                        </select>
-                    </div>
-                    <Input name="ssn" placeholder="SSN" value={policy.ssn} onChange={(e) => handleChange(e, level)} />
-                    <Input name="subscriberPhone" placeholder="Phone" value={policy.subscriberPhone} onChange={(e) => handleChange(e, level)} />
-                    <Input name="subAddress1" placeholder="Address 1" value={policy.subAddress1} onChange={(e) => handleChange(e, level)} />
-                    <Input name="subAddress2" placeholder="Address 2" value={policy.subAddress2} onChange={(e) => handleChange(e, level)} />
-                    <Input name="subCity" placeholder="City" value={policy.subCity} onChange={(e) => handleChange(e, level)} />
-                    <Input name="subState" placeholder="State" value={policy.subState} onChange={(e) => handleChange(e, level)} />
-                    <Input name="subZip" placeholder="Zip" value={policy.subZip} onChange={(e) => handleChange(e, level)} />
-                    <Input name="subCountry" placeholder="Country" value={policy.subCountry} onChange={(e) => handleChange(e, level)} />
-                </fieldset>
-
-                {/* Policy Options */}
-                <fieldset>
-                    <legend className="font-semibold text-gray-700">Policy Options</legend>
-                    <div className="grid grid-cols-3 gap-4 mt-2">
-                        <Input name="copay" placeholder="Copay" value={policy.copay} onChange={(e) => handleChange(e, level)} />
-                        <select name="acceptAssignment" value={policy.acceptAssignment} onChange={(e) => handleChange(e, level)} className="rounded border-gray-300 shadow-sm">
-                            <option value="YES">YES</option>
-                            <option value="NO">NO</option>
-                        </select>
-                        <select name="secondaryMedicareType" value={policy.secondaryMedicareType} onChange={(e) => handleChange(e, level)} className="rounded border-gray-300 shadow-sm">
-                            <option value="N/A">N/A</option>
-                            <option value="Part A">Part A</option>
-                            <option value="Part B">Part B</option>
-                        </select>
-                    </div>
-                </fieldset>
-
-                <div className="flex justify-end">
-                    <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-xl shadow-md">
-                        Save {level} Policy
-                    </button>
-                </div>
-            </form>
+        // when tab changes, load that row into the form
+        const current = rows[insuranceSubTab];
+        setForm(
+            current
+                ? { ...current, patientId, coverageType: mapTabToCoverageType(insuranceSubTab) }
+                : {
+                    patientId,
+                    coverageType: mapTabToCoverageType(insuranceSubTab),
+                    planName: "",
+                    policyNumber: "",
+                }
         );
-    };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [insuranceSubTab]);
 
-    const renderSummary = () => {
-        const p = insuranceForm.primary;
-        return (
-            <div className="bg-white border rounded-lg shadow-sm p-6">
-                <div className="flex justify-between mb-4">
-                    <h4 className="text-lg font-semibold">Insurance</h4>
+    const resetMessagesSoon = () => setTimeout(() => { setError(null); setInfo(null); }, 2500);
+
+    function mapCovTypeToTab(t?: string | null): InsuranceLevel | null {
+        if (!t) return null;
+        const up = t.toUpperCase();
+        if (up.includes("PRIMARY")) return "primary";
+        if (up.includes("SECONDARY")) return "secondary";
+        if (up.includes("TERTIARY")) return "tertiary";
+        return null;
+    }
+
+    function mapTabToCoverageType(tab: InsuranceLevel) {
+        return tab.toUpperCase(); // PRIMARY/SECONDARY/TERTIARY
+    }
+
+    async function load() {
+        setLoading(true);
+        setError(null);
+        try {
+            // org-scoped list, we filter by patientId
+            const res = await fetchWithAuth(`${API}/api/coverages`, { headers: commonHeaders });
+
+            // ADD DEBUG LOGS HERE:
+            console.log("Insurance API Response status:", res.status);
+            console.log("Insurance API Response headers:", Object.fromEntries(res.headers.entries()));
+
+            const body: ApiResponse<CoverageDto[]> = await res.json();
+
+            // ADD DEBUG LOGS HERE:
+            console.log("Insurance API Response body:", body);
+
+            const perLevel: Record<InsuranceLevel, CoverageDto | null> = {
+                primary: null, secondary: null, tertiary: null,
+            };
+
+            if (res.ok && body.success && Array.isArray(body.data)) {
+                body.data
+                    .filter((c) => Number(c.patientId) === patientId)
+                    .forEach((c) => {
+                        const key = mapCovTypeToTab(c.coverageType) ?? "primary";
+                        perLevel[key] = c;
+                    });
+            }
+
+            setRows(perLevel);
+
+            // refresh currently visible form
+            const current = perLevel[insuranceSubTab];
+            setForm(
+                current
+                    ? { ...current, patientId, coverageType: mapTabToCoverageType(insuranceSubTab) }
+                    : { patientId, coverageType: mapTabToCoverageType(insuranceSubTab) }
+            );
+        } catch (e: any) {
+            setError(e?.message || "Failed to load coverages");
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    useEffect(() => {
+        void load();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [patientId, resolvedOrgId]);
+
+    function setF<K extends keyof CoverageDto>(key: K, value: CoverageDto[K]) {
+        setForm((f) => ({ ...f, [key]: value }));
+    }
+
+    async function saveCurrent() {
+        setSaving(true);
+        setError(null);
+        setInfo(null);
+        try {
+            // enforce patient & org & coverageType
+            const payload: CoverageDto = {
+                ...form,
+                patientId,
+                orgId: resolvedOrgId,
+                coverageType: mapTabToCoverageType(insuranceSubTab),
+            };
+
+            if (!rows[insuranceSubTab]?.id) {
+                // CREATE
+                const res = await fetchWithAuth(`${API}/api/coverages`, {
+                    method: "POST",
+                    headers: commonHeaders,
+                    body: JSON.stringify(payload),
+                });
+                const body: ApiResponse<CoverageDto> = await res.json();
+                if (!res.ok || !body.success) throw new Error(body.message || "Create failed");
+                setInfo(`${tabLabels[insuranceSubTab]} insurance added`);
+            } else {
+                // UPDATE
+                const id = rows[insuranceSubTab]!.id!;
+                const res = await fetchWithAuth(`${API}/api/coverages/${id}/${patientId}`, {
+                    method: "PUT",
+                    headers: commonHeaders,
+                    body: JSON.stringify(payload),
+                });
+                const body: ApiResponse<CoverageDto> = await res.json();
+                if (!res.ok || !body.success) throw new Error(body.message || "Update failed");
+                setInfo(`${tabLabels[insuranceSubTab]} insurance updated`);
+            }
+
+            await load();
+            setEditInsurance(false);
+            setViewMode("dashboard");
+            setHighlightedTab("dashboard");
+        } catch (e: any) {
+            setError(e?.message || "Save failed");
+        } finally {
+            setSaving(false);
+            resetMessagesSoon();
+        }
+    }
+
+    async function deleteCurrent() {
+        const row = rows[insuranceSubTab];
+        if (!row?.id) return;
+        if (!confirm(`Delete ${tabLabels[insuranceSubTab]} insurance?`)) return;
+
+        setSaving(true);
+        setError(null);
+        setInfo(null);
+        try {
+            const res = await fetchWithAuth(`${API}/api/coverages/${row.id}/${patientId}`, {
+                method: "DELETE",
+                headers: commonHeaders,
+            });
+            const body: ApiResponse<null> = await res.json();
+            if (!res.ok || !body.success) throw new Error(body.message || "Delete failed");
+            setInfo(`${tabLabels[insuranceSubTab]} insurance deleted`);
+            await load();
+        } catch (e: any) {
+            setError(e?.message || "Delete failed");
+        } finally {
+            setSaving(false);
+            resetMessagesSoon();
+        }
+    }
+
+    const current = rows[insuranceSubTab];
+
+    return (
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+            <div className="flex justify-between items-center mb-4">
+                <h4 className="text-lg font-semibold text-gray-800">Insurance</h4>
+                {!editInsurance && (
                     <button
-                        onClick={() => {
-                            setEditInsurance(true);
-                            setInsuranceSubTab("primary");
-                        }}
-                        className="px-3 py-1 text-sm bg-blue-600 text-white rounded"
+                        onClick={() => setEditInsurance(true)}
+                        className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
                     >
                         Edit
                     </button>
-                </div>
-                <div className="bg-gray-50 rounded p-4 text-sm space-y-2">
-                    <p>
-                        <strong>Insurer:</strong>{" "}
-                        {companies.find((c) => c.id === p.providerId)?.name || "Self-Pay"}
-                    </p>
-                    <p><strong>Plan:</strong> {p.planName || "—"}</p>
-                    <p><strong>Policy #:</strong> {p.policyNumber || "—"}</p>
-                    <p><strong>Group #:</strong> {p.groupNumber || "—"}</p>
-                    <p><strong>Copay:</strong> {p.copay || "—"}</p>
-                    <p><strong>Assignment:</strong> {p.acceptAssignment}</p>
-                </div>
+                )}
             </div>
-        );
-    };
 
+            {/* Alerts */}
+            {error && (
+                <div className="mb-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded p-2">{error}</div>
+            )}
+            {info && (
+                <div className="mb-3 text-sm text-green-700 bg-green-50 border border-green-200 rounded p-2">{info}</div>
+            )}
+
+            {/* Sub-tabs */}
+            <div className="flex gap-2 mb-4 border-b">
+                {(["primary", "secondary", "tertiary"] as InsuranceLevel[]).map((tab) => (
+                    <button
+                        key={tab}
+                        onClick={() => setInsuranceSubTab(tab)}
+                        className={`px-3 py-1 rounded-t ${
+                            insuranceSubTab === tab ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600"
+                        }`}
+                    >
+                        {tabLabels[tab]}
+                    </button>
+                ))}
+            </div>
+
+            {/* READ ONLY */}
+            {!editInsurance ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <FieldRead label="Provider" value={current?.provider || patient.insuranceProvider || "—"} />
+                    <FieldRead label="Plan Name" value={current?.planName} />
+                    <FieldRead label="Policy Number" value={current?.policyNumber} />
+                    <FieldRead label="Group Number" value={current?.groupNumber} />
+                    <FieldRead label="Coverage Start" value={current?.coverageStartDate } />
+                    <FieldRead label="Coverage End" value={current?.coverageEndDate } />
+                    <FieldRead label="Copay" value={current?.copayAmount != null ? String(current?.copayAmount) : "—"} />
+                    <FieldRead label="Coverage Type" value={current?.coverageType} />
+
+                    <Section title="Subscriber">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FieldRead label="Employer" value={current?.subscriberEmployer} />
+                            <FieldRead label="Phone" value={current?.subscriberPhone} />
+                            <FieldRead label="Address 1" value={current?.subscriberAddressLine1} />
+                            <FieldRead label="Address 2" value={current?.subscriberAddressLine2} />
+                            <FieldRead label="City" value={current?.subscriberCity} />
+                            <FieldRead label="State" value={current?.subscriberState} />
+                            <FieldRead label="Zip" value={current?.subscriberZipCode} />
+                            <FieldRead label="Country" value={current?.subscriberCountry} />
+                        </div>
+                    </Section>
+
+                    <Section title="Policy Holder">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FieldRead label="Name" value={current?.byholderName} />
+                            <FieldRead label="Relation" value={current?.byholderRelation} />
+                            <FieldRead label="Phone" value={current?.byholderPhone} />
+                            <FieldRead label="Address 1" value={current?.byholderAddressLine1} />
+                            <FieldRead label="Address 2" value={current?.byholderAddressLine2} />
+                            <FieldRead label="City" value={current?.byholderCity} />
+                            <FieldRead label="State" value={current?.byholderState} />
+                            <FieldRead label="Zip" value={current?.byholderZipCode} />
+                            <FieldRead label="Country" value={current?.byholderCountry} />
+                        </div>
+                    </Section>
+                </div>
+            ) : (
+                // EDIT MODE
+                <form
+                    className="space-y-6"
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        void saveCurrent();
+                    }}
+                >
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <Input label="Provider" value={form.provider || ""} onChange={(v) => setF("provider", v)} />
+                        <Input label="Plan Name" value={form.planName || ""} onChange={(v) => setF("planName", v)} />
+                        <Input label="Policy Number" value={form.policyNumber || ""} onChange={(v) => setF("policyNumber", v)} />
+                        <Input label="Group Number" value={form.groupNumber || ""} onChange={(v) => setF("groupNumber", v)} />
+                        <Input label="Coverage Type" value={form.coverageType || ""} onChange={(v) => setF("coverageType", v)} />
+                        <Input label="Copay" type="number" value={form.copayAmount ?? ""} onChange={(v) => setF("copayAmount", v === "" ? null : Number(v))} />
+                        <Input label="Coverage Start (yyyy-mm-dd)" value={form.coverageStartDate || ""} onChange={(v) => setF("coverageStartDate", v)} />
+                        <Input label="Coverage End (yyyy-mm-dd)" value={form.coverageEndDate || ""} onChange={(v) => setF("coverageEndDate", v)} />
+                        </div>
+
+                    <Section title="Subscriber">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <Input label="Employer" value={form.subscriberEmployer || ""} onChange={(v) => setF("subscriberEmployer", v)} />
+                            <Input label="Phone" value={form.subscriberPhone || ""} onChange={(v) => setF("subscriberPhone", v)} />
+                            <Input label="Address Line 1" value={form.subscriberAddressLine1 || ""} onChange={(v) => setF("subscriberAddressLine1", v)} />
+                            <Input label="Address Line 2" value={form.subscriberAddressLine2 || ""} onChange={(v) => setF("subscriberAddressLine2", v)} />
+                            <Input label="City" value={form.subscriberCity || ""} onChange={(v) => setF("subscriberCity", v)} />
+                            <Input label="State" value={form.subscriberState || ""} onChange={(v) => setF("subscriberState", v)} />
+                            <Input label="Zip Code" value={form.subscriberZipCode || ""} onChange={(v) => setF("subscriberZipCode", v)} />
+                            <Input label="Country" value={form.subscriberCountry || ""} onChange={(v) => setF("subscriberCountry", v)} />
+                        </div>
+                    </Section>
+
+                    <Section title="Policy Holder">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <Input label="Name" value={form.byholderName || ""} onChange={(v) => setF("byholderName", v)} />
+                            <Input label="Relation" value={form.byholderRelation || ""} onChange={(v) => setF("byholderRelation", v)} />
+                            <Input label="Phone" value={form.byholderPhone || ""} onChange={(v) => setF("byholderPhone", v)} />
+                            <Input label="Address Line 1" value={form.byholderAddressLine1 || ""} onChange={(v) => setF("byholderAddressLine1", v)} />
+                            <Input label="Address Line 2" value={form.byholderAddressLine2 || ""} onChange={(v) => setF("byholderAddressLine2", v)} />
+                            <Input label="City" value={form.byholderCity || ""} onChange={(v) => setF("byholderCity", v)} />
+                            <Input label="State" value={form.byholderState || ""} onChange={(v) => setF("byholderState", v)} />
+                            <Input label="Zip Code" value={form.byholderZipCode || ""} onChange={(v) => setF("byholderZipCode", v)} />
+                            <Input label="Country" value={form.byholderCountry || ""} onChange={(v) => setF("byholderCountry", v)} />
+                        </div>
+                    </Section>
+
+                    <div className="flex flex-wrap gap-2">
+                        <button
+                            type="submit"
+                            disabled={saving}
+                            className="px-3 py-2 bg-emerald-600 text-white rounded disabled:opacity-50"
+                        >
+                            {saving ? "Saving…" : "Save All & Exit"}
+                        </button>
+                        {rows[insuranceSubTab]?.id && (
+                            <button
+                                type="button"
+                                onClick={deleteCurrent}
+                                disabled={saving}
+                                className="px-3 py-2 bg-red-600 text-white rounded disabled:opacity-50"
+                            >
+                                Delete {tabLabels[insuranceSubTab].toLowerCase()}
+                            </button>
+                        )}
+                        <button
+                            type="button"
+                            onClick={() => setEditInsurance(false)}
+                            disabled={saving}
+                            className="px-3 py-2 bg-gray-200 rounded disabled:opacity-50"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            )}
+
+            {loading && <div className="mt-3 text-sm text-gray-500">Loading insurance…</div>}
+        </div>
+    );
+}
+
+/* --- small presentational bits --- */
+function Input({
+                   label,
+                   value,
+                   onChange,
+                   type = "text",
+               }: {
+    label: string;
+    value: string | number;
+    onChange: (v: string) => void;
+    type?: string;
+}) {
     return (
-        <div className="max-w-5xl mx-auto p-6">
-            {editInsurance ? renderForm(insuranceSubTab) : renderSummary()}
+        <div>
+            <label className="block text-xs text-gray-600 mb-1">{label}</label>
+            <input
+                type={type}
+                className="w-full px-3 py-2 border rounded-md"
+                value={value as any}
+                onChange={(e) => onChange(e.target.value)}
+            />
+        </div>
+    );
+}
+
+function FieldRead({ label, value }: { label: string; value?: string | null }) {
+    return (
+        <div>
+            <div className="text-xs text-gray-500">{label}</div>
+            <div className="text-gray-800">{value || "—"}</div>
+        </div>
+    );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+    return (
+        <div className="md:col-span-2 border-t pt-4">
+            <div className="text-sm font-medium text-gray-800 mb-2">{title}</div>
+            {children}
         </div>
     );
 }

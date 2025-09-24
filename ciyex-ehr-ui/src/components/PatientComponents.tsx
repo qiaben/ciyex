@@ -28,22 +28,6 @@ interface Billing {
     totalBalanceDue?: number;
 }
 
-interface Medication {
-    id: string;
-    name: string;
-    dosage: string;
-    frequency: string;
-    route: string;
-    status: string;
-    instructions?: string;
-}
-
-interface Allergy {
-    id: string;
-    substance: string;
-    reaction?: string;
-}
-
 interface Lab {
     testName: string;
     orderDate: string;
@@ -67,7 +51,6 @@ interface ReportFlatProps {
     setActiveTab: (tab: string) => void;
 }
 
-/* ---------------- APPOINTMENTS ---------------- */
 /* ---------------- APPOINTMENTS ---------------- */
 export const AppointmentsFlat: React.FC<{
     patientId: number;
@@ -352,52 +335,23 @@ export const BillingFlat: React.FC<{ billing: Billing | null }> = ({ billing }) 
     </div>
 );
 
-/* ---------------- MEDICATIONS ---------------- */
-export const MedicationsFlat: React.FC<{ medications: Medication[] }> = ({ medications }) => (
-    <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-        <h4 className="font-semibold text-lg text-gray-800 mb-4">Medications</h4>
-        {medications?.length > 0 ? (
-            <ul className="space-y-3">
-                {medications.map((med) => (
-                    <li key={med.id} className="p-4 border rounded-lg">
-                        <h5 className="font-medium text-gray-800">
-                            {med.name} <span className="text-gray-600">{med.dosage}</span>
-                        </h5>
-                        <div className="text-xs text-gray-500 space-x-3">
-                            <span>{med.frequency}</span>
-                            <span>{med.route}</span>
-                            <span>{med.status}</span>
-                        </div>
-                        {med.instructions && (
-                            <p className="mt-2 text-sm text-gray-600">{med.instructions}</p>
-                        )}
-                    </li>
-                ))}
-            </ul>
-        ) : (
-            <div className="text-center py-6 text-gray-500">No medications</div>
-        )}
-    </div>
-);
+/* ---------------- MEDICATIONS (re-export) ---------------- */
+export { default as MedicationsFlat } from "./MedicationsFlat";
 
-/* ---------------- ALLERGIES ---------------- */
-export const AllergiesFlat: React.FC<{ allergies: Allergy[] }> = ({ allergies }) => (
-    <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-        <h4 className="font-semibold text-lg text-gray-800 mb-4">Allergies</h4>
-        {allergies?.length ? (
-            <ul className="space-y-3">
-                {allergies.map((a) => (
-                    <li key={a.id} className="p-3 border rounded">
-                        <strong>{a.substance}</strong>
-                        <p className="text-xs text-gray-500">Reaction: {a.reaction || "—"}</p>
-                    </li>
-                ))}
-            </ul>
-        ) : (
-            <div className="text-center py-6 text-gray-500">No allergies recorded</div>
-        )}
-    </div>
-);
+/* ---------------- ALLERGIES (re-export) ---------------- */
+export { default as AllergiesFlat } from "./AllergiesFlat";
+
+/* ---------------- INSURANCE (re-export) ---------------- */
+export { default as InsuranceFlat } from "./InsuranceFlat";
+
+export { default as MedicalProblemsFlat } from "./MedicalProblemsFlat";
+
+export { default as IssuesFlat } from "@/components/IssuesFlat";
+
+export { default as ImmunizationsFlat } from "@/components/ImmunizationsFlat";
+
+/* ---------------- HEALTHCARE SERVICES (new) ---------------- */
+export { default as HealthcareServicesFlat } from "@/components/HealthcareServicesFlat";
 
 /* ---------------- REPORT ---------------- */
 export const ReportFlat: React.FC<ReportFlatProps> = ({
