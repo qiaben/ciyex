@@ -328,34 +328,38 @@ export default function AppointmentPage() {
 
         {/* Table */}
         <div ref={tableRef} className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-md">
-          <table className="w-full table-auto">
-            <colgroup>
-              <col className="w-20" />
-              <col className="w-48" />
-              <col className="w-48" />
-              <col />
-              <col className="w-32" />
-              <col className="w-32" />
-              <col className="w-28" />
-              <col className="w-28" />
-              <col className="w-28" />
-              <col className="w-[220px]" /> {/* Action column */}
-            </colgroup>
-            <thead className="bg-gray-100 dark:bg-gray-800">
-              <tr>
-                <th className="py-3 px-6 text-left text-sm font-medium">MRN</th>
-                <th className="py-3 px-6 text-left text-sm font-medium">Patient Name</th>
-                <th className="py-3 px-6 text-left text-sm font-medium">Provider Name</th>
-                <th className="py-3 px-6 text-left text-sm font-medium">Location</th>
-                <th className="py-3 px-6 text-left text-sm font-medium">Visit Type</th>
-                <th className="py-3 px-6 text-left text-sm font-medium">Start Date</th>
-                <th className="py-3 px-6 text-left text-sm font-medium">Start Time</th>
-                <th className="py-3 px-6 text-left text-sm font-medium">Priority</th>
-                <th className="py-3 px-6 text-left text-sm font-medium">Status</th>
-                <th className="py-3 px-6 text-left text-sm font-medium">Action</th>
-              </tr>
-            </thead>
-            <tbody>
+            <table className="w-full table-auto">
+                <colgroup>
+                    {[
+                        "w-20",
+                        "w-48",
+                        "w-48",
+                        "",
+                        "w-32",
+                        "w-32",
+                        "w-28",
+                        "w-28",
+                        "w-28",
+                        "w-[220px]", // Action column
+                    ].map((cls, i) => (
+                        <col key={i} className={cls || undefined} />
+                    ))}
+                </colgroup>
+                <thead className="bg-gray-100 dark:bg-gray-800">
+                <tr>
+                    <th className="py-3 px-6 text-left text-sm font-medium">MRN</th>
+                    <th className="py-3 px-6 text-left text-sm font-medium">Patient Name</th>
+                    <th className="py-3 px-6 text-left text-sm font-medium">Provider Name</th>
+                    <th className="py-3 px-6 text-left text-sm font-medium">Location</th>
+                    <th className="py-3 px-6 text-left text-sm font-medium">Visit Type</th>
+                    <th className="py-3 px-6 text-left text-sm font-medium">Start Date</th>
+                    <th className="py-3 px-6 text-left text-sm font-medium">Start Time</th>
+                    <th className="py-3 px-6 text-left text-sm font-medium">Priority</th>
+                    <th className="py-3 px-6 text-left text-sm font-medium">Status</th>
+                    <th className="py-3 px-6 text-left text-sm font-medium">Action</th>
+                </tr>
+                </thead>
+                <tbody>
               {loadingAppointments ? (
                 <tr>
                   <td colSpan={10} className="py-8 text-center text-sm text-gray-500 dark:text-gray-400" />
