@@ -35,7 +35,6 @@ export default function DemographicsFlat({
                                              editDemographics,
                                              setEditDemographics,
                                              saveDemographics,
-
                                          }: Props) {
     const [providers, setProviders] = useState<Provider[]>([]);
     const [patients, setPatients] = useState<PatientRef[]>([]);
@@ -85,8 +84,9 @@ export default function DemographicsFlat({
         setDemoForm((prev) => ({ ...prev, [field]: value }));
     };
 
+    // ✅ Bold labels
     const Label = ({ text, required }: { text: string; required?: boolean }) => (
-        <label className="block text-xs text-gray-600 mb-0.5  flex items-center gap-1">
+        <label className="block text-xs font-semibold text-gray-800 mb-0.5 flex items-center gap-1">
             {text}
             {required && <span className="text-red-500" title="Required">*</span>}
         </label>
@@ -104,7 +104,9 @@ export default function DemographicsFlat({
             {editDemographics ? (
                 options ? (
                     <select
-                        value={(demoForm[field] as string) || (patient[field] as string) || ""}
+                        value={
+                            (demoForm[field] as string) || (patient[field] as string) || ""
+                        }
                         onChange={(e) => handleInputChange(field, e.target.value)}
                         className="w-full border-b border-gray-300 bg-transparent text-xs focus:outline-none"
                     >
@@ -118,20 +120,28 @@ export default function DemographicsFlat({
                 ) : (
                     <input
                         type={type}
-                        value={(demoForm[field] as string) || (patient[field] as string) || ""}
+                        value={
+                            (demoForm[field] as string) || (patient[field] as string) || ""
+                        }
                         onChange={(e) => handleInputChange(field, e.target.value)}
                         className="w-full border-b border-gray-300 bg-transparent text-xs focus:outline-none"
                     />
                 )
             ) : (
-                <span className="text-xs text-gray-700">
+                <span className="text-xs text-gray-700 font-normal">
           {(patient[field] as string) || ""}
         </span>
             )}
         </div>
     );
 
-    const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
+    const Section = ({
+                         title,
+                         children,
+                     }: {
+        title: string;
+        children: React.ReactNode;
+    }) => (
         <section className="w-full mb-4">
             <h2 className="text-sm font-semibold text-blue-700 border-b pb-0.5 mb-2">
                 {title}
@@ -208,27 +218,38 @@ export default function DemographicsFlat({
                     {renderField("Preferred Name", "preferredName")}
                     {renderField("Date of Birth", "dateOfBirth", "date", undefined, true)}
                     {renderField("Sex at Birth", "sexAtBirth", "text", ["Male", "Female"], true)}
+
                     {/* Assigned Provider */}
                     <div className="col-span-2">
                         <Label text="Assigned Provider" required />
                         {editDemographics ? (
                             <select
-                                value={(demoForm.assignedProvider as string) || (patient.assignedProvider as string) || ""}
-                                onChange={(e) => handleInputChange("assignedProvider", e.target.value)}
+                                value={
+                                    (demoForm.assignedProvider as string) ||
+                                    (patient.assignedProvider as string) ||
+                                    ""
+                                }
+                                onChange={(e) =>
+                                    handleInputChange("assignedProvider", e.target.value)
+                                }
                                 className="w-full border-b border-gray-300 bg-transparent text-xs focus:outline-none"
                             >
                                 {providers.map((p) => (
                                     <option key={p.id} value={p.id}>
                                         {p.identification
-                                            ? `${p.identification.firstName || ""} ${p.identification.lastName || ""}`
+                                            ? `${p.identification.firstName || ""} ${
+                                                p.identification.lastName || ""
+                                            }`
                                             : `Provider #${p.id}`}
                                     </option>
                                 ))}
                             </select>
                         ) : (
-                            <span className="text-xs text-gray-700">
+                            <span className="text-xs text-gray-700 font-normal">
                 {(() => {
-                    const prov = providers.find((p) => p.id === patient.assignedProvider);
+                    const prov = providers.find(
+                        (p) => p.id === patient.assignedProvider
+                    );
                     return prov?.identification
                         ? `${prov.identification.firstName} ${prov.identification.lastName}`
                         : prov
@@ -244,22 +265,32 @@ export default function DemographicsFlat({
                         <Label text="Referring Provider" />
                         {editDemographics ? (
                             <select
-                                value={(demoForm.referringProvider as string) || (patient.referringProvider as string) || ""}
-                                onChange={(e) => handleInputChange("referringProvider", e.target.value)}
+                                value={
+                                    (demoForm.referringProvider as string) ||
+                                    (patient.referringProvider as string) ||
+                                    ""
+                                }
+                                onChange={(e) =>
+                                    handleInputChange("referringProvider", e.target.value)
+                                }
                                 className="w-full border-b border-gray-300 bg-transparent text-xs focus:outline-none"
                             >
                                 {providers.map((p) => (
                                     <option key={p.id} value={p.id}>
                                         {p.identification
-                                            ? `${p.identification.firstName || ""} ${p.identification.lastName || ""}`
+                                            ? `${p.identification.firstName || ""} ${
+                                                p.identification.lastName || ""
+                                            }`
                                             : `Provider #${p.id}`}
                                     </option>
                                 ))}
                             </select>
                         ) : (
-                            <span className="text-xs text-gray-700">
+                            <span className="text-xs text-gray-700 font-normal">
                 {(() => {
-                    const ref = providers.find((p) => p.id === patient.referringProvider);
+                    const ref = providers.find(
+                        (p) => p.id === patient.referringProvider
+                    );
                     return ref?.identification
                         ? `${ref.identification.firstName} ${ref.identification.lastName}`
                         : ref
@@ -275,8 +306,14 @@ export default function DemographicsFlat({
                         <Label text="Referring Patient" />
                         {editDemographics ? (
                             <select
-                                value={(demoForm.referringPatient as string) || (patient.referringPatient as string) || ""}
-                                onChange={(e) => handleInputChange("referringPatient", e.target.value)}
+                                value={
+                                    (demoForm.referringPatient as string) ||
+                                    (patient.referringPatient as string) ||
+                                    ""
+                                }
+                                onChange={(e) =>
+                                    handleInputChange("referringPatient", e.target.value)
+                                }
                                 className="w-full border-b border-gray-300 bg-transparent text-xs focus:outline-none"
                             >
                                 {patients.map((pt) => (
@@ -286,16 +323,17 @@ export default function DemographicsFlat({
                                 ))}
                             </select>
                         ) : (
-                            <span className="text-xs text-gray-700">
+                            <span className="text-xs text-gray-700 font-normal">
                 {(() => {
-                    const pt = patients.find((p) => p.id === patient.referringPatient);
+                    const pt = patients.find(
+                        (p) => p.id === patient.referringPatient
+                    );
                     return pt ? `${pt.firstName} ${pt.lastName}` : "";
                 })()}
               </span>
                         )}
                     </div>
                 </div>
-
             </Section>
 
             {/* ✅ Contact Information */}
@@ -317,10 +355,12 @@ export default function DemographicsFlat({
             <Section title="Family File & Care Team">
                 <div className="grid grid-cols-2 gap-2">
                     {renderField("Head of Household", "headOfHousehold")}
-                    {renderField("Financial Responsibility", "financialResponsibility", "text", [
-                        "Self",
-                        "HOH responsible",
-                    ])}
+                    {renderField(
+                        "Financial Responsibility",
+                        "financialResponsibility",
+                        "text",
+                        ["Self", "HOH responsible"]
+                    )}
                     {renderField("Head of Communication", "headOfCommunication")}
                 </div>
                 <h3 className="mt-1 font-medium text-xs">Family Members</h3>
@@ -331,7 +371,7 @@ export default function DemographicsFlat({
                         ))}
                     </ul>
                 ) : (
-                    <div className="text-xs text-gray-500">None</div>
+                    <div className="text-xs text-gray-500 font-normal">None</div>
                 )}
                 <h3 className="mt-2 font-medium text-xs">Care Team</h3>
                 {patient.careTeam?.length ? (
@@ -341,14 +381,17 @@ export default function DemographicsFlat({
                         ))}
                     </ul>
                 ) : (
-                    <div className="text-xs text-gray-500">None</div>
+                    <div className="text-xs text-gray-500 font-normal">None</div>
                 )}
             </Section>
 
             {/* ✅ Communication Preferences */}
             <Section title="Communication Preferences">
                 <div className="grid grid-cols-2 gap-2">
-                    {renderField("Appointment Reminders", "reminderPreference", "text", ["Yes", "No"])}
+                    {renderField("Appointment Reminders", "reminderPreference", "text", [
+                        "Yes",
+                        "No",
+                    ])}
                     {renderField("Preferred Contact Time", "preferredContactTime", "text", [
                         "Morning",
                         "Afternoon",
@@ -365,7 +408,8 @@ export default function DemographicsFlat({
                                             ? (demoForm[`comm${method.replace(/\W/g, "")}`] as boolean) ||
                                             (patient[`comm${method.replace(/\W/g, "")}`] as boolean) ||
                                             false
-                                            : (patient[`comm${method.replace(/\W/g, "")}`] as boolean) || false
+                                            : (patient[`comm${method.replace(/\W/g, "")}`] as boolean) ||
+                                            false
                                     }
                                     disabled={!editDemographics}
                                     onChange={

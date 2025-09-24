@@ -1,1186 +1,32 @@
-// "use client";
-//
-
-
-// import { useEffect, useRef, useState } from "react";
-// import { useParams, useRouter } from "next/navigation";
-// import { fetchWithAuth } from "@/utils/fetchWithAuth";
-// import AdminLayout from "@/app/(admin)/layout";
-//
-// import Link from "next/link";
-// import DemographicsFlat from "@/components/DemographicsFlat";
-//
-// import HistoryFlat from "@/components/HistoryFlat";
-// import InsuranceFlat from "@/components/InsuranceFlat";
-// import {
-//     AppointmentsFlat,
-//     BillingFlat,
-//     MedicationsFlat,
-//     ReportFlat,
-//     AllergiesFlat,
-//     DocumentsFlat,
-//     LabsFlat,
-// } from "@/components/PatientComponents";
-// import EncounterTableExpandable from "@/components/encounter/EncounterTableExpandable";
-//
-// interface Patient {
-//     id: string;
-//     firstName: string;
-//     lastName: string;
-//     email: string;
-//     phoneNumber: string;
-//     dateOfBirth: string;
-//     gender?: string;
-//     ssn?: string;
-//     mrn?: string;
-//     status?: "Active" | "Inactive" | "Pending";
-//     address?: string;
-//     provider?: string;
-//     referringProvider?: string;
-//     pharmacy?: string;
-//     hipaaNoticeReceived?: string;
-//     employerName?: string;
-//     employerAddress?: string;
-//     occupation?: string;
-//     language?: string;
-//     race?: string;
-//     ethnicity?: string;
-//     nationality?: string;
-//     billingNote?: string;
-//     previousNames?: string;
-//     guardianName?: string;
-//     guardianRelationship?: string;
-//     insuranceProvider?: string;
-//     primaryCarePhysician?: string;
-//     lastVisitDate?: string;
-//     familyMembers?: string[];
-//     careTeam?: string[];
-//     // ✅ Allow safe extension (string keys can map to different primitive types)
-//     [key: string]: string | number | boolean | string[] | undefined;
-// }
-//
-// type InsuranceLevel = "primary" | "secondary" | "tertiary";
-//
-// interface InsurancePolicy {
-//     provider?: string;
-//     planName?: string;
-//     effectiveStart?: string;
-//     effectiveEnd?: string;
-//     policyNumber?: string;
-//     groupNumber?: string;
-//     subscriberEmployer?: string;
-//     subscriber?: string;
-//     subscriberDob?: string;
-//     subscriberSex?: "Unassigned" | "Male" | "Female";
-//     ssn?: string;
-//     subscriberAddress?: string;
-//     copay?: string;
-//     acceptsAssignment?: "Yes" | "No";
-//     secondaryMedicareType?: string;
-// }
-//
-// type InsuranceForm = Record<InsuranceLevel, InsurancePolicy>;
-//
-// interface Allergy {
-//     id: string;
-//     substance: string;
-//     reaction?: string;
-//     severity?: string;
-//     status: "Active" | "Inactive" | string;
-//     notes?: string;
-// }
-//
-// interface HistoryForm {
-//     general: { riskFactors: string; examsTests: string };
-//     family: {
-//         father: string;
-//         mother: string;
-//         siblings: string;
-//         spouse: string;
-//         offspring: string;
-//         diagFather: string;
-//         diagMother: string;
-//         diagSiblings: string;
-//         diagSpouse: string;
-//         diagOffspring: string;
-//     };
-//     relatives: {
-//         cancer: string;
-//         diabetes: string;
-//         heartProblems: string;
-//         epilepsy: string;
-//         suicide: string;
-//         tuberculosis: string;
-//         hbp: string;
-//         stroke: string;
-//         mentalIllness: string;
-//     };
-//     lifestyle: {
-//         tobacco: string;
-//         coffee: string;
-//         alcohol: string;
-//         drugs: string;
-//         counseling: string;
-//         exercise: string;
-//         hazardous: string;
-//         sleep: string;
-//         seatbelt: string;
-//     };
-//     other: { nameValue: string; additionalHistory: string };
-// }
-//
-// interface Appointment {
-//     id: string;
-//     date: string;
-//     provider: string;
-//     type: string;
-//     status: "Scheduled" | "Completed" | "Cancelled";
-//     notes?: string;
-// }
-//
-// interface Medication {
-//     id: string;
-//     name: string;
-//     dosage: string;
-//     frequency: string;
-//     route: string;
-//     status: "Active" | "Inactive" | "Completed";
-//     instructions?: string;
-// }
-//
-// interface XmlResponse {
-//     success?: boolean;
-//     data?: Record<string, string>;
-//     [key: string]: string | boolean | Record<string, string> | undefined;
-// }
-//
-// function parseXmlResponse(xmlText: string): Promise<XmlResponse> {
-//     return new Promise((resolve, reject) => {
-//         try {
-//             const parser = new DOMParser();
-//             const xmlDoc = parser.parseFromString(xmlText, "text/xml");
-//             const response: XmlResponse = {};
-//             Array.from(xmlDoc.documentElement.children).forEach((child) => {
-//                 if (child.children.length > 0) {
-//                     if (child.nodeName === "data") {
-//                         response.data = {};
-//                         Array.from(child.children).forEach((dataChild) => {
-//                             response.data![dataChild.nodeName] = dataChild.textContent || "";
-//                         });
-//                     } else {
-//                         response[child.nodeName] = child.textContent || "";
-//                     }
-//                 } else {
-//                     response[child.nodeName] = child.textContent || "";
-//                 }
-//             });
-//             if ("success" in response && typeof response.success === "string") {
-//                 response.success = (response.success as unknown as string) === "true";
-//             }
-//
-//             resolve(response);
-//         } catch {
-//             reject(new Error("Failed to parse XML response"));
-//         }
-//     });
-// }
-//
-// export default function PatientDashboardPage() {
-//     const params = useParams();
-//     const router = useRouter();
-//     const id = params?.id as string;
-//
-//     const [historyForm, setHistoryForm] = useState<HistoryForm>({
-//         general: { riskFactors: "", examsTests: "" },
-//         family: {
-//             father: "",
-//             mother: "",
-//             siblings: "",
-//             spouse: "",
-//             offspring: "",
-//             diagFather: "",
-//             diagMother: "",
-//             diagSiblings: "",
-//             diagSpouse: "",
-//             diagOffspring: "",
-//         },
-//         relatives: {
-//             cancer: "",
-//             diabetes: "",
-//             heartProblems: "",
-//             epilepsy: "",
-//             suicide: "",
-//             tuberculosis: "",
-//             hbp: "",
-//             stroke: "",
-//             mentalIllness: "",
-//         },
-//         lifestyle: {
-//             tobacco: "",
-//             coffee: "",
-//             alcohol: "",
-//             drugs: "",
-//             counseling: "",
-//             exercise: "",
-//             hazardous: "",
-//             sleep: "",
-//             seatbelt: "",
-//         },
-//         other: { nameValue: "", additionalHistory: "" },
-//     });
-//
-//     const [activeHistoryTab, setActiveHistoryTab] = useState<keyof HistoryForm>("general");
-//     const [editHistory, setEditHistory] = useState(false);
-//     const [lastVisitedTab, setLastVisitedTab] = useState("dashboard");
-//     const [billing, setBilling] = useState<{
-//         patientBalanceDue: number;
-//         insuranceBalanceDue: number;
-//         totalBalanceDue: number;
-//     } | null>(null);
-//     const [patient, setPatient] = useState<Patient | null>(null);
-//     const [loading, setLoading] = useState(true);
-//     const [error, setError] = useState<string | null>(null);
-//     const [appointments, setAppointments] = useState<Appointment[]>([]);
-//     const [medications, setMedications] = useState<Medication[]>([]);
-//     const [allergies, setAllergies] = useState<Allergy[]>([]);
-//     const [viewMode, setViewMode] = useState<string>("dashboard");
-//     const [highlightedTab, setHighlightedTab] = useState<string>("dashboard");
-//     const [selectedDoc, setSelectedDoc] = useState<string | null>(null);
-//     const [useDateRange, setUseDateRange] = useState(false);
-//     const [startDate, setStartDate] = useState("");
-//     const [endDate, setEndDate] = useState("");
-//     const [editInsurance, setEditInsurance] = useState(false);
-//     const [insuranceSubTab, setInsuranceSubTab] = useState<
-//         "primary" | "secondary" | "tertiary"
-//     >("primary");
-//     const [editDemographics, setEditDemographics] = useState(false);
-//     const [demoForm, setDemoForm] = useState<Partial<Patient>>({});
-//     const emptyPolicy: InsurancePolicy = {
-//         acceptsAssignment: "Yes",
-//         subscriberSex: "Unassigned",
-//     };
-//     const [insuranceForm, setInsuranceForm] = useState<InsuranceForm>({
-//         primary: { ...emptyPolicy, provider: patient?.insuranceProvider },
-//         secondary: { ...emptyPolicy },
-//         tertiary: { ...emptyPolicy },
-//     });
-//
-//     const setPolicyField = <K extends keyof InsurancePolicy>(
-//         level: InsuranceLevel,
-//         field: K,
-//         value: InsurancePolicy[K]
-//     ) => {
-//         setInsuranceForm((prev) => ({
-//             ...prev,
-//             [level]: {
-//                 ...prev[level],
-//                 [field]: value,
-//             },
-//         }));
-//     };
-//
-//     const [reportFilters, setReportFilters] = useState<string[]>([]);
-//     const toggleFilter = (filter: string) => {
-//         setReportFilters((prev) =>
-//             prev.includes(filter) ? prev.filter((f) => f !== filter) : [...prev, filter]
-//         );
-//     };
-//
-//     const generateReport = async (type: string, filters?: string[]) => {
-//         try {
-//             const res = await fetchWithAuth(`/api/reports/generate?type=${type}`, {
-//                 method: "POST",
-//                 headers: { "Content-Type": "application/json" },
-//                 body: JSON.stringify({ filters }),
-//             });
-//             const data = await res.json();
-//             console.log("Report generated:", data);
-//         } catch (err) {
-//             console.error("Error generating report:", err);
-//         }
-//     };
-//
-//     const downloadReport = async (type: string, filters?: string[]) => {
-//         try {
-//             const res = await fetchWithAuth(`/api/reports/download?type=${type}`, {
-//                 method: "POST",
-//                 headers: { "Content-Type": "application/json" },
-//                 body: JSON.stringify({ filters }),
-//             });
-//
-//             if (!res.ok) {
-//                 throw new Error(`Failed to download report: ${res.status} ${res.statusText}`);
-//             }
-//
-//             const blob = await res.blob();
-//             const url = window.URL.createObjectURL(blob);
-//             const link = document.createElement("a");
-//             link.href = url;
-//             link.setAttribute("download", `${type}-report.pdf`);
-//             document.body.appendChild(link);
-//             link.click();
-//             link.remove();
-//             URL.revokeObjectURL(url);
-//         } catch (err: unknown) {
-//             const message = err instanceof Error ? err.message : String(err);
-//             console.error("Error downloading report:", message);
-//         }
-//     };
-//
-//     const tabsHeaderRef = useRef<HTMLDivElement | null>(null);
-//     const mainContentRef = useRef<HTMLDivElement | null>(null);
-//     const [headerH, setHeaderH] = useState<number>(64);
-//     const tabContentRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
-//     const ignoreInitialIntersection = useRef<boolean>(true);
-//
-//     useEffect(() => {
-//         const recompute = () => setHeaderH(tabsHeaderRef.current?.offsetHeight ?? 64);
-//         recompute();
-//         const ro = new ResizeObserver(recompute);
-//         if (tabsHeaderRef.current) ro.observe(tabsHeaderRef.current);
-//         return () => ro.disconnect();
-//     }, []);
-//
-//     useEffect(() => {
-//         const t = setTimeout(() => {
-//             ignoreInitialIntersection.current = false;
-//         }, 700);
-//         return () => clearTimeout(t);
-//     }, []);
-//
-//     useEffect(() => {
-//         const root = mainContentRef.current;
-//         if (!root) return;
-//         const onScroll = () => {
-//             if (ignoreInitialIntersection.current)
-//                 ignoreInitialIntersection.current = false;
-//         };
-//         root.addEventListener("scroll", onScroll, { passive: true });
-//         return () => root.removeEventListener("scroll", onScroll);
-//     }, []);
-//
-//     useEffect(() => {
-//         const root = mainContentRef.current;
-//         if (!root) return;
-//
-//         if (viewMode !== "dashboard") {
-//             return;
-//         }
-//
-//         const sections = Object.entries(tabContentRefs.current)
-//             .map(([key, el]) => ({ key, el }))
-//             .filter((s): s is { key: string; el: HTMLDivElement } => !!s.el);
-//
-//         sections.forEach(({ key, el }) => {
-//             (el as HTMLElement).dataset.tabkey = key;
-//         });
-//
-//         const observer = new IntersectionObserver(
-//             (entries) => {
-//                 if (ignoreInitialIntersection.current) return;
-//                 const visible = entries.filter((e) => e.isIntersecting);
-//                 if (visible.length === 0) return;
-//                 const top = visible.sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-//                 const key = (top.target as HTMLElement).dataset.tabkey!;
-//                 if (key) setHighlightedTab(key);
-//             },
-//             {
-//                 root,
-//                 rootMargin: `-${headerH + 8}px 0px -45% 0px`,
-//                 threshold: [0, 0.05, 0.2, 0.5, 0.75, 1],
-//             }
-//         );
-//
-//         sections.forEach(({ el }) => observer.observe(el));
-//         return () => observer.disconnect();
-//     }, [headerH, viewMode, patient]);
-//
-//     useEffect(() => {
-//         const fetchPatientData = async () => {
-//             try {
-//                 setLoading(true);
-//                 const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/patients/${id}`);
-//                 const text = await res.text();
-//                 const data =
-//                     res.headers.get("content-type")?.includes("application/xml") || text.startsWith("<")
-//                         ? await parseXmlResponse(text)
-//                         : JSON.parse(text);
-//
-//                 if (!res.ok) throw new Error((data as any).message || `HTTP error! status: ${res.status}`);
-//                 if ((data as any).success) {
-//                     const fetched = (data as any).data as Patient;
-//                     setPatient(fetched);
-//                     setDemoForm({ ...fetched });
-//                 } else {
-//                     throw new Error((data as any).message || "Failed to fetch patient");
-//                 }
-//
-//                 const fetchHistory = async () => {
-//                     try {
-//                         const res = await fetchWithAuth(
-//                             `${process.env.NEXT_PUBLIC_API_URL}/api/patients/${id}/history`
-//                         );
-//                         const data = await res.json();
-//                         if (res.ok && data.success) {
-//                             setHistoryForm(data.data);
-//                         }
-//                     } catch (e) {
-//                         console.error("Failed to fetch history:", e);
-//                     }
-//                 };
-//
-//                 const fetchBilling = async () => {
-//                     try {
-//                         const res = await fetchWithAuth(
-//                             `${process.env.NEXT_PUBLIC_API_URL}/api/patients/${id}/billing`
-//                         );
-//                         const data = await res.json();
-//                         if (res.ok && data.success) {
-//                             setBilling(data.data);
-//                         }
-//                     } catch (e) {
-//                         console.error("Failed to fetch billing:", e);
-//                     }
-//                 };
-//
-//                 const fetchAppointments = async () => {
-//                     try {
-//                         const res = await fetchWithAuth(
-//                             `${process.env.NEXT_PUBLIC_API_URL}/api/patients/${id}/appointments`
-//                         );
-//                         const data = await res.json();
-//                         if (res.ok && data.success) setAppointments(data.data);
-//                     } catch (e) {
-//                         console.error("Failed to fetch appointments:", e);
-//                     }
-//                 };
-//
-//                 const fetchMedications = async () => {
-//                     try {
-//                         const res = await fetchWithAuth(
-//                             `${process.env.NEXT_PUBLIC_API_URL}/api/patients/${id}/medications`
-//                         );
-//                         const data = await res.json();
-//                         if (res.ok && data.success) setMedications(data.data);
-//                     } catch (e) {
-//                         console.error("Failed to fetch medications:", e);
-//                     }
-//                 };
-//
-//                 const fetchAllergies = async () => {
-//                     try {
-//                         const res = await fetchWithAuth(
-//                             `${process.env.NEXT_PUBLIC_API_URL}/api/patients/${id}/allergies`
-//                         );
-//                         const data = await res.json();
-//                         if (res.ok && data.success) setAllergies(data.data);
-//                     } catch (e) {
-//                         console.error("Failed to fetch allergies:", e);
-//                     }
-//                 };
-//
-//                 await Promise.all([
-//                     fetchAppointments(),
-//                     fetchMedications(),
-//                     fetchAllergies(),
-//                     fetchHistory(),
-//                     fetchBilling(),
-//                 ]);
-//             } catch (err: unknown) {
-//                 console.error("Patient data fetch failed:", err);
-//                 const message = err instanceof Error ? err.message : "An unknown error occurred";
-//                 setError(message);
-//                 if (message.includes("401")) router.push("/login");
-//             } finally {
-//                 setLoading(false);
-//             }
-//         };
-//
-//         if (id) void fetchPatientData(); // ✅ mark promise as intentionally unhandled
-//     }, [id, router]);
-//
-//     async function saveDemographics() {
-//         if (!demoForm || !patient) return;
-//         const payload = { ...patient, ...demoForm };
-//         const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/patients/${patient.id}`, {
-//             method: "PUT",
-//             headers: { "Content-Type": "application/json" },
-//             body: JSON.stringify(payload),
-//         });
-//
-//         const text = await res.text();
-//         const data =
-//             res.headers.get("content-type")?.includes("application/xml") || text.startsWith("<")
-//                 ? await parseXmlResponse(text)
-//                 : JSON.parse(text);
-//
-//         if (!res.ok || !(data as any).success) {
-//             throw new Error((data as any).message || "Failed to save demographics");
-//         }
-//
-//         const updated: Patient = ((data as any).data as Patient) ?? payload;
-//         setPatient(updated);
-//         setEditDemographics(false);
-//     }
-//
-//     async function saveHistory() {
-//         if (!patient) return;
-//         const res = await fetchWithAuth(
-//             `${process.env.NEXT_PUBLIC_API_URL}/api/patients/${patient.id}/history`,
-//             {
-//                 method: "PUT",
-//                 headers: { "Content-Type": "application/json" },
-//                 body: JSON.stringify(historyForm),
-//             }
-//         );
-//         const data = await res.json();
-//         if (!res.ok || !data.success) throw new Error(data.message || "Failed to save history");
-//         setEditHistory(false);
-//         setHistoryForm(data.data);
-//     }
-//
-//     async function saveInsurance() {
-//         if (!patient) throw new Error("No patient loaded");
-//
-//         const payload = { policies: insuranceForm };
-//         const res = await fetchWithAuth(
-//             `${process.env.NEXT_PUBLIC_API_URL}/api/patients/${patient.id}/insurance`,
-//             {
-//                 method: "PUT",
-//                 headers: { "Content-Type": "application/json" },
-//                 body: JSON.stringify(payload),
-//             }
-//         );
-//
-//         const text = await res.text();
-//         const data =
-//             res.headers.get("content-type")?.includes("application/xml") || text.startsWith("<")
-//                 ? await parseXmlResponse(text)
-//                 : JSON.parse(text);
-//
-//         if (!res.ok || !(data as any).success) {
-//             throw new Error((data as any).message || "Failed to save insurance");
-//         }
-//
-//         if ((data as any).data?.policies) {
-//             setInsuranceForm(((data as any).data.policies as unknown) as InsuranceForm);
-//         }
-//     }
-//
-//     const onQuickAction = (key: string) => {
-//         setViewMode(key);
-//         setHighlightedTab(key);
-//     };
-//
-//     const onTabClick = (key: string) => {
-//         if (key !== "report") {
-//             setLastVisitedTab(key);
-//         }
-//         setViewMode(key);
-//         setHighlightedTab(key);
-//         mainContentRef.current?.scrollTo({ top: 0, behavior: "smooth" });
-//     };
-//
-//     const formatDateLocal = (date: string) => {
-//         return date ? new Date(date).toLocaleDateString() : "—";
-//     };
-//
-//     const calculateAgeLocal = (dob: string) => {
-//         if (!dob) return "—";
-//         const ageDifMs = Date.now() - new Date(dob).getTime();
-//         const ageDate = new Date(ageDifMs);
-//         return Math.abs(ageDate.getUTCFullYear() - 1970);
-//     };
-//
-//     const formatDateTimeLocal = (date: string) => {
-//         return date ? new Date(date).toLocaleString() : "—";
-//     };
-//
-//     if (loading) {
-//         return (
-//             <AdminLayout>
-//                 <div className="p-6 text-center">Loading patient data...</div>
-//             </AdminLayout>
-//         );
-//     }
-//
-//     if (error) {
-//         return (
-//             <AdminLayout>
-//                 <div className="p-6 text-center text-red-600">Error: {error}</div>
-//             </AdminLayout>
-//         );
-//     }
-//
-//     if (!patient) {
-//         return (
-//             <AdminLayout>
-//                 <div className="p-6 text-center">
-//                     <p>Patient not found</p>
-//                     <button
-//                         onClick={() => router.push("/patients")}
-//                         className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-//                     >
-//                         Back to Patients List
-//                     </button>
-//                 </div>
-//             </AdminLayout>
-//         );
-//     }
-//
-//     const patientTabs = [
-//         { key: "dashboard", label: "Dashboard" },
-//
-//         { key: "demographics", label: "Demographics" },
-//         { key: "appointments", label: "Appointments" },
-//         { key: "encounters", label: "Encounters" },
-//         { key: "insurance", label: "Insurance" },
-//         { key: "history", label: "History" },
-//         { key: "documents", label: "Documents" },
-//         { key: "report", label: "Report" },
-//         { key: "allergies", label: "Allergies" },
-//         { key: "medications", label: "Medications" },
-//         { key: "labs", label: "Labs" },
-//         { key: "transactions", label: "Transactions" },
-//         { key: "issues", label: "Issues" },
-//         { key: "vitals", label: "Vitals" },
-//         { key: "messages", label: "Messages" },
-//         // ✅ New Encounters tab (placed after Messages as requested)
-//
-//     ];
-//
-//     const renderTabContent = (tabKey: string) => {
-//         switch (tabKey) {
-//             case "dashboard":
-//                 return (
-//                     <div className="space-y-10">
-//                         {/* ✅ Recent & Upcoming in one card */}
-//                         <div
-//                             id="activity"
-//                             ref={(el) => {
-//                                 tabContentRefs.current["activity"] = el;
-//                             }}
-//                             style={{ scrollMarginTop: headerH + 12 }}
-//                             className="bg-white rounded-lg border border-gray-200 shadow-sm p-6"
-//                         >
-//                             <h4 className="text-lg font-semibold text-gray-800 mb-4">Recent & Upcoming</h4>
-//                             <div className="grid md:grid-cols-2 gap-6">
-//                                 {/* Recent Activity */}
-//                                 <div>
-//                                     <h5 className="text-sm font-medium text-blue-700 mb-2">Recent Activity</h5>
-//                                     {appointments.length > 0 ? (
-//                                         <ul className="text-sm space-y-1 text-gray-600 list-disc pl-4">
-//                                             {appointments
-//                                                 .filter((a) => a.status === "Completed")
-//                                                 .slice(-3)
-//                                                 .map((appt) => (
-//                                                     <li key={appt.id}>
-//                                                         {formatDateTimeLocal(appt.date)} — {appt.type}
-//                                                     </li>
-//                                                 ))}
-//                                         </ul>
-//                                     ) : (
-//                                         <p className="text-gray-500 text-sm">No recent activity</p>
-//                                     )}
-//                                 </div>
-//
-//                                 {/* Upcoming Appointments */}
-//                                 <div>
-//                                     <h5 className="text-sm font-medium text-blue-700 mb-2">Upcoming</h5>
-//                                     {appointments.find((a) => a.status === "Scheduled") ? (
-//                                         <p className="text-sm text-gray-600">
-//                                             {formatDateTimeLocal(
-//                                                 appointments.find((a) => a.status === "Scheduled")!.date
-//                                             )}{" "}
-//                                             — with {appointments.find((a) => a.status === "Scheduled")!.provider}
-//                                         </p>
-//                                     ) : (
-//                                         <p className="text-gray-500 text-sm">No upcoming appointments</p>
-//                                     )}
-//                                 </div>
-//                             </div>
-//                         </div>
-//
-//                         {/* ✅ Demographics */}
-//                         <div
-//                             id="demographics"
-//                             ref={(el) => {
-//                                 tabContentRefs.current["demographics"] = el;
-//                             }}
-//                             style={{ scrollMarginTop: headerH + 12 }}
-//                         >
-//                             <DemographicsFlat
-//                                 patient={patient}
-//                                 demoForm={demoForm}
-//                                 setDemoForm={setDemoForm}
-//                                 editDemographics={editDemographics}
-//                                 setEditDemographics={setEditDemographics}
-//                                 saveDemographics={saveDemographics}
-//                                 calculateAgeLocal={calculateAgeLocal}
-//                             />
-//                         </div>
-//
-//                         {/* ✅ Appointments */}
-//                         <div
-//                             id="appointments"
-//                             ref={(el) => {
-//                                 tabContentRefs.current["appointments"] = el;
-//                             }}
-//                             style={{ scrollMarginTop: headerH + 12 }}
-//                         >
-//                             <AppointmentsFlat
-//                                 patientId={Number(patient.id)}
-//                                 formatDateTimeLocal={formatDateTimeLocal}
-//                             />
-//                         </div>
-//
-//                         {/* Encounter /*}
-//
-//
-//                         {/* ✅ Insurance */}
-//                         <div
-//                             id="insurance"
-//                             ref={(el) => {
-//                                 tabContentRefs.current["insurance"] = el;
-//                             }}
-//                             style={{ scrollMarginTop: headerH + 12 }}
-//                         >
-//                             <InsuranceFlat
-//                                 patient={patient}
-//                                 insuranceForm={insuranceForm}
-//                                 setInsuranceForm={setInsuranceForm}
-//                                 editInsurance={editInsurance}
-//                                 setEditInsurance={setEditInsurance}
-//                                 insuranceSubTab={insuranceSubTab}
-//                                 setInsuranceSubTab={setInsuranceSubTab}
-//                                 saveInsurance={saveInsurance}
-//                                 setViewMode={setViewMode}
-//                                 setHighlightedTab={setHighlightedTab}
-//                             />
-//                         </div>
-//
-//                         {/* ✅ History */}
-//                         <div
-//                             id="history"
-//                             ref={(el) => {
-//                                 tabContentRefs.current["history"] = el;
-//                             }}
-//                             style={{ scrollMarginTop: headerH + 12 }}
-//                         >
-//                             <HistoryFlat
-//                                 historyForm={historyForm}
-//                                 setHistoryForm={setHistoryForm}
-//                                 editHistory={editHistory}
-//                                 setEditHistory={setEditHistory}
-//                                 activeHistoryTab={activeHistoryTab}
-//                                 setActiveHistoryTab={setActiveHistoryTab}
-//                                 saveHistory={saveHistory}
-//
-//                             />
-//                         </div>
-//
-//                         {/* ✅ Documents */}
-//                         <div
-//                             id="documents"
-//                             ref={(el) => {
-//                                 tabContentRefs.current["documents"] = el;
-//                             }}
-//                             style={{ scrollMarginTop: headerH + 12 }}
-//                         >
-//                             <DocumentsFlat selectedDoc={selectedDoc} setSelectedDoc={setSelectedDoc} />
-//                         </div>
-//
-//                         {/* ✅ Report */}
-//                         <div
-//                             id="report"
-//                             ref={(el) => {
-//                                 tabContentRefs.current["report"] = el;
-//                             }}
-//                             style={{ scrollMarginTop: headerH + 12 }}
-//                         >
-//                             <ReportFlat
-//                                 useDateRange={useDateRange}
-//                                 setUseDateRange={setUseDateRange}
-//                                 startDate={startDate}
-//                                 setStartDate={setStartDate}
-//                                 endDate={endDate}
-//                                 setEndDate={setEndDate}
-//                                 generateReport={generateReport}
-//                                 downloadReport={downloadReport}
-//                                 reportFilters={reportFilters}
-//                                 toggleFilter={toggleFilter}
-//                                 lastVisitedTab={lastVisitedTab}
-//                                 setActiveTab={setViewMode}
-//                             />
-//                         </div>
-//
-//                         {/* ✅ Allergies */}
-//                         <div
-//                             id="allergies"
-//                             ref={(el) => {
-//                                 tabContentRefs.current["allergies"] = el;
-//                             }}
-//                             style={{ scrollMarginTop: headerH + 12 }}
-//                         >
-//                             <AllergiesFlat allergies={allergies} />
-//                         </div>
-//
-//                         {/* ✅ Medications */}
-//                         <div
-//                             id="medications"
-//                             ref={(el) => {
-//                                 tabContentRefs.current["medications"] = el;
-//                             }}
-//                             style={{ scrollMarginTop: headerH + 12 }}
-//                         >
-//                             <MedicationsFlat medications={medications} />
-//                         </div>
-//
-//                         {/* ✅ Labs */}
-//                         <div
-//                             id="labs"
-//                             ref={(el) => {
-//                                 tabContentRefs.current["labs"] = el;
-//                             }}
-//                             style={{ scrollMarginTop: headerH + 12 }}
-//                         >
-//                             <LabsFlat labsData={[]} />
-//                         </div>
-//
-//                         {/* ✅ Transactions */}
-//                         <div
-//                             id="transactions"
-//                             ref={(el) => {
-//                                 tabContentRefs.current["transactions"] = el;
-//                             }}
-//                             style={{ scrollMarginTop: headerH + 12 }}
-//                         >
-//                             <BillingFlat billing={billing} />
-//                         </div>
-//
-//                         {/* ✅ Issues */}
-//                         <div
-//                             id="issues"
-//                             ref={(el) => {
-//                                 tabContentRefs.current["issues"] = el;
-//                             }}
-//                             style={{ scrollMarginTop: headerH + 12 }}
-//                             className="bg-white rounded-lg border border-gray-200 shadow-sm p-6"
-//                         >
-//                             <h4 className="text-sm font-semibold text-gray-800 mb-2">Issues</h4>
-//                             <p className="text-sm text-gray-500">No issues recorded</p>
-//                         </div>
-//
-//                         {/* ✅ Vitals */}
-//                         <div
-//                             id="vitals"
-//                             ref={(el) => {
-//                                 tabContentRefs.current["vitals"] = el;
-//                             }}
-//                             style={{ scrollMarginTop: headerH + 12 }}
-//                             className="bg-white rounded-lg border border-gray-200 shadow-sm p-6"
-//                         >
-//                             <h4 className="text-sm font-semibold text-gray-800 mb-2">Vitals</h4>
-//                             <p className="text-sm text-gray-500">No vitals recorded</p>
-//                         </div>
-//
-//                         {/* ✅ Messages */}
-//                         <div
-//                             id="messages"
-//                             ref={(el) => {
-//                                 tabContentRefs.current["messages"] = el;
-//                             }}
-//                             style={{ scrollMarginTop: headerH + 12 }}
-//                             className="bg-white rounded-lg border border-gray-200 shadow-sm p-6"
-//                         >
-//                             <h4 className="text-sm font-semibold text-gray-800 mb-2">Messages</h4>
-//                             <p className="text-sm text-gray-500">Patient communications</p>
-//                         </div>
-//                     </div>
-//                 );
-//
-//             case "encounters":
-//                 return (
-//                     <div className="min-w-0">
-//                         <EncounterTableExpandable patientId={Number(patient.id)} />
-//                     </div>
-//                 );
-//
-//             default:
-//                 return (
-//                     <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-//                         <div className="text-center py-8">
-//                             <div className="mx-auto w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-3">
-//                                 <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-//                                     <path
-//                                         strokeLinecap="round"
-//                                         strokeLinejoin="round"
-//                                         strokeWidth="2"
-//                                         d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-//                                     />
-//                                 </svg>
-//                             </div>
-//                             <h5 className="text-gray-700 font-medium">No data available</h5>
-//                             <p className="text-gray-500 text-sm mt-1">This section is currently empty</p>
-//                         </div>
-//                     </div>
-//                 );
-//         }
-//     };
-//
-//     return (
-//         <AdminLayout>
-//             <style jsx global>{`
-//         html,
-//         body {
-//           height: 100%;
-//           margin: 0;
-//           padding: 0;
-//           overflow-y: auto;
-//           overflow-x: hidden;
-//         }
-//       `}</style>
-//             <style jsx>{`
-//         .patientSummary *,
-//         .quickActions * {
-//           overflow: visible !important;
-//           height: auto !important;
-//           max-height: none !important;
-//           -ms-overflow-style: none;
-//           scrollbar-width: none;
-//         }
-//
-//         .patientSummary *::-webkit-scrollbar,
-//         .quickActions *::-webkit-scrollbar {
-//           display: none;
-//         }
-//       `}</style>
-//
-//             {/* Light gray page background */}
-//             <div className="pageScroll bg-gray-50">
-//                 <div
-//                     ref={tabsHeaderRef}
-//                     className="z-50 border-b border-gray-200 bg-white/95 backdrop-blur px-3 py-1.5"
-//                 >
-//                     <div className="flex items-center justify-between gap-3 min-w-0">
-//                         <div className="flex items-center gap-3 min-w-0">
-//                             <Link
-//                                 href="/patients"
-//                                 className="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 border border-gray-300 text-xs font-medium text-gray-700 flex items-center"
-//                             >
-//                                 <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-//                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-//                                 </svg>
-//                                 Patients
-//                             </Link>
-//                             <div className="flex items-center min-w-0">
-//                                 <span className="text-xs text-gray-500 mr-1 shrink-0">Patient:</span>
-//                                 <div className="px-2 py-0.5 rounded bg-blue-50 text-xs font-medium text-blue-800 truncate">
-//                                     {patient.firstName} {patient.lastName}
-//                                 </div>
-//                                 {patient.mrn && (
-//                                     <div className="ml-2 px-1.5 py-0.5 rounded bg-gray-100 text-[10px] text-gray-600 shrink-0">
-//                                         MRN: {patient.mrn}
-//                                     </div>
-//                                 )}
-//                             </div>
-//                         </div>
-//                         {/* Removed old "New Encounter" form button — Encounters are now managed in the Encounters tab */}
-//                     </div>
-//                     <div className="mt-1.5">
-//                         <div className="flex flex-wrap gap-2">
-//                             {patientTabs.map((tab) => (
-//                                 <button
-//                                     key={tab.key}
-//                                     className={`h-8 inline-flex items-center px-3 rounded-md text-xs font-medium whitespace-nowrap leading-none transition-colors ${
-//                                         highlightedTab === tab.key
-//                                             ? "bg-blue-600 text-white shadow"
-//                                             : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-200"
-//                                     }`}
-//                                     onClick={() => onTabClick(tab.key)}
-//                                 >
-//                                     {tab.label}
-//                                 </button>
-//                             ))}
-//                         </div>
-//                     </div>
-//                 </div>
-//
-//                 <div className="w-full max-w-screen-2xl mx-auto p-4">
-//                     <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,17fr)_minmax(0,3fr)] gap-4">
-//                         <main
-//                             ref={mainContentRef}
-//                             className="min-w-0 overflow-y-auto hide-scrollbar"
-//                             style={{ height: `calc(100vh - ${headerH}px)` }}
-//                         >
-//                             {viewMode === "dashboard" ? (
-//                                 <div
-//                                     id="dashboard"
-//                                     ref={(el) => void (tabContentRefs.current.dashboard = el)}
-//                                     style={{ scrollMarginTop: headerH + 12 }}
-//                                 >
-//                                     <h2 className="text-lg font-semibold mb-3"></h2>
-//                                     <div className="min-w-0">{renderTabContent("dashboard")}</div>
-//                                 </div>
-//                             ) : (
-//                                 <div
-//                                     id={viewMode}
-//                                     ref={(el) => {
-//                                         tabContentRefs.current[viewMode] = el;
-//                                     }}
-//                                     style={{ scrollMarginTop: headerH + 12 }}
-//                                     className="min-w-0"
-//                                 >
-//                                     <div className="min-w-0">{renderTabContent(viewMode)}</div>
-//                                 </div>
-//                             )}
-//                         </main>
-//
-//                         <aside className="min-w-0 hide-scrollbar overflow-y-auto">
-//                             <div
-//                                 style={{
-//                                     position: "sticky",
-//                                     top: headerH + 12,
-//                                     height: `calc(100vh - ${headerH + 24}px)`,
-//                                 }}
-//                                 className="flex flex-col gap-4"
-//                             >
-//                                 <div className="flex-[0_0_30%] bg-gradient-to-br from-indigo-50 to-white rounded-2xl shadow-md p-4 flex flex-col">
-//                                     <h3 className="text-sm font-semibold text-gray-800 mb-2 tracking-wide">
-//                                         Patient Summary
-//                                     </h3>
-//                                     <div className="space-y-1 text-sm flex-1">
-//                                         <div className="font-semibold text-lg text-gray-900 truncate">
-//                                             {patient.firstName} {patient.lastName}
-//                                         </div>
-//                                         <div className="text-gray-500">
-//                                             {formatDateLocal(patient.dateOfBirth)} · Age {calculateAgeLocal(patient.dateOfBirth)}
-//                                         </div>
-//                                         <div className="text-gray-700">{patient.phoneNumber || "—"}</div>
-//                                         <div className="text-gray-400 text-xs italic">
-//                                             {appointments.length > 0
-//                                                 ? `Last visit: ${formatDateLocal(appointments[appointments.length - 1].date)}`
-//                                                 : "No visits recorded"}
-//                                         </div>
-//                                     </div>
-//                                 </div>
-//                                 <div className="flex-[0_0_25%] bg-white rounded-2xl shadow-md p-4 flex flex-col">
-//                                     <h3 className="text-sm font-semibold text-gray-800 mb-2 tracking-wide">
-//                                         Quick Actions
-//                                     </h3>
-//                                     <div className="grid grid-cols-1 gap-2 flex-1">
-//                                         {[
-//                                             { key: "appointments", label: "Appointments", color: "blue" },
-//                                             { key: "billing", label: "Billing", color: "yellow" },
-//                                             { key: "demographics", label: "Demographics", color: "purple" },
-//                                             { key: "messages", label: "Messages", color: "green" },
-//                                             { key: "encounters", label: "Encounters", color: "blue" },
-//                                         ].map(({ key, label, color }) => {
-//                                             const colors: Record<string, { active: string; inactive: string }> = {
-//                                                 blue: {
-//                                                     active: "bg-blue-600 text-white",
-//                                                     inactive: "bg-blue-50 text-blue-700 hover:bg-blue-100",
-//                                                 },
-//                                                 yellow: {
-//                                                     active: "bg-yellow-500 text-white",
-//                                                     inactive: "bg-yellow-50 text-yellow-700 hover:bg-yellow-100",
-//                                                 },
-//                                                 purple: {
-//                                                     active: "bg-purple-600 text-white",
-//                                                     inactive: "bg-purple-50 text-purple-700 hover:bg-purple-100",
-//                                                 },
-//                                                 green: {
-//                                                     active: "bg-green-600 text-white",
-//                                                     inactive: "bg-green-50 text-green-700 hover:bg-green-100",
-//                                                 },
-//                                             };
-//                                             const base =
-//                                                 "w-full px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200 shadow-sm";
-//                                             const isActive = highlightedTab === key;
-//                                             return (
-//                                                 <button
-//                                                     key={key}
-//                                                     onClick={() => onQuickAction(key)}
-//                                                     className={`${base} ${isActive ? colors[color].active : colors[color].inactive}`}
-//                                                 >
-//                                                     {label}
-//                                                 </button>
-//                                             );
-//                                         })}
-//                                     </div>
-//                                 </div>
-//                             </div>
-//                         </aside>
-//                     </div>
-//                 </div>
-//             </div>
-//         </AdminLayout>
-//     );
-// }
-
-
-
 "use client";
 
+import AllergiesSummary from "@/components/patients/AllergiesSummary";
+import MedicalProblemsSummary from "@/components/patients/MedicalProblemsSummary";
+import InsuranceSummary from "@/components/patients/InsuranceSummary";
 import { useEffect, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { fetchWithAuth } from "@/utils/fetchWithAuth";
 import AdminLayout from "@/app/(admin)/layout";
 
 import Link from "next/link";
 import DemographicsFlat from "@/components/DemographicsFlat";
 import HistoryFlat from "@/components/HistoryFlat";
-import InsuranceFlat from "@/components/InsuranceFlat";
 import {
     AppointmentsFlat,
     BillingFlat,
     MedicationsFlat,
-    ReportFlat,
     AllergiesFlat,
+    InsuranceFlat,
+    ReportFlat,
     DocumentsFlat,
     LabsFlat,
+    IssuesFlat,
+    MedicalProblemsFlat,
+    ImmunizationsFlat,
+    HealthcareServicesFlat  // ✅ add this
 } from "@/components/PatientComponents";
 import EncounterTableExpandable from "@/components/encounter/EncounterTableExpandable";
 
-type InsuranceLevel = "primary" | "secondary" | "tertiary";
-
-interface InsurancePolicy {
-    providerId: number | null;
-    planName: string;
-    effectiveDate: string;
-    effectiveDateEnd: string;
-    policyNumber: string;
-    groupNumber: string;
-
-    subscriberEmployer: string;
-    seAddress1: string;
-    seAddress2: string;
-    seCity: string;
-    seState: string;
-    seZip: string;
-    seCountry: string;
-
-    relationship: string;
-    subscriberFirstName: string;
-    subscriberMiddleName: string;
-    subscriberLastName: string;
-    subscriberDob: string;
-    sex: "Male" | "Female" | "Other" | "";
-    ssn: string;
-    subAddress1: string;
-    subAddress2: string;
-    subCity: string;
-    subState: string;
-    subZip: string;
-    subCountry: string;
-    subscriberPhone: string;
-
-    copay: string;
-    acceptAssignment: "YES" | "NO";
-    secondaryMedicareType: "N/A" | "Part A" | "Part B";
-}
-
-type InsuranceForm = Record<InsuranceLevel, InsurancePolicy>;
 
 interface Patient {
     id: string;
@@ -1217,49 +63,27 @@ interface Patient {
     [key: string]: string | number | boolean | string[] | undefined;
 }
 
-type ExamStatus = "N/A" | "Normal" | "Abnormal" | "";
+type InsuranceLevel = "primary" | "secondary" | "tertiary";
 
-interface HistoryForm {
-    general: {
-        riskFactors: Record<string, boolean | string>;
-        examsTests: Record<string, { status: ExamStatus; notes: string }>;
-    };
-    family: {
-        father: string;
-        mother: string;
-        siblings: string;
-        spouse: string;
-        offspring: string;
-        diagFather: string;
-        diagMother: string;
-        diagSiblings: string;
-        diagSpouse: string;
-        diagOffspring: string;
-    };
-    relatives: {
-        cancer: string;
-        diabetes: string;
-        heartProblems: string;
-        epilepsy: string;
-        suicide: string;
-        tuberculosis: string;
-        hbp: string;
-        stroke: string;
-        mentalIllness: string;
-    };
-    lifestyle: {
-        tobacco: { value: string; status: string };
-        coffee: { value: string; status: string };
-        alcohol: { value: string; status: string };
-        drugs: { value: string; status: string };
-        counseling: { value: string; status: string };
-        exercise: { value: string; status: string };
-        hazardous: { value: string; status: string };
-        sleep: string;
-        seatbelt: string;
-    };
-    other: { nameValue1: string; nameValue2: string; additionalHistory: string };
+interface InsurancePolicy {
+    provider?: string;
+    planName?: string;
+    effectiveStart?: string;
+    effectiveEnd?: string;
+    policyNumber?: string;
+    groupNumber?: string;
+    subscriberEmployer?: string;
+    subscriber?: string;
+    subscriberDob?: string;
+    subscriberSex?: "Unassigned" | "Male" | "Female";
+    ssn?: string;
+    subscriberAddress?: string;
+    copay?: string;
+    acceptsAssignment?: "Yes" | "No";
+    secondaryMedicareType?: string;
 }
+
+type InsuranceForm = Record<InsuranceLevel, InsurancePolicy>;
 
 interface EncounterFormData {
     visitCategory: string;
@@ -1274,15 +98,6 @@ interface EncounterFormData {
     dischargeDisposition: string;
     reasonForVisit: string;
     issues: string[];
-}
-
-interface Allergy {
-    id: string;
-    substance: string;
-    reaction?: string;
-    severity?: string;
-    status: "Active" | "Inactive" | string;
-    notes?: string;
 }
 
 interface EncounterFormProps {
@@ -1315,6 +130,198 @@ interface XmlResponse {
     [key: string]: string | boolean | Record<string, string> | undefined;
 }
 
+// Add this component right before the PatientDashboardPage function
+interface ActivityItem {
+    id: string;
+    type: 'appointment' | 'medication' | 'lab' | 'document' | 'message' | 'billing' | 'vital' | 'issue';
+    title: string;
+    description: string;
+    timestamp: string;
+    status: 'completed' | 'pending' | 'scheduled' | 'cancelled' | 'new' | 'updated';
+    priority?: 'high' | 'medium' | 'low';
+    metadata?: Record<string, any>;
+}
+
+interface RecentActivityProps {
+    patientId: number;
+    limit?: number;
+}
+
+function RecentActivityFeed({ patientId, limit = 10 }: RecentActivityProps) {
+    const [activities, setActivities] = useState<ActivityItem[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        const fetchRecentActivity = async () => {
+            try {
+                setLoading(true);
+
+                // Fetch data from multiple endpoints in parallel (we only process appointments, medications and labs here)
+                const [appointmentsRes, medicationsRes, labsRes] = await Promise.allSettled([
+                    fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/patients/${patientId}/appointments?limit=5`),
+                    fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/patients/${patientId}/medications?limit=5`),
+                    fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/patients/${patientId}/labs?limit=5`),
+                ]);
+
+                const allActivities: ActivityItem[] = [];
+
+                // Process appointments
+                if (appointmentsRes.status === 'fulfilled' && appointmentsRes.value.ok) {
+                    const appointments = await appointmentsRes.value.json();
+                    appointments.data?.content?.forEach((appt: Record<string, any>) => {
+                        allActivities.push({
+                            id: `appt-${appt.id}`,
+                            type: 'appointment',
+                            title: `Appointment: ${appt.visitType || 'Visit'}`,
+                            description: `With Provider at ${appt.appointmentStartTime}`,
+                            timestamp: appt.appointmentStartDate,
+                            status: String(appt.status ?? 'new') as ActivityItem['status'],
+                            metadata: { providerId: appt.providerId }
+                        });
+                    });
+                }
+
+                // Process medications
+                if (medicationsRes.status === 'fulfilled' && medicationsRes.value.ok) {
+                    const medications = await medicationsRes.value.json();
+                    medications.data?.forEach((med: Record<string, any>) => {
+                        allActivities.push({
+                            id: `med-${med.id}`,
+                            type: 'medication',
+                            title: `Medication: ${med.name}`,
+                            description: `${med.dosage} ${med.frequency}`,
+                            timestamp: med.startDate || med.createdDate,
+                            status: String(med.status ?? 'new') as ActivityItem['status'],
+                            metadata: { instructions: med.instructions }
+                        });
+                    });
+                }
+
+                // Process lab results
+                if (labsRes.status === 'fulfilled' && labsRes.value.ok) {
+                    const labs = await labsRes.value.json();
+                    labs.data?.forEach((lab: Record<string, any>) => {
+                        allActivities.push({
+                            id: `lab-${lab.id}`,
+                            type: 'lab',
+                            title: `Lab Result: ${lab.testName}`,
+                            description: `Result: ${lab.result}, Status: ${lab.status}`,
+                            timestamp: lab.orderDate || lab.resultDate,
+                            status: lab.status?.toLowerCase() === 'completed' ? 'completed' : 'pending',
+                            priority: lab.result === 'Abnormal' ? 'high' : 'medium'
+                        });
+                    });
+                }
+
+                // Sort by timestamp and limit
+                const sortedActivities = allActivities
+                    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+                    .slice(0, limit);
+
+                setActivities(sortedActivities);
+
+            } catch (err) {
+                console.error('Failed to fetch recent activity:', err);
+                setError('Failed to load recent activity');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        if (patientId) {
+            fetchRecentActivity();
+        }
+    }, [patientId, limit]);
+
+    const getActivityIcon = (type: string) => {
+        const icons = {
+            appointment: '📅',
+            medication: '💊',
+            lab: '🧪',
+            document: '📄',
+            message: '✉️',
+            billing: '💰',
+            vital: '❤️',
+            issue: '⚠️'
+        };
+        return icons[type as keyof typeof icons] || '📋';
+    };
+
+    const getStatusColor = (status: string) => {
+        const colors = {
+            completed: 'text-green-600 bg-green-100',
+            scheduled: 'text-blue-600 bg-blue-100',
+            pending: 'text-yellow-600 bg-yellow-100',
+            cancelled: 'text-red-600 bg-red-100',
+            new: 'text-purple-600 bg-purple-100',
+            updated: 'text-indigo-600 bg-indigo-100'
+        };
+        return colors[status as keyof typeof colors] || 'text-gray-600 bg-gray-100';
+    };
+
+    if (loading) {
+        return (
+            <div className="space-y-3">
+                {[...Array(3)].map((_, i) => (
+                    <div key={i} className="animate-pulse flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-gray-200 rounded-full"></div>
+                        <div className="flex-1 space-y-2">
+                            <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                            <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        );
+    }
+
+    if (error) {
+        return <p className="text-red-600 text-sm">{error}</p>;
+    }
+
+    return (
+        <div className="space-y-2">
+            {activities.length === 0 ? (
+                <p className="text-gray-500 text-sm">No recent activity</p>
+            ) : (
+                activities.map((activity) => (
+                    <div key={activity.id} className="flex items-start space-x-2 p-2 rounded-lg hover:bg-gray-50">
+                        <div className="text-xl mt-1">{getActivityIcon(activity.type)}</div>
+
+                        <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between">
+                                <h6 className="text-xs font-medium text-gray-900 truncate">
+                                    {activity.title}
+                                </h6>
+                                <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${getStatusColor(activity.status)}`}>
+                  {activity.status}
+                </span>
+                            </div>
+
+                            <p className="text-xs text-gray-600 mt-0.5 truncate">
+                                {activity.description}
+                            </p>
+
+                            <div className="flex items-center justify-between mt-1">
+                <span className="text-[10px] text-gray-500">
+                  {new Date(activity.timestamp).toLocaleDateString()}
+                </span>
+
+                                {activity.priority === 'high' && (
+                                    <span className="text-[10px] text-red-600 bg-red-100 px-1.5 py-0.5 rounded">
+                    ⚠️ High
+                  </span>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                ))
+            )}
+        </div>
+    );
+}
+
 function parseXmlResponse(xmlText: string): Promise<XmlResponse> {
     return new Promise((resolve, reject) => {
         try {
@@ -1338,6 +345,7 @@ function parseXmlResponse(xmlText: string): Promise<XmlResponse> {
             if ("success" in response && typeof response.success === "string") {
                 response.success = response.success === "true";
             }
+
             resolve(response);
         } catch {
             reject(new Error("Failed to parse XML response"));
@@ -1348,10 +356,11 @@ function parseXmlResponse(xmlText: string): Promise<XmlResponse> {
 export default function PatientDashboardPage() {
     const params = useParams();
     const router = useRouter();
+    const search = useSearchParams();
     const id = params?.id as string;
 
-    const [historyForm, setHistoryForm] = useState<HistoryForm>({
-        general: { riskFactors: {}, examsTests: {} },
+    const [historyForm, setHistoryForm] = useState({
+        general: { riskFactors: "", examsTests: "" },
         family: {
             father: "",
             mother: "",
@@ -1376,20 +385,20 @@ export default function PatientDashboardPage() {
             mentalIllness: "",
         },
         lifestyle: {
-            tobacco: { value: "", status: "" },
-            coffee: { value: "", status: "" },
-            alcohol: { value: "", status: "" },
-            drugs: { value: "", status: "" },
-            counseling: { value: "", status: "" },
-            exercise: { value: "", status: "" },
-            hazardous: { value: "", status: "" },
+            tobacco: "",
+            coffee: "",
+            alcohol: "",
+            drugs: "",
+            counseling: "",
+            exercise: "",
+            hazardous: "",
             sleep: "",
             seatbelt: "",
         },
-        other: { nameValue1: "", nameValue2: "", additionalHistory: "" },
+        other: { nameValue: "", additionalHistory: "" },
     });
 
-    const [activeHistoryTab, setActiveHistoryTab] = useState<keyof HistoryForm>("general");
+    const [activeHistoryTab, setActiveHistoryTab] = useState<keyof typeof historyForm>("general");
     const [editHistory, setEditHistory] = useState(false);
     const [lastVisitedTab, setLastVisitedTab] = useState("dashboard");
     const [billing, setBilling] = useState<{
@@ -1402,7 +411,7 @@ export default function PatientDashboardPage() {
     const [error, setError] = useState<string | null>(null);
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [medications, setMedications] = useState<Medication[]>([]);
-    const [allergies, setAllergies] = useState<Allergy[]>([]);
+    const [allergies, setAllergies] = useState<any[]>([]);
     const [viewMode, setViewMode] = useState<string>("dashboard");
     const [highlightedTab, setHighlightedTab] = useState<string>("dashboard");
     const [selectedDoc, setSelectedDoc] = useState<string | null>(null);
@@ -1425,43 +434,16 @@ export default function PatientDashboardPage() {
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
     const [editInsurance, setEditInsurance] = useState(false);
-    const [insuranceSubTab, setInsuranceSubTab] = useState<InsuranceLevel>("primary");
+    const [insuranceSubTab, setInsuranceSubTab] =
+        useState<"primary" | "secondary" | "tertiary">("primary");
     const [editDemographics, setEditDemographics] = useState(false);
     const [demoForm, setDemoForm] = useState<Partial<Patient>>({});
     const emptyPolicy: InsurancePolicy = {
-        providerId: null,
-        planName: "",
-        effectiveDate: "",
-        effectiveDateEnd: "",
-        policyNumber: "",
-        groupNumber: "",
-        subscriberEmployer: "",
-        seAddress1: "",
-        seAddress2: "",
-        seCity: "",
-        seState: "",
-        seZip: "",
-        seCountry: "",
-        relationship: "",
-        subscriberFirstName: "",
-        subscriberMiddleName: "",
-        subscriberLastName: "",
-        subscriberDob: "",
-        sex: "",
-        ssn: "",
-        subAddress1: "",
-        subAddress2: "",
-        subCity: "",
-        subState: "",
-        subZip: "",
-        subCountry: "",
-        subscriberPhone: "",
-        copay: "",
-        acceptAssignment: "YES",
-        secondaryMedicareType: "N/A",
+        acceptsAssignment: "Yes",
+        subscriberSex: "Unassigned",
     };
     const [insuranceForm, setInsuranceForm] = useState<InsuranceForm>({
-        primary: { ...emptyPolicy, providerId: patient?.insuranceProvider ? 1 : null },
+        primary: { ...emptyPolicy, provider: undefined },
         secondary: { ...emptyPolicy },
         tertiary: { ...emptyPolicy },
     });
@@ -1486,12 +468,13 @@ export default function PatientDashboardPage() {
             prev.includes(filter) ? prev.filter((f) => f !== filter) : [...prev, filter]
         );
     };
+
     const generateReport = async (type: string, filters?: string[]) => {
         try {
             const res = await fetchWithAuth(`/api/reports/generate?type=${type}`, {
                 method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({filters}),
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ filters }),
             });
             const data = await res.json();
             console.log("Report generated:", data);
@@ -1504,8 +487,8 @@ export default function PatientDashboardPage() {
         try {
             const res = await fetchWithAuth(`/api/reports/download?type=${type}`, {
                 method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({filters}),
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ filters }),
             });
 
             if (!res.ok) {
@@ -1548,29 +531,53 @@ export default function PatientDashboardPage() {
         return () => clearTimeout(t);
     }, []);
 
+    // React to ?tab=... and optional #hash (e.g., ?tab=allergies#allergies)
     useEffect(() => {
-        const root = mainContentRef.current;
-        if (!root) return;
-        const onScroll = () => {
-            if (ignoreInitialIntersection.current) ignoreInitialIntersection.current = false;
-        };
-        root.addEventListener("scroll", onScroll, {passive: true});
-        return () => root.removeEventListener("scroll", onScroll);
-    }, []);
+        const qpTab = search?.get("tab");
+        if (!qpTab) return;
+
+        const valid = new Set([
+            "dashboard",
+            "demographics",
+            "appointments",
+            "insurance",
+            "history",
+            "documents",
+            "report",
+            "allergies",
+            "medicalproblems",
+            "medications",
+            "labs",
+            "transactions",
+            "issues",
+            "vitals",
+            "messages",
+        ]);
+
+        if (valid.has(qpTab) && viewMode !== qpTab) {
+            setViewMode(qpTab);
+            setHighlightedTab(qpTab);
+            setLastVisitedTab(qpTab);
+            // after the tab renders, scroll to hash if present
+            setTimeout(() => {
+                if (typeof window !== "undefined" && window.location.hash) {
+                    const el = document.querySelector(window.location.hash);
+                    el?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }
+            }, 0);
+        }
+    }, [search, viewMode]);
 
     useEffect(() => {
-        const root = mainContentRef.current;
-        if (!root) return;
-
         if (viewMode !== "dashboard") {
             return;
         }
 
         const sections = Object.entries(tabContentRefs.current)
-            .map(([key, el]) => ({key, el}))
+            .map(([key, el]) => ({ key, el }))
             .filter((s): s is { key: string; el: HTMLDivElement } => !!s.el);
 
-        sections.forEach(({key, el}) => {
+        sections.forEach(({ key, el }) => {
             (el as HTMLElement).dataset.tabkey = key;
         });
 
@@ -1584,13 +591,13 @@ export default function PatientDashboardPage() {
                 if (key) setHighlightedTab(key);
             },
             {
-                root,
+                root: null,
                 rootMargin: `-${headerH + 8}px 0px -45% 0px`,
                 threshold: [0, 0.05, 0.2, 0.5, 0.75, 1],
             }
         );
 
-        sections.forEach(({el}) => observer.observe(el));
+        sections.forEach(({ el }) => observer.observe(el));
         return () => observer.disconnect();
     }, [headerH, viewMode, patient, showEncounterForm]);
 
@@ -1598,26 +605,29 @@ export default function PatientDashboardPage() {
         const fetchPatientData = async () => {
             try {
                 setLoading(true);
-                const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/patients/${id}`);
+                const res = await fetchWithAuth(
+                    `${process.env.NEXT_PUBLIC_API_URL}/api/patients/${id}`
+                );
                 const text = await res.text();
                 const data =
                     res.headers.get("content-type")?.includes("application/xml") || text.startsWith("<")
                         ? await parseXmlResponse(text)
                         : JSON.parse(text);
 
-                        
                 if (!res.ok) throw new Error(data.message || `HTTP error! status: ${res.status}`);
                 if (data.success) {
                     const fetched = data.data as Patient;
                     setPatient(fetched);
-                    setDemoForm({...fetched});
+                    setDemoForm({ ...fetched });
                 } else {
                     throw new Error(data.message || "Failed to fetch patient");
                 }
 
                 const fetchHistory = async () => {
                     try {
-                        const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/patients/${id}/history`);
+                        const res = await fetchWithAuth(
+                            `${process.env.NEXT_PUBLIC_API_URL}/api/patients/${id}/history`
+                        );
                         const data = await res.json();
                         if (res.ok && data.success) {
                             setHistoryForm(data.data);
@@ -1629,7 +639,9 @@ export default function PatientDashboardPage() {
 
                 const fetchBilling = async () => {
                     try {
-                        const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/patients/${id}/billing`);
+                        const res = await fetchWithAuth(
+                            `${process.env.NEXT_PUBLIC_API_URL}/api/patients/${id}/billing`
+                        );
                         const data = await res.json();
                         if (res.ok && data.success) {
                             setBilling(data.data);
@@ -1641,7 +653,9 @@ export default function PatientDashboardPage() {
 
                 const fetchAppointments = async () => {
                     try {
-                        const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/patients/${id}/appointments`);
+                        const res = await fetchWithAuth(
+                            `${process.env.NEXT_PUBLIC_API_URL}/api/patients/${id}/appointments`
+                        );
                         const data = await res.json();
                         if (res.ok && data.success) setAppointments(data.data);
                     } catch (e) {
@@ -1651,7 +665,9 @@ export default function PatientDashboardPage() {
 
                 const fetchMedications = async () => {
                     try {
-                        const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/patients/${id}/medications`);
+                        const res = await fetchWithAuth(
+                            `${process.env.NEXT_PUBLIC_API_URL}/api/patients/${id}/medications`
+                        );
                         const data = await res.json();
                         if (res.ok && data.success) setMedications(data.data);
                     } catch (e) {
@@ -1661,7 +677,9 @@ export default function PatientDashboardPage() {
 
                 const fetchAllergies = async () => {
                     try {
-                        const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/patients/${id}/allergies`);
+                        const res = await fetchWithAuth(
+                            `${process.env.NEXT_PUBLIC_API_URL}/api/patients/${id}/allergies`
+                        );
                         const data = await res.json();
                         if (res.ok && data.success) setAllergies(data.data);
                     } catch (e) {
@@ -1676,6 +694,9 @@ export default function PatientDashboardPage() {
                     fetchHistory(),
                     fetchBilling(),
                 ]);
+                // reference state variables so linters don't flag them as "assigned but never used"
+                void medications;
+                void allergies;
             } catch (err: unknown) {
                 console.error("Patient data fetch failed:", err);
                 const message = err instanceof Error ? err.message : "An unknown error occurred";
@@ -1686,17 +707,20 @@ export default function PatientDashboardPage() {
             }
         };
 
-        if (id) void fetchPatientData(); // ✅ mark promise as intentionally unhandled
+        if (id) void fetchPatientData();
     }, [id, router]);
 
     async function saveDemographics() {
         if (!demoForm || !patient) return;
-        const payload = {...patient, ...demoForm};
-        const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/patients/${patient.id}`, {
-            method: "PUT",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify(payload),
-        });
+        const payload = { ...patient, ...demoForm };
+        const res = await fetchWithAuth(
+            `${process.env.NEXT_PUBLIC_API_URL}/api/patients/${patient.id}`,
+            {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            }
+        );
 
         const text = await res.text();
         const data =
@@ -1715,44 +739,47 @@ export default function PatientDashboardPage() {
 
     async function saveHistory() {
         if (!patient) return;
-        const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/patients/${patient.id}/history`, {
-            method: "PUT",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify(historyForm),
-        });
+        const res = await fetchWithAuth(
+            `${process.env.NEXT_PUBLIC_API_URL}/api/patients/${patient.id}/history`,
+            {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(historyForm),
+            }
+        );
         const data = await res.json();
         if (!res.ok || !data.success) throw new Error(data.message || "Failed to save history");
         setEditHistory(false);
         setHistoryForm(data.data);
     }
 
-    // async function saveInsurance() {
-    //     if (!patient) throw new Error("No patient loaded");
-    //
-    //     const payload = {policies: insuranceForm};
-    //     const res = await fetchWithAuth(
-    //         `${process.env.NEXT_PUBLIC_API_URL}/api/patients/${patient.id}/insurance`,
-    //         {
-    //             method: "PUT",
-    //             headers: {"Content-Type": "application/json"},
-    //             body: JSON.stringify(payload),
-    //         }
-    //     );
-    //
-    //     const text = await res.text();
-    //     const data =
-    //         res.headers.get("content-type")?.includes("application/xml") || text.startsWith("<")
-    //             ? await parseXmlResponse(text)
-    //             : JSON.parse(text);
-    //
-    //     if (!res.ok || !data.success) {
-    //         throw new Error(data.message || "Failed to save insurance");
-    //     }
-    //
-    //     if (data.data?.policies) {
-    //         setInsuranceForm(data.data.policies as InsuranceForm);
-    //     }
-    // }
+    async function saveInsurance() {
+        if (!patient) throw new Error("No patient loaded");
+
+        const payload = { policies: insuranceForm };
+        const res = await fetchWithAuth(
+            `${process.env.NEXT_PUBLIC_API_URL}/api/patients/${patient.id}/insurance`,
+            {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            }
+        );
+
+        const text = await res.text();
+        const data =
+            res.headers.get("content-type")?.includes("application/xml") || text.startsWith("<")
+                ? await parseXmlResponse(text)
+                : JSON.parse(text);
+
+        if (!res.ok || !data.success) {
+            throw new Error(data.message || "Failed to save insurance");
+        }
+
+        if (data.data?.policies) {
+            setInsuranceForm(data.data.policies as InsuranceForm);
+        }
+    }
 
     async function saveEncounter() {
         if (!patient) throw new Error("No patient loaded");
@@ -1760,7 +787,7 @@ export default function PatientDashboardPage() {
             `${process.env.NEXT_PUBLIC_API_URL}/api/patients/${patient.id}/encounters`,
             {
                 method: "POST",
-                headers: {"Content-Type": "application/json"},
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(encounterForm),
             }
         );
@@ -1791,19 +818,14 @@ export default function PatientDashboardPage() {
         });
     }
 
-    // const handleOpenEncounter = () => {
-    //     setShowEncounterForm(true);
-    //     setHighlightedTab("appointments");
-    //     setViewMode("appointments");
-    // };
+    const handleOpenEncounter = () => {
+        setShowEncounterForm(true);
+        setHighlightedTab("appointments");
+        setViewMode("appointments");
+    };
 
     const handleCloseEncounter = () => {
         setShowEncounterForm(false);
-    };
-
-    const onQuickAction = (key: string) => {
-        setViewMode(key);
-        setHighlightedTab(key);
     };
 
     const onTabClick = (key: string) => {
@@ -1812,7 +834,7 @@ export default function PatientDashboardPage() {
         }
         setViewMode(key);
         setHighlightedTab(key);
-        mainContentRef.current?.scrollTo({top: 0, behavior: "smooth"});
+        window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
     const formatDateLocal = (date: string) => {
@@ -1829,12 +851,6 @@ export default function PatientDashboardPage() {
     const formatDateTimeLocal = (date: string) => {
         return date ? new Date(date).toLocaleString() : "—";
     };
-
-    // const filteredAppointments = appointments.filter((appt) =>
-    //     appt.provider.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    //     appt.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    //     appt.status.toLowerCase().includes(searchTerm.toLowerCase())
-    // );
 
     if (loading) {
         return (
@@ -1869,22 +885,26 @@ export default function PatientDashboardPage() {
     }
 
     const patientTabs = [
-        {key: "dashboard", label: "Dashboard"},
-
-        {key: "demographics", label: "Demographics"},
-        {key: "appointments", label: "Appointments"},
+        { key: "dashboard", label: "Dashboard" },
+        { key: "demographics", label: "Demographics" },
+        { key: "appointments", label: "Appointments" },
         { key: "encounters", label: "Encounters" },
-        {key: "insurance", label: "Insurance"},
-        {key: "history", label: "History"},
-        {key: "documents", label: "Documents"},
-        {key: "report", label: "Report"},
-        {key: "allergies", label: "Allergies"},
-        {key: "medications", label: "Medications"},
-        {key: "labs", label: "Labs"},
-        {key: "transactions", label: "Transactions"},
-        {key: "issues", label: "Issues"},
-        {key: "vitals", label: "Vitals"},
-        {key: "messages", label: "Messages"},
+        { key: "insurance", label: "Insurance" },
+        { key: "history", label: "History" },
+        { key: "documents", label: "Documents" },
+        { key: "report", label: "Report" },
+        { key: "allergies", label: "Allergies" },
+        { key: "medicalproblems", label: "Medical Problems" },
+        { key: "medications", label: "Medications" },
+        { key: "labs", label: "Labs" },
+        { key: "transactions", label: "Transactions" },
+        { key: "issues", label: "Issues" },
+        { key: "vitals", label: "Vitals" },
+        { key: "messages", label: "Messages" },
+
+        // 👇 New buttons
+        { key: "immunizations", label: "Immunizations" },
+        { key: "healthcareservices", label: "Healthcare Services" },
     ];
 
     const renderTabContent = (tabKey: string) => {
@@ -1892,242 +912,294 @@ export default function PatientDashboardPage() {
             case "dashboard":
                 return (
                     <div className="space-y-10">
-                        {/* ✅ Recent & Upcoming in one card */}
+                        {/* --- Recent & Upcoming --- */}
                         <div
                             id="activity"
-                            ref={(el) => { tabContentRefs.current["activity"] = el }}
+                            ref={(el) => {
+                                tabContentRefs.current["activity"] = el;
+                            }}
                             style={{ scrollMarginTop: headerH + 12 }}
                             className="bg-white rounded-lg border border-gray-200 shadow-sm p-6"
                         >
                             <h4 className="text-lg font-semibold text-gray-800 mb-4">
-                                Recent & Upcoming
+                                Recent &amp; Upcoming
                             </h4>
                             <div className="grid md:grid-cols-2 gap-6">
-                                {/* Recent Activity */}
+                                {/* Enhanced Recent Activity */}
                                 <div>
-                                    <h5 className="text-sm font-medium text-blue-700 mb-2">
-                                        Recent Activity
-                                    </h5>
-                                    {appointments.length > 0 ? (
-                                        <ul className="text-sm space-y-1 text-gray-600 list-disc pl-4">
-                                            {appointments
-                                                .filter((a) => a.status === "Completed")
-                                                .slice(-3)
-                                                .map((appt) => (
-                                                    <li key={appt.id}>
-                                                        {formatDateTimeLocal(appt.date)} — {appt.type}
-                                                    </li>
-                                                ))}
-                                        </ul>
-                                    ) : (
-                                        <p className="text-gray-500 text-sm">No recent activity</p>
-                                    )}
+                                    <div className="flex items-center justify-between mb-2">
+                                        <h5 className="text-sm font-medium text-blue-700">
+                                            Recent Activity
+                                        </h5>
+                                    </div>
+                                    <RecentActivityFeed patientId={Number(patient.id)} limit={5} />
                                 </div>
 
-                                {/* Upcoming Appointments */}
+                                {/* Enhanced Upcoming Section */}
                                 <div>
-                                    <h5 className="text-sm font-medium text-blue-700 mb-2">
-                                        Upcoming
-                                    </h5>
-                                    {appointments.find((a) => a.status === "Scheduled") ? (
-                                        <p className="text-sm text-gray-600">
-                                            {formatDateTimeLocal(
-                                                appointments.find((a) => a.status === "Scheduled")!.date
-                                            )}{" "}
-                                            — with{" "}
-                                            {appointments.find((a) => a.status === "Scheduled")!.provider}
-                                        </p>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <h5 className="text-sm font-medium text-blue-700">
+                                            Upcoming
+                                        </h5>
+                                        <button
+                                            onClick={() => setViewMode("appointments")}
+                                            className="text-xs text-blue-600 hover:text-blue-800"
+                                        >
+                                            View all →
+                                        </button>
+                                    </div>
+
+                                    {appointments.filter(a => a.status === "Scheduled").length > 0 ? (
+                                        <div className="space-y-3">
+                                            {appointments
+                                                .filter((a) => a.status === "Scheduled")
+                                                .slice(0, 3)
+                                                .map((appt) => (
+                                                    <div key={appt.id} className="p-3 bg-blue-50 rounded-lg border border-blue-100">
+                                                        <div className="flex items-center justify-between">
+                                                            <h6 className="text-sm font-medium text-blue-900">
+                                                                {formatDateTimeLocal(appt.date).split(',')[0]}
+                                                            </h6>
+                                                            <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                                                    Scheduled
+                                                </span>
+                                                        </div>
+                                                        <p className="text-sm text-blue-700 mt-1">
+                                                            {formatDateTimeLocal(appt.date).split(',')[1]?.trim()}
+                                                        </p>
+                                                        <p className="text-sm text-gray-600 mt-1">
+                                                            with <strong>{appt.provider}</strong>
+                                                        </p>
+                                                        <p className="text-xs text-blue-600 mt-1">
+                                                            {appt.type}
+                                                        </p>
+                                                        {appt.notes && (
+                                                            <p className="text-xs text-gray-500 mt-1 truncate">
+                                                                {appt.notes}
+                                                            </p>
+                                                        )}
+                                                        <div className="mt-2 flex space-x-2">
+                                                            <button className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700">
+                                                                Confirm
+                                                            </button>
+                                                            <button className="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded hover:bg-gray-300">
+                                                                Reschedule
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+
+                                            {appointments.filter(a => a.status === "Scheduled").length > 3 && (
+                                                <div className="text-center pt-2">
+                                                    <button
+                                                        onClick={() => setViewMode("appointments")}
+                                                        className="text-xs text-blue-600 hover:text-blue-800"
+                                                    >
+                                                        +{appointments.filter(a => a.status === "Scheduled").length - 3} more appointments
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
                                     ) : (
-                                        <p className="text-gray-500 text-sm">
-                                            No upcoming appointments
-                                        </p>
+                                        <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg">
+                                            <div className="text-3xl mb-2">⏰</div>
+                                            <p className="text-sm">No upcoming appointments</p>
+                                            <button
+                                                onClick={() => setViewMode("appointments")}
+                                                className="text-xs text-blue-600 hover:text-blue-800 mt-2"
+                                            >
+                                                Schedule appointment →
+                                            </button>
+                                        </div>
                                     )}
+                                </div>
+                            </div>
+
+                            {/* Quick Stats Row */}
+                            <div className="mt-6 pt-6 border-t grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div className="text-center">
+                                    <div className="text-2xl font-bold text-blue-600">
+                                        {appointments.filter(a => a.status === "Scheduled").length}
+                                    </div>
+                                    <div className="text-xs text-gray-600">Upcoming</div>
+                                </div>
+                                <div className="text-center">
+                                    <div className="text-2xl font-bold text-green-600">
+                                        {appointments.filter(a => a.status === "Completed").length}
+                                    </div>
+                                    <div className="text-xs text-gray-600">Completed</div>
+                                </div>
+                                <div className="text-center">
+                                    <div className="text-2xl font-bold text-gray-600">
+                                        {appointments.length}
+                                    </div>
+                                    <div className="text-xs text-gray-600">Total</div>
+                                </div>
+                                <div className="text-center">
+                                    <div className="text-2xl font-bold text-orange-600">
+                                        {new Date().getMonth()}
+                                    </div>
+                                    <div className="text-xs text-gray-600">This Month</div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* ✅ Demographics */}
-                        <div
-                            id="demographics"
-                            ref={(el) => { tabContentRefs.current["demographics"] = el }}
-                            style={{ scrollMarginTop: headerH + 12 }}
-                        >
-                            <DemographicsFlat
-                                patient={patient}
-                                demoForm={demoForm}
-                                setDemoForm={setDemoForm}
-                                editDemographics={editDemographics}
-                                setEditDemographics={setEditDemographics}
-                                saveDemographics={saveDemographics}
-                                calculateAgeLocal={calculateAgeLocal}
-                            />
-                        </div>
-
-                        {/* ✅ Appointments */}
-                        <div
-                            id="appointments"
-                            ref={(el) => { tabContentRefs.current["appointments"] = el }}
-                            style={{ scrollMarginTop: headerH + 12 }}
-                        >
-                            <AppointmentsFlat
-                                patientId={Number(patient.id)}
-                                formatDateTimeLocal={formatDateTimeLocal}
-                            />
-                        </div>
-
-                        {/* ✅ Insurance */}
-                        <div
-                            id="insurance"
-                            ref={(el) => {
-                                tabContentRefs.current["insurance"] = el;
-                            }}
-                            style={{ scrollMarginTop: headerH + 12 }}
-                        >
-                            <InsuranceFlat
-                                patient={patient}
-                                insuranceForm={insuranceForm}
-                                setInsuranceForm={setInsuranceForm}
-                                editInsurance={editInsurance}
-                                setEditInsurance={setEditInsurance}
-                                insuranceSubTab={insuranceSubTab}
-                                setInsuranceSubTab={setInsuranceSubTab}
-                                setPolicyField={setPolicyField}
-                                setViewMode={setViewMode}
-                                setHighlightedTab={setHighlightedTab}
-                            />
-                        </div>
-
-                        {/* ✅ History */}
-                        <div
-                            id="history"
-                            ref={(el) => {
-                                tabContentRefs.current["history"] = el;
-                            }}
-                            style={{ scrollMarginTop: headerH + 12 }}
-                        >
-                            <HistoryFlat
-                                historyForm={historyForm}
-                                setHistoryForm={setHistoryForm}
-                                editHistory={editHistory}
-                                setEditHistory={setEditHistory}
-                                activeHistoryTab={activeHistoryTab}
-                                setActiveHistoryTab={setActiveHistoryTab}
-                                saveHistory={saveHistory}
-                            />
-                        </div>
-
-                        {/* ✅ Documents */}
-                        <div
-                            id="documents"
-                            ref={(el) => { tabContentRefs.current["documents"] = el }}
-                            style={{ scrollMarginTop: headerH + 12 }}
-                        >
-                            <DocumentsFlat
-                                selectedDoc={selectedDoc}
-                                setSelectedDoc={setSelectedDoc}
-                            />
-                        </div>
-
-                        {/* ✅ Report */}
-                        <div
-                            id="report"
-                            ref={(el) => { tabContentRefs.current["report"] = el }}
-                            style={{ scrollMarginTop: headerH + 12 }}
-                        >
-                            <ReportFlat
-                                useDateRange={useDateRange}
-                                setUseDateRange={setUseDateRange}
-                                startDate={startDate}
-                                setStartDate={setStartDate}
-                                endDate={endDate}
-                                setEndDate={setEndDate}
-                                generateReport={generateReport}
-                                downloadReport={downloadReport}
-                                reportFilters={reportFilters}
-                                toggleFilter={toggleFilter}
-                                lastVisitedTab={lastVisitedTab}
-                                setActiveTab={setViewMode}
-                            />
-                        </div>
-
-                        {/* ✅ Allergies */}
-                        <div
-                            id="allergies"
-                            ref={(el) => { tabContentRefs.current["allergies"] = el }}
-                            style={{ scrollMarginTop: headerH + 12 }}
-                        >
-                            <AllergiesFlat allergies={allergies} />
-                        </div>
-
-                        {/* ✅ Medications */}
-                        <div
-                            id="medications"
-                            ref={(el) => { tabContentRefs.current["medications"] = el }}
-                            style={{ scrollMarginTop: headerH + 12 }}
-                        >
-                            <MedicationsFlat medications={medications} />
-                        </div>
-
-                        {/* ✅ Labs */}
-                        <div
-                            id="labs"
-                            ref={(el) => { tabContentRefs.current["labs"] = el }}
-                            style={{ scrollMarginTop: headerH + 12 }}
-                        >
-                            <LabsFlat labsData={[]} />
-                        </div>
-
-                        {/* ✅ Transactions */}
-                        <div
-                            id="transactions"
-                            ref={(el) => { tabContentRefs.current["transactions"] = el }}
-                            style={{ scrollMarginTop: headerH + 12 }}
-                        >
-                            <BillingFlat billing={billing} />
-                        </div>
-
-                        {/* ✅ Issues */}
-                        <div
-                            id="issues"
-                            ref={(el) => { tabContentRefs.current["issues"] = el }}
-                            style={{ scrollMarginTop: headerH + 12 }}
-                            className="bg-white rounded-lg border border-gray-200 shadow-sm p-6"
-                        >
-                            <h4 className="text-sm font-semibold text-gray-800 mb-2">Issues</h4>
-                            <p className="text-sm text-gray-500">No issues recorded</p>
-                        </div>
-
-                        {/* ✅ Vitals */}
-                        <div
-                            id="vitals"
-                            ref={(el) => { tabContentRefs.current["vitals"] = el }}
-                            style={{ scrollMarginTop: headerH + 12 }}
-                            className="bg-white rounded-lg border border-gray-200 shadow-sm p-6"
-                        >
-                            <h4 className="text-sm font-semibold text-gray-800 mb-2">Vitals</h4>
-                            <p className="text-sm text-gray-500">No vitals recorded</p>
-                        </div>
-
-                        {/* ✅ Messages */}
-                        <div
-                            id="messages"
-                            ref={(el) => { tabContentRefs.current["messages"] = el }}
-                            style={{ scrollMarginTop: headerH + 12 }}
-                            className="bg-white rounded-lg border border-gray-200 shadow-sm p-6"
-                        >
-                            <h4 className="text-sm font-semibold text-gray-800 mb-2">Messages</h4>
-                            <p className="text-sm text-gray-500">Patient communications</p>
+                        {/* --- Summary Cards --- */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <AllergiesSummary patientId={Number(patient.id)}  />
+                            <MedicalProblemsSummary patientId={Number(patient.id)}  />
+                            <InsuranceSummary patientId={Number(patient.id)} />
                         </div>
                     </div>
                 );
 
-            case "encounters":
+
+            case "demographics":
+                return (
+                    <DemographicsFlat
+                        patient={patient}
+                        demoForm={demoForm}
+                        setDemoForm={setDemoForm}
+                        editDemographics={editDemographics}
+                        setEditDemographics={setEditDemographics}
+                        saveDemographics={saveDemographics}
+                        calculateAgeLocal={calculateAgeLocal}
+                    />
+                );
+
+            case "appointments":
+                return (
+                    <AppointmentsFlat
+                        patientId={Number(patient.id)}
+                        formatDateTimeLocal={formatDateTimeLocal}
+                    />
+                );
+
+            case "insurance":
+                return (
+                    <InsuranceFlat
+                        patient={patient}
+                        insuranceForm={insuranceForm}
+                        setInsuranceForm={setInsuranceForm}
+                        editInsurance={editInsurance}
+                        setEditInsurance={setEditInsurance}
+                        insuranceSubTab={insuranceSubTab}
+                        setInsuranceSubTab={setInsuranceSubTab}
+                        saveInsurance={saveInsurance}
+                        setPolicyField={setPolicyField}
+                        setViewMode={setViewMode}
+                        setHighlightedTab={setHighlightedTab}
+                    />
+                );
+
+            case "history":
+                return (
+                    <HistoryFlat
+                        historyForm={historyForm}
+                        setHistoryForm={setHistoryForm}
+                        editHistory={editHistory}
+                        setEditHistory={setEditHistory}
+                        activeHistoryTab={activeHistoryTab}
+                        setActiveHistoryTab={setActiveHistoryTab}
+                        saveHistory={saveHistory}
+                    />
+                );
+
+                case "encounters":
                 return (
                     <div className="min-w-0">
                         <EncounterTableExpandable patientId={Number(patient.id)} />
                     </div>
                 );
 
+
+            case "documents":
+                return <DocumentsFlat selectedDoc={selectedDoc} setSelectedDoc={setSelectedDoc} />;
+
+            case "report":
+                return (
+                    <ReportFlat
+                        useDateRange={useDateRange}
+                        setUseDateRange={setUseDateRange}
+                        startDate={startDate}
+                        setStartDate={setStartDate}
+                        endDate={endDate}
+                        setEndDate={setEndDate}
+                        generateReport={generateReport}
+                        downloadReport={downloadReport}
+                        reportFilters={reportFilters}
+                        toggleFilter={toggleFilter}
+                        lastVisitedTab={lastVisitedTab}
+                        setActiveTab={setViewMode}
+                    />
+                );
+
+            case "allergies":
+                return <AllergiesFlat patientId={Number(patient.id)} />;
+
+            case "medicalproblems":
+                return (
+                    <div
+                        className="min-w-0"
+                        id="medicalproblems"
+                        ref={(el) => {
+                            tabContentRefs.current["medicalproblems"] = el;
+                        }}
+                        style={{ scrollMarginTop: headerH + 12 }}
+                    >
+                        <MedicalProblemsFlat patientId={Number(patient.id)} />
+                    </div>
+                );
+
+            case "medications":
+                return <MedicationsFlat patientId={Number(patient.id)} />;
+
+            case "labs":
+                return <LabsFlat labsData={[]} />;
+
+            case "transactions":
+                return <BillingFlat billing={billing} />;
+
+            case "issues":
+                return (
+                    <div
+                        className="min-w-0"
+                        id="issues"
+                        ref={(el) => {
+                            tabContentRefs.current["issues"] = el;
+                        }}
+                        style={{ scrollMarginTop: headerH + 12 }}
+                    >
+                        <IssuesFlat patientId={Number(patient.id)} />
+                    </div>
+                );
+
+            case "vitals":
+                return (
+                    <div
+                        id="vitals"
+                        ref={(el) => {
+                            tabContentRefs.current["vitals"] = el;
+                        }}
+                        style={{ scrollMarginTop: headerH + 12 }}
+                        className="bg-white rounded-lg border border-gray-200 shadow-sm p-6"
+
+                    >
+                    </div>
+                );
+
+            case "messages":
+                return (
+                    <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+                        <h4 className="text-sm font-semibold text-gray-800 mb-2">Messages</h4>
+                        <p className="text-sm text-gray-500">Patient communications</p>
+                    </div>
+                );
+
+            case "immunizations":
+                        return <ImmunizationsFlat patientId={Number(patient.id)} />;
+           case "healthcareservices":
+                return <HealthcareServicesFlat patientId={Number(patient.id)} />;
 
             default:
                 return (
@@ -2149,9 +1221,7 @@ export default function PatientDashboardPage() {
                                 </svg>
                             </div>
                             <h5 className="text-gray-700 font-medium">No data available</h5>
-                            <p className="text-gray-500 text-sm mt-1">
-                                This section is currently empty
-                            </p>
+                            <p className="text-gray-500 text-sm mt-1">This section is currently empty</p>
                         </div>
                     </div>
                 );
@@ -2170,105 +1240,61 @@ export default function PatientDashboardPage() {
                     overflow-x: hidden;
                 }
             `}</style>
-            <style jsx>{`
-                //.pageScroll {
-                //    min-height: 100vh;
-                //    width: 100%;
-                //    overflow-y: auto;
-                //    overflow-x: hidden;
-                //    -webkit-overflow-scrolling: touch;
-                //}
 
-                .patientSummary *,
-                .quickActions * {
-                    overflow: visible !important;
-                    height: auto !important;
-                    max-height: none !important;
-                    -ms-overflow-style: none;
-                    scrollbar-width: none;
-                }
-
-                //.hide-scrollbar {
-                //    -ms-overflow-style: none; /* IE & Edge */
-                //    scrollbar-width: none; /* Firefox */
-                //}
-
-                //.hide-scrollbar::-webkit-scrollbar {
-                //    display: none; /* Chrome, Safari, Opera */
-                //}
-
-                .patientSummary *::-webkit-scrollbar,
-                .quickActions *::-webkit-scrollbar {
-                    display: none;
-                }
-            `}</style>
-
-            {/* Light gray page background */}
             <div className="pageScroll bg-gray-50">
                 <div
                     ref={tabsHeaderRef}
-                    className="z-50 border-b border-gray-200 bg-white/95 backdrop-blur px-3 py-1.5"
+                    className="sticky top-0 z-50 border-b border-gray-200 bg-white/95 backdrop-blur px-3 py-1.5"
                 >
-
                     <div className="flex items-center justify-between gap-3 min-w-0">
                         <div className="flex items-center gap-3 min-w-0">
                             <Link
                                 href="/patients"
                                 className="px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 border border-gray-300 text-xs font-medium text-gray-700 flex items-center"
                             >
-                                <svg
-                                    className="w-3 h-3 mr-1"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth="2"
-                                        d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                                    />
+                                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                                 </svg>
                                 Patients
                             </Link>
-                            <div className="flex items-center min-w-0">
-              <span className="text-xs text-gray-500 mr-1 shrink-0">
-                Patient:
-              </span>
-                                <div
-                                    className="px-2 py-0.5 rounded bg-blue-50 text-xs font-medium text-blue-800 truncate">
+
+                            <div className="flex items-center flex-wrap gap-2 min-w-0">
+                                <span className="text-xs text-gray-500 mr-1 shrink-0">Patient:</span>
+                                <div className="px-2 py-0.5 rounded bg-blue-50 text-xs font-medium text-blue-800 truncate">
                                     {patient.firstName} {patient.lastName}
                                 </div>
                                 {patient.mrn && (
-                                    <div
-                                        className="ml-2 px-1.5 py-0.5 rounded bg-gray-100 text-[10px] text-gray-600 shrink-0">
+                                    <div className="px-1.5 py-0.5 rounded bg-gray-100 text-[10px] text-gray-600 shrink-0">
                                         MRN: {patient.mrn}
                                     </div>
                                 )}
+                                <div className="h-7 px-3 inline-flex items-center rounded-full bg-indigo-50 text-indigo-700 text-xs">
+                                    {formatDateLocal(patient.dateOfBirth)} · Age {calculateAgeLocal(patient.dateOfBirth)}
+                                </div>
+                                <div className="h-7 px-3 inline-flex items-center rounded-full bg-gray-100 text-gray-700 text-xs">
+                                    {patient.phoneNumber || "—"}
+                                </div>
+                                <div className="h-7 px-3 inline-flex items-center rounded-full bg-gray-100 text-gray-700 text-xs">
+                                    {appointments.length > 0
+                                        ? `Last visit: ${formatDateLocal(appointments[appointments.length - 1].date)}`
+                                        : "No visits recorded"}
+                                </div>
                             </div>
                         </div>
+
                         <div className="flex items-center gap-3 shrink-0">
-                            {/* <button
+                            <button
                                 className="h-8 px-3 rounded bg-blue-600 hover:bg-blue-700 text-xs font-medium text-white shadow-sm inline-flex items-center"
                                 onClick={handleOpenEncounter}
                             >
-                                <svg
-                                    className="w-3 h-3 mr-1"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth="2"
-                                        d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                                    />
+                                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                                 </svg>
-                              {/* //  New Encounter */}
-                            {/* </button> */} 
+                                New Encounter
+                            </button>
                         </div>
                     </div>
+
                     <div className="mt-1.5">
                         <div className="flex flex-wrap gap-2">
                             {patientTabs.map((tab) => (
@@ -2289,18 +1315,11 @@ export default function PatientDashboardPage() {
                 </div>
 
                 <div className="w-full max-w-screen-2xl mx-auto p-4">
-                    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,17fr)_minmax(0,3fr)] gap-4">
-                        <main
-                            ref={mainContentRef}
-                            className="min-w-0 overflow-y-auto hide-scrollbar"
-                            style={{height: `calc(100vh - ${headerH}px)`}}
-                        >
+                    <div className="grid grid-cols-1 gap-4">
+                        <main ref={mainContentRef} className="min-w-0">
                             {showEncounterForm ? (
                                 <main className="flex-1 p-6 overflow-auto">
-                                    <EncounterForm
-                                        onCancel={handleCloseEncounter}
-                                        onSave={saveEncounter}
-                                    />
+                                    <EncounterForm onCancel={handleCloseEncounter} onSave={saveEncounter} />
                                 </main>
                             ) : (
                                 <>
@@ -2308,12 +1327,10 @@ export default function PatientDashboardPage() {
                                         <div
                                             id="dashboard"
                                             ref={(el) => void (tabContentRefs.current.dashboard = el)}
-                                            style={{scrollMarginTop: headerH + 12}}
+                                            style={{ scrollMarginTop: headerH + 12 }}
                                         >
                                             <h2 className="text-lg font-semibold mb-3"></h2>
-                                            <div className="min-w-0">
-                                                {renderTabContent("dashboard")}
-                                            </div>
+                                            <div className="min-w-0">{renderTabContent("dashboard")}</div>
                                         </div>
                                     ) : (
                                         <div
@@ -2321,110 +1338,15 @@ export default function PatientDashboardPage() {
                                             ref={(el) => {
                                                 tabContentRefs.current[viewMode] = el;
                                             }}
-                                            style={{scrollMarginTop: headerH + 12}}
+                                            style={{ scrollMarginTop: headerH + 12 }}
                                             className="min-w-0"
                                         >
-                                            <div className="min-w-0">
-                                                {renderTabContent(viewMode)}
-                                            </div>
+                                            <div className="min-w-0">{renderTabContent(viewMode)}</div>
                                         </div>
                                     )}
                                 </>
                             )}
                         </main>
-
-                        <aside className="min-w-0 hide-scrollbar overflow-y-auto">
-                            <div
-                                style={{
-                                    position: "sticky",
-                                    top: headerH + 12,
-                                    height: `calc(100vh - ${headerH + 24}px)`,
-                                }}
-                                className="flex flex-col gap-4"
-                            >
-                                <div
-                                    className="flex-[0_0_30%] bg-gradient-to-br from-indigo-50 to-white rounded-2xl shadow-md p-4 flex flex-col">
-                                    <h3 className="text-sm font-semibold text-gray-800 mb-2 tracking-wide">
-                                        Patient Summary
-                                    </h3>
-                                    <div className="space-y-1 text-sm flex-1">
-                                        <div className="font-semibold text-lg text-gray-900 truncate">
-                                            {patient.firstName} {patient.lastName}
-                                        </div>
-                                        <div className="text-gray-500">
-                                            {formatDateLocal(patient.dateOfBirth)} · Age{" "}
-                                            {calculateAgeLocal(patient.dateOfBirth)}
-                                        </div>
-                                        <div className="text-gray-700">
-                                            {patient.phoneNumber || "—"}
-                                        </div>
-                                        <div className="text-gray-400 text-xs italic">
-                                            {appointments.length > 0
-                                                ? `Last visit: ${formatDateLocal(
-                                                    appointments[appointments.length - 1].date
-                                                )}`
-                                                : "No visits recorded"}
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="flex-[0_0_25%] bg-white rounded-2xl shadow-md p-4 flex flex-col">
-                                    <h3 className="text-sm font-semibold text-gray-800 mb-2 tracking-wide">
-                                        Quick Actions
-                                    </h3>
-                                    <div className="grid grid-cols-1 gap-2 flex-1">
-                                        {[
-                                            {key: "appointments", label: "Appointments", color: "blue"},
-                                            {key: "billing", label: "Billing", color: "yellow"},
-                                            {key: "demographics", label: "Demographics", color: "purple"},
-                                            {key: "messages", label: "Messages", color: "green"},
-                                            { key: "encounters", label: "Encounters", color: "blue" },
-                                        ].map(({key, label, color}) => {
-                                            const colors: Record<
-                                                string,
-                                                { active: string; inactive: string }
-                                            > = {
-                                                blue: {
-                                                    active: "bg-blue-600 text-white",
-                                                    inactive:
-                                                        "bg-blue-50 text-blue-700 hover:bg-blue-100",
-                                                },
-                                                yellow: {
-                                                    active: "bg-yellow-500 text-white",
-                                                    inactive:
-                                                        "bg-yellow-50 text-yellow-700 hover:bg-yellow-100",
-                                                },
-                                                purple: {
-                                                    active: "bg-purple-600 text-white",
-                                                    inactive:
-                                                        "bg-purple-50 text-purple-700 hover:bg-purple-100",
-                                                },
-                                                green: {
-                                                    active: "bg-green-600 text-white",
-                                                    inactive:
-                                                        "bg-green-50 text-green-700 hover:bg-green-100",
-                                                },
-                                            };
-                                            const base =
-                                                "w-full px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200 shadow-sm";
-                                            const isActive = highlightedTab === key;
-                                            return (
-                                                <button
-                                                    key={key}
-                                                    onClick={() => onQuickAction(key)}
-                                                    className={`${base} ${
-                                                        isActive
-                                                            ? colors[color].active
-                                                            : colors[color].inactive
-                                                    }`}
-                                                >
-                                                    {label}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            </div>
-                        </aside>
                     </div>
                 </div>
             </div>
