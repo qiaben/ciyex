@@ -14,6 +14,7 @@ import {
     EventContentArg,
 } from '@fullcalendar/core';
 import Alert from "@/components/ui/alert/Alert";
+import VideoCallButton from "@/components/telehealth/VideoCallButton";
 
 
 
@@ -484,10 +485,33 @@ const Calendar: React.FC = () => {
                             label: item.title,
                         }));
 
+                    // Ensure Telehealth is available as a visit type
+                    const hasTelehealth = opts.some(opt => opt.value.toLowerCase().includes('telehealth') || opt.value.toLowerCase().includes('virtual'));
+                    if (!hasTelehealth) {
+                        opts.push({ value: 'Telehealth', label: 'Telehealth' });
+                    }
+
                     setVisitTypeOptions(opts);
+                } else {
+                    // Fallback visit types
+                    setVisitTypeOptions([
+                        { value: 'Consultation', label: 'Consultation' },
+                        { value: 'Follow-up', label: 'Follow-up' },
+                        { value: 'Initial Visit', label: 'Initial Visit' },
+                        { value: 'Telehealth', label: 'Telehealth' },
+                        { value: 'Emergency', label: 'Emergency' }
+                    ]);
                 }
             } catch (err) {
                 console.error("Failed to fetch visit types", err);
+                // Fallback visit types in case of error
+                setVisitTypeOptions([
+                    { value: 'Consultation', label: 'Consultation' },
+                    { value: 'Follow-up', label: 'Follow-up' },
+                    { value: 'Initial Visit', label: 'Initial Visit' },
+                    { value: 'Telehealth', label: 'Telehealth' },
+                    { value: 'Emergency', label: 'Emergency' }
+                ]);
             }
         })();
     }, [apiUrl]);
@@ -1420,6 +1444,28 @@ const Calendar: React.FC = () => {
                                 ×
                             </button>
                         </div>
+
+                        {/* Video Call Section - Show for existing appointments with selected patient and provider */}
+                        {selectedEvent && selectedPatientId && appointmentProviderId && (
+                            <div className="mx-6 mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h4 className="font-medium text-blue-900 text-sm">Telehealth Options</h4>
+                                        <p className="text-blue-700 text-xs mt-1">
+                                            Start a video call for this appointment
+                                        </p>
+                                    </div>
+                                    <VideoCallButton
+                                        appointmentId={selectedEvent.id ? Number(selectedEvent.id) : undefined}
+                                        patientId={Number(selectedPatientId)}
+                                        providerId={Number(appointmentProviderId)}
+                                        patientName={selectedPatientName}
+                                        variant="primary"
+                                        size="sm"
+                                    />
+                                </div>
+                            </div>
+                        )}
 
                         {/* Body */}
                         <div className="custom-scrollbar max-h-[70vh] overflow-y-auto px-6 pb-6 lg:px-10">
