@@ -24,13 +24,15 @@ services:
         ENVIRONMENT: stage   # Use 'prod' for production, 'stage' for staging
     ports:
       - "3000:3000"
+      - "3001:3001"
+      - "3002:3002"
       - "8080:8080"
     environment:
       SPRING_PROFILES_ACTIVE: local    # Or 'prod', 'dev', etc.
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/ciyexdb
-      SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: root
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/ciyexdb
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
 
 volumes:
   databasevolume: {}
-  pgdata:
+  pgdata: {}
