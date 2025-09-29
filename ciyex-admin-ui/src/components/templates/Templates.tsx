@@ -6,21 +6,36 @@ import AdminLayout from "@/app/(admin)/layout";
 
 // ------------------ Types ------------------
 export type Template = {
-  id: string;
+  id?: number | string; // backend likely Long; keep union for safety
   locations: string; // logical grouping (formerly "classpath")
   practiceType: string;
 };
 
-// ------------------ Mock Data ------------------
-const seedTemplates: Template[] = [
-  { id: "TPL-0001", locations: "IntakeForms", practiceType: "Medical" },
-  { id: "TPL-0002", locations: "ConsentForms", practiceType: "Dental" },
-  { id: "TPL-0003", locations: "ExamForms", practiceType: "Vision" },
-  { id: "TPL-0004", locations: "PediatricForms", practiceType: "Medical" },
-];
-
 // ------------------ Utils ------------------
 const classIf = (cond: boolean, yes: string, no = "") => (cond ? yes : no);
+
+async function safeJson<T = any>(res: Response): Promise<T | null> {
+  try {
+    return (await res.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
+function authHeaders(extra?: Record<string, string>) {
+  const token = localStorage.getItem("token");
+  const orgId = localStorage.getItem("orgId") || "1";
+  const facilityId = localStorage.getItem("facilityId") || "1";
+  const role = localStorage.getItem("role") || "SUPER_ADMIN";
+  return {
+    Authorization: `Bearer ${token}`,
+    "x-org-id": orgId,
+    "x-facility-id": facilityId,
+    "x-role": role,
+    Accept: "application/json",
+    ...(extra || {}),
+  } as HeadersInit;
+}
 
 // ------------------ Portal Modal ------------------
 function Modal({
@@ -36,13 +51,15 @@ function Modal({
 
   useEffect(() => {
     setMounted(true);
-    if (open) {
-      const prev = document.body.style.overflow;
-      document.body.style.overflow = "hidden";
-      return () => {
-        document.body.style.overflow = prev;
-      };
-    }
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
   }, [open]);
 
   if (!open || !mounted) return null;
@@ -55,6 +72,8 @@ function Modal({
       <div
         className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl dark:bg-neutral-900"
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
       >
         {children}
       </div>
@@ -65,8 +84,7 @@ function Modal({
 
 // ------------------ Main Component ------------------
 export default function Templates() {
-  // In-memory only (no localStorage)
-  const [rows, setRows] = useState<Template[]>(() => seedTemplates);
+  const [rows, setRows] = useState<Template[]>([]);
   const [query, setQuery] = useState("");
   const [locationsFilter, setLocationsFilter] = useState("All Locations");
   const [typeFilter, setTypeFilter] = useState("All Types");
@@ -76,12 +94,45 @@ export default function Templates() {
   // Modal + form state
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Template | null>(null);
-  const [form, setForm] = useState<Template>({ id: "", locations: "", practiceType: "" });
+  const [form, setForm] = useState<Template>({ id: undefined, locations: "", practiceType: "" });
   const [error, setError] = useState<string>("");
+
+  // UX states
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | string | null>(null);
+  const apiBase = useMemo(() => process.env.NEXT_PUBLIC_API_URL, []);
 
   // Pagination
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
+
+  // Load data
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      try {
+        const res = await fetch(`${apiBase}/api/admin/templates`, {
+          headers: authHeaders(),
+        });
+        if (!res.ok) throw new Error(`Load failed (${res.status})`);
+        const json = await safeJson<any>(res);
+        if (cancelled) return;
+        if (Array.isArray(json?.data)) setRows(json!.data);
+        else if (Array.isArray(json)) setRows(json as Template[]);
+        else setRows([]);
+      } catch (e) {
+        console.error("Failed to load templates:", e);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBase]);
 
   // Derived lists
   const allLocations = useMemo(
@@ -99,21 +150,20 @@ export default function Templates() {
 
     if (query.trim()) {
       const q = query.trim().toLowerCase();
-      list = list.filter(
-        (r) =>
-          r.id.toLowerCase().includes(q) ||
-          r.locations.toLowerCase().includes(q) ||
-          r.practiceType.toLowerCase().includes(q)
+      list = list.filter((r) =>
+        [String(r.id ?? ""), r.locations, r.practiceType]
+          .join("\u0000")
+          .toLowerCase()
+          .includes(q)
       );
     }
 
-    if (locationsFilter !== "All Locations")
-      list = list.filter((r) => r.locations === locationsFilter);
+    if (locationsFilter !== "All Locations") list = list.filter((r) => r.locations === locationsFilter);
     if (typeFilter !== "All Types") list = list.filter((r) => r.practiceType === typeFilter);
 
     list.sort((a, b) => {
-      const A = String(a[sortKey]).toLowerCase();
-      const B = String(b[sortKey]).toLowerCase();
+      const A = String(a[sortKey] ?? "").toLowerCase();
+      const B = String(b[sortKey] ?? "").toLowerCase();
       if (A < B) return sortDir === "asc" ? -1 : 1;
       if (A > B) return sortDir === "asc" ? 1 : -1;
       return 0;
@@ -132,7 +182,7 @@ export default function Templates() {
   // Actions
   const openCreate = () => {
     setEditing(null);
-    setForm({ id: "", locations: "", practiceType: "" });
+    setForm({ id: undefined, locations: "", practiceType: "" });
     setError("");
     setShowModal(true);
   };
@@ -144,39 +194,66 @@ export default function Templates() {
     setShowModal(true);
   };
 
-  const remove = (id: string) => {
+  const remove = async (id?: number | string) => {
+    if (id == null) return;
     if (!confirm("Delete this template?")) return;
-    setRows((prev) => prev.filter((r) => r.id !== id));
+    setDeletingId(id);
+    try {
+      const res = await fetch(`${apiBase}/api/admin/templates/${id}`, {
+        method: "DELETE",
+        headers: authHeaders(),
+      });
+      if (!res.ok) throw new Error(`Delete failed (${res.status})`);
+      setRows((prev) => prev.filter((r) => r.id !== id));
+    } catch (e) {
+      console.error("Failed to delete template:", e);
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const validate = (draft: Template) => {
-    if (!draft.locations.trim()) return "Locations is required";
-    if (!draft.practiceType.trim()) return "Practice type is required";
+    if (!draft.locations?.trim()) return "Locations is required";
+    if (!draft.practiceType?.trim()) return "Practice type is required";
     return "";
   };
 
-  const upsert = (e: React.FormEvent) => {
+  const upsert = async (e: React.FormEvent) => {
     e.preventDefault();
     const draft: Template = {
       ...form,
-      id: form.id?.trim() || generateId(),
       locations: form.locations.trim(),
       practiceType: form.practiceType.trim(),
     };
     const msg = validate(draft);
     if (msg) return setError(msg);
 
-    setRows((prev) => {
-      const exists = prev.some((r) => r.id === draft.id);
-      if (exists) return prev.map((r) => (r.id === draft.id ? draft : r));
-      return [draft, ...prev];
-    });
-    setShowModal(false);
-  };
+    setSaving(true);
+    try {
+      const isEdit = Boolean(editing?.id ?? draft.id);
+      const method = isEdit ? "PUT" : "POST";
+      const url = isEdit
+        ? `${apiBase}/api/admin/templates/${editing?.id ?? draft.id}`
+        : `${apiBase}/api/admin/templates`;
 
-  const generateId = () => {
-    const n = Math.floor(Math.random() * 9000) + 1000;
-    return `TPL-${n}`;
+      const res = await fetch(url, {
+        method,
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify(draft),
+      });
+      if (!res.ok) throw new Error(`${isEdit ? "Update" : "Create"} failed (${res.status})`);
+      const json = await safeJson<any>(res);
+      const updated = (json?.data ?? json) as Template;
+
+      if (isEdit) setRows((prev) => prev.map((r) => (r.id === (editing?.id ?? draft.id) ? updated : r)));
+      else setRows((prev) => [updated, ...prev]);
+
+      setShowModal(false);
+    } catch (e) {
+      console.error("Failed to save template:", e);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const toggleSort = (key: keyof Template) => {
@@ -202,7 +279,7 @@ export default function Templates() {
             <div className="flex items-center gap-2">
               <button
                 onClick={openCreate}
-                className="inline-flex items-center rounded-2xl border border-transparent bg-black px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-gray-800 dark:bg:white dark:text-black dark:hover:bg-neutral-200"
+                className="inline-flex items-center rounded-2xl border border-transparent bg-black px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
               >
                 + New Template
               </button>
@@ -274,6 +351,13 @@ export default function Templates() {
             </div>
           </div>
 
+          {/* Loading / Error */}
+          {loading && (
+            <div className="mb-3 rounded-xl border border-dashed p-4 text-sm text-gray-500 dark:border-neutral-700 dark:text-neutral-400">
+              Loading templates…
+            </div>
+          )}
+
           {/* Table */}
           <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-neutral-800">
@@ -307,7 +391,7 @@ export default function Templates() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-neutral-800">
-                {pageData.length === 0 && (
+                {pageData.length === 0 && !loading && (
                   <tr>
                     <td colSpan={4} className="px-4 py-10 text-center text-sm text-gray-500 dark:text-neutral-400">
                       No templates found.
@@ -315,8 +399,8 @@ export default function Templates() {
                   </tr>
                 )}
                 {pageData.map((t) => (
-                  <tr key={t.id} className="hover:bg-gray-50 dark:hover:bg-neutral-800/50">
-                    <td className="whitespace-nowrap px-4 py-3 text-sm font-medium">{t.id}</td>
+                  <tr key={String(t.id)} className="hover:bg-gray-50 dark:hover:bg-neutral-800/50">
+                    <td className="whitespace-nowrap px-4 py-3 text-sm font-medium">{String(t.id ?? "")}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm">{t.locations}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm">{t.practiceType}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm">
@@ -329,9 +413,17 @@ export default function Templates() {
                         </button>
                         <button
                           onClick={() => remove(t.id)}
-                          className="rounded-xl border border-red-300 px-3 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50 dark:border-red-800/60 dark:hover:bg-red-900/30"
+                          disabled={deletingId === t.id}
+                          className={
+                            "rounded-xl border px-3 py-1 text-xs font-medium transition " +
+                            classIf(
+                              deletingId === t.id,
+                              "cursor-wait border-red-200 text-red-300 dark:border-red-900/40 dark:text-red-800",
+                              "border-red-300 text-red-600 hover:bg-red-50 dark:border-red-800/60 dark:hover:bg-red-900/30"
+                            )
+                          }
                         >
-                          Delete
+                          {deletingId === t.id ? "Deleting…" : "Delete"}
                         </button>
                       </div>
                     </td>
@@ -344,7 +436,7 @@ export default function Templates() {
           {/* Footer / Pagination */}
           <div className="mt-4 flex flex-col items-center justify-between gap-3 sm:flex-row">
             <div className="text-sm text-gray-600 dark:text-neutral-400">
-              Showing <span className="font-medium">{pageData.length}</span> of{" "}
+              Showing <span className="font-medium">{pageData.length}</span> of {" "}
               <span className="font-medium">{total}</span> templates
             </div>
             <div className="flex items-center gap-2">
@@ -401,13 +493,15 @@ export default function Templates() {
             )}
 
             <form onSubmit={upsert} className="space-y-3">
+              {/* ID is optional; backend will assign if absent. Shown as read-only when editing. */}
               <div>
-                <label className="mb-1 block text-sm font-medium">Template ID (optional)</label>
+                <label className="mb-1 block text-sm font-medium">Template ID</label>
                 <input
-                  value={form.id}
+                  value={String(form.id ?? "")}
                   onChange={(e) => setForm({ ...form, id: e.target.value })}
-                  placeholder="e.g., TPL-1234 (auto if blank)"
-                  className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-black focus:outline-none focus:ring-1 focus:ring-black dark:border-neutral-700 dark:bg-neutral-800 dark:focus:border-white dark:focus:ring-white"
+                  placeholder={editing ? undefined : "Leave blank to auto-assign"}
+                  disabled={Boolean(editing)}
+                  className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-black focus:outline-none focus:ring-1 focus:ring-black disabled:cursor-not-allowed disabled:bg-gray-100 dark:border-neutral-700 dark:bg-neutral-800 dark:focus:border-white dark:focus:ring-white"
                 />
               </div>
               <div>
@@ -446,9 +540,15 @@ export default function Templates() {
                 </button>
                 <button
                   type="submit"
-                  className="rounded-2xl bg-black px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
+                  disabled={saving}
+                  className={
+                    "rounded-2xl px-4 py-2 text-sm font-semibold text-white shadow-sm transition " +
+                    (saving
+                      ? "cursor-wait bg-gray-400 dark:bg-neutral-700"
+                      : "bg-black hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200")
+                  }
                 >
-                  {editing ? "Save Changes" : "Create"}
+                  {saving ? (editing ? "Saving…" : "Creating…") : editing ? "Save Changes" : "Create"}
                 </button>
               </div>
             </form>
