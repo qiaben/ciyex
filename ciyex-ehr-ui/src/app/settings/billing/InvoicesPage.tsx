@@ -56,14 +56,10 @@ const InvoicesPage = () => {
     try {
       const orgId = localStorage.getItem("orgId") || "1";
       const res = await fetchWithAuth(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/billing-history/pay`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/invoice-bills/${id}/pay`,
         {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Org-Id": orgId,
-          },
-          body: JSON.stringify({ invoiceId: id }),
+          method: "PUT",
+          headers: { "X-Org-Id": orgId },
         }
       );
 

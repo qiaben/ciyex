@@ -121,7 +121,7 @@ const BillingPage = () => {
     try {
       const orgId = localStorage.getItem("orgId") || "1";
       const res = await fetchWithAuth(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/billing-history`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/invoice-bills/history`,
         { headers: { "X-Org-Id": orgId } }
       );
       const json = await safeJson<BillingHistory[]>(res);
@@ -136,7 +136,7 @@ const BillingPage = () => {
     try {
       const orgId = localStorage.getItem("orgId") || "1";
       await fetchWithAuth(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/billing-history/${id}/archive`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/invoice-bills/${id}/archive`,
         { method: "PUT", headers: { "X-Org-Id": orgId } }
       );
       await loadHistory();
@@ -150,7 +150,7 @@ const BillingPage = () => {
     try {
       const orgId = localStorage.getItem("orgId") || "1";
       await fetchWithAuth(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/billing-history/${id}/unarchive`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/invoice-bills/${id}/unarchive`,
         { method: "PUT", headers: { "X-Org-Id": orgId } }
       );
       await loadHistory();
@@ -164,7 +164,7 @@ const BillingPage = () => {
     try {
       const orgId = localStorage.getItem("orgId") || "1";
       await fetchWithAuth(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/billing-history/${id}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/invoice-bills/${id}`,
         { method: "DELETE", headers: { "X-Org-Id": orgId } }
       );
       await loadHistory();

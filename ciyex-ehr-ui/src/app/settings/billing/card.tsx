@@ -64,7 +64,7 @@ const StripeCardForm = ({
     }
 
     const res = await fetchWithAuth(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/billing/tokenize`,
+      `${process.env.NEXT_PUBLIC_API_URL}/api/stripe/cards/billing/tokenize`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-org-id": "1" },
@@ -105,13 +105,14 @@ const StripeCardForm = ({
         value={lastName}
         onChange={(e) => setLastName(e.target.value)}
       />
-
       <CardNumberElement className="p-3 border rounded w-full" />
       <CardExpiryElement className="p-3 border rounded w-full" />
       <CardCvcElement className="p-3 border rounded w-full" />
-
       <div className="flex justify-end gap-2 mt-3">
-        <button onClick={onCancel} className="px-4 py-2 rounded bg-gray-300">
+        <button
+          onClick={onCancel}
+          className="px-4 py-2 rounded bg-gray-300"
+        >
           Cancel
         </button>
         <button
@@ -164,7 +165,7 @@ const GpsCardForm = ({
     };
 
     const res = await fetchWithAuth(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/gps/billing/tokenize`,
+      `${process.env.NEXT_PUBLIC_API_URL}/api/gps/cards/billing/tokenize`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-org-id": "1" },
@@ -224,7 +225,10 @@ const GpsCardForm = ({
         />
       </div>
       <div className="flex justify-end gap-2 mt-3">
-        <button onClick={onCancel} className="px-4 py-2 rounded bg-gray-300">
+        <button
+          onClick={onCancel}
+          className="px-4 py-2 rounded bg-gray-300"
+        >
           Cancel
         </button>
         <button
@@ -246,12 +250,29 @@ const CardsPage = () => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   async function loadCards() {
-    const res = await fetchWithAuth(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/billing/cards`,
-      { headers: { "x-org-id": "1" } }
+    const orgId = localStorage.getItem("orgId") || "1";
+
+    const stripeRes = await fetchWithAuth(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/stripe/cards`,
+      { headers: { "x-org-id": orgId } }
     );
-    const json = await safeJson<CardDetails[]>(res);
-    if (json?.success) setCards(json.data);
+    const gpsRes = await fetchWithAuth(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/gps/cards`,
+      { headers: { "x-org-id": orgId } }
+    );
+
+    const stripeJson = await safeJson<CardDetails[]>(stripeRes);
+    const gpsJson = await safeJson<CardDetails[]>(gpsRes);
+
+    const allCards: CardDetails[] = [
+      ...(stripeJson?.data?.map((c) => ({ ...c, paymentProcessor: "stripe" as const })) || []),
+      ...(gpsJson?.data?.map((c) => ({ ...c, paymentProcessor: "gps" as const })) || []),
+    ];
+
+    // sort default cards first
+    allCards.sort((a, b) => (b.isDefault ? 1 : 0) - (a.isDefault ? 1 : 0));
+
+    setCards(allCards);
   }
 
   useEffect(() => {
@@ -309,13 +330,15 @@ const CardsPage = () => {
         <tbody>
           {cards.length ? (
             cards.map((c) => (
-              <tr key={c.id} className="border-t">
+              <tr key={`${c.paymentProcessor}-${c.id}`} className="border-t">
                 <td className="px-4 py-2">{c.brand ?? "-"}</td>
                 <td className="px-4 py-2">{c.last4 ?? "-"}</td>
                 <td className="px-4 py-2">
                   {c.expMonth}/{c.expYear}
                 </td>
-                <td className="px-4 py-2">{c.paymentProcessor}</td>
+                <td className="px-4 py-2">
+                  {c.paymentProcessor.toUpperCase()}
+                </td>
                 <td className="px-4 py-2">{c.isDefault ? "✅" : ""}</td>
               </tr>
             ))
