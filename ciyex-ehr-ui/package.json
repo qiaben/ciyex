@@ -1,8 +1,4 @@
 
-
-
-
-
 {
   "name": "ciyex-connect-patient-portal",
   "version": "2.0.2",
@@ -29,12 +25,17 @@
     "apexcharts": "^4.3.0",
     "autoprefixer": "^10.4.20",
     "flatpickr": "^4.6.13",
-
-    "next": "^15.5.3",
-
     "html2canvas": "^1.4.1",
+    "html2pdf.js": "^0.12.1",
     "jspdf": "^3.0.2",
+    "lucide-react": "^0.544.0",
     "next": "15.4.5",
+
+
+    "puppeteer": "^24.22.0",
+
+
+
 
     "react": "^18.0.0",
     "react-apexcharts": "^1.7.0",
@@ -61,11 +62,7 @@
     "jwt-decode": "^4.0.0",
     "postcss": "^8",
     "tailwindcss": "^4.0.0",
-
-    "typescript": "^5.9.2",
-
     "typescript": "^5"
-
   },
   "overrides": {
     "@react-jvectormap/core": {
@@ -78,3 +75,4 @@
     }
   }
 }
+

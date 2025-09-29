@@ -1,5 +1,6 @@
 "use client";
 
+
 import React, { useEffect, useState } from "react";
 import { useSidebar } from "@/context/SidebarContext";
 import AppHeader from "@/layout/AppHeader";
@@ -54,9 +55,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         "/profile": "User Profile",
         "/appointments": "Appointments",
         "/settings/providers": "Providers",
-        "/settings/forms/lists": "Forms",
+        "/settings/forms/lists": "Lists",
         "/settings/forms/admin": "Encounter Sections",
-        "/settings/forms/config": "Configuration Settings",
+        "/settings/config": "Integration",
+        "/settings/Documents": "Documents Settings",
         "/settings/insurance": "Insurance Companies",
         "/settings/codes": "Codes",
         "/settings": "Settings",
@@ -69,6 +71,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         "/inventory-management/maintenance": "Inventory Maintenance",
         "/inventory-management/settings": "Inventory Settings",
         "/patient_education": "Patient Education",
+        "/all-encounters": "All Encounters",
+      
+        
     };
 
     const pageTitle =

@@ -1,4 +1,5 @@
 'use client';
+
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
@@ -9,35 +10,44 @@ interface Practice {
 
 const PracticeSwitch: React.FC = () => {
     const [practices, setPractices] = useState<Practice[]>([]);
-    const [userOrgIds, setUserOrgIds] = useState<number[]>([]);
+    const [loading, setLoading] = useState(true);
     const router = useRouter();
 
     useEffect(() => {
-        // Simulated data fetch for available practices
-        const fetchedPractices: Practice[] = [
-            { orgId: 1, orgName: "Qiaben Health" },
-            { orgId: 2, orgName: "MediPlus" },
-            { orgId: 3, orgName: "CareWell" }
-        ];
+        try {
+            // Get login data from localStorage
+            const userData = JSON.parse(localStorage.getItem("user") || "{}");
 
-        // Fetch the orgIds from localStorage
-        const orgIdsFromStorage = JSON.parse(localStorage.getItem('orgIds') || '[]');
-        setUserOrgIds(orgIdsFromStorage);
+            // Extract orgs (array with orgId + orgName)
+            const orgs: Practice[] = Array.isArray(userData.orgs) ? userData.orgs : [];
 
-        // Filter practices based on orgIds from localStorage
-        const filteredPractices = fetchedPractices.filter(practice => orgIdsFromStorage.includes(practice.orgId));
-        setPractices(filteredPractices);
+            setPractices(orgs);
+
+            // Auto-select if only one org
+            if (orgs.length === 1) {
+                handlePracticeSelect(orgs[0].orgId);
+            }
+        } catch (err) {
+            console.error("Error loading practices:", err);
+            setPractices([]);
+        } finally {
+            setLoading(false);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const handlePracticeSelect = (orgId: number) => {
-        // Proceed if the orgId is valid for the user
-        if (userOrgIds.includes(orgId)) {
-            localStorage.setItem('orgId', String(orgId));
-            router.push(`/dashboard?orgId=${orgId}`);
-        } else {
-            alert("You do not have access to this practice.");
-        }
+        localStorage.setItem("orgId", String(orgId));
+        router.push(`/dashboard?orgId=${orgId}`);
     };
+
+    if (loading) {
+        return (
+            <div className="flex justify-center items-center min-h-screen bg-gray-100">
+                <p>Loading practices...</p>
+            </div>
+        );
+    }
 
     return (
         <div className="flex justify-center items-center min-h-screen bg-gray-100">
@@ -51,7 +61,7 @@ const PracticeSwitch: React.FC = () => {
                                 onClick={() => handlePracticeSelect(practice.orgId)}
                                 className="w-full p-3 text-left bg-gray-100 hover:bg-gray-200 rounded-md transition"
                             >
-                                {practice.orgName}
+                                {practice.orgName || `Org #${practice.orgId}`}
                             </button>
                         ))
                     ) : (
