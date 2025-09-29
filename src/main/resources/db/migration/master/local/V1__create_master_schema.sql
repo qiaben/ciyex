@@ -55,7 +55,8 @@ BEGIN
             fhir_id character varying(255),
             org_name character varying(255) NOT NULL,
             postal_code character varying(255),
-            state character varying(255)
+            state character varying(255),
+            status character varying(16) NOT NULL DEFAULT 'ACTIVE'
         );
         ALTER TABLE public.orgs OWNER TO postgres;
     END IF;
