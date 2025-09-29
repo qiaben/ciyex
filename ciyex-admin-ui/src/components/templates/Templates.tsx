@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import AdminLayout from "@/app/(admin)/layout";
+import Alert from "../ui/alert/Alert";
 
 // ------------------ Types ------------------
 export type Template = {
@@ -14,7 +15,7 @@ export type Template = {
 // ------------------ Utils ------------------
 const classIf = (cond: boolean, yes: string, no = "") => (cond ? yes : no);
 
-async function safeJson<T = any>(res: Response): Promise<T | null> {
+async function safeJson<T = unknown>(res: Response): Promise<T | null> {
   try {
     return (await res.json()) as T;
   } catch {
@@ -101,40 +102,73 @@ export default function Templates() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<number | string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | string | null>(null);
+  const [alertData, setAlertData] = useState<{
+    variant: "success" | "error" | "warning" | "info";
+    title: string;
+    message: string;
+  } | null>(null);
   const apiBase = useMemo(() => process.env.NEXT_PUBLIC_API_URL, []);
 
   // Pagination
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
+  const [totalCount, setTotalCount] = useState(0);
 
-  // Load data
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      setLoading(true);
-      try {
-        const res = await fetch(`${apiBase}/api/admin/templates`, {
-          headers: authHeaders(),
-        });
-        if (!res.ok) throw new Error(`Load failed (${res.status})`);
-        const json = await safeJson<any>(res);
-        if (cancelled) return;
-        if (Array.isArray(json?.data)) setRows(json!.data);
-        else if (Array.isArray(json)) setRows(json as Template[]);
+  // Load data (server-side pagination)
+  const loadPage = React.useCallback(async (p = page, s = size) => {
+    setLoading(true);
+    try {
+      const url = `${apiBase}/api/admin/templates?page=${p}&size=${s}`;
+      const res = await fetch(url, {
+        headers: authHeaders(),
+      });
+      if (!res.ok) throw new Error(`Load failed (${res.status})`);
+      const json = (await safeJson(res)) as unknown;
+
+      // total count is supplied in header when paginated
+      const totalHeader = res.headers.get("X-Total-Count");
+      const total = totalHeader ? parseInt(totalHeader, 10) : undefined;
+      if (typeof total === "number" && !isNaN(total)) setTotalCount(total);
+
+      // Narrow the unknown JSON safely
+      if (Array.isArray(json)) {
+        setRows(json as Template[]);
+      } else if (json && typeof json === "object") {
+        const asRecord = json as Record<string, unknown>;
+        const maybeData = asRecord["data"];
+        if (Array.isArray(maybeData)) setRows(maybeData as Template[]);
         else setRows([]);
-      } catch (e) {
-        console.error("Failed to load templates:", e);
-      } finally {
-        if (!cancelled) setLoading(false);
+      } else {
+        setRows([]);
       }
+    } catch (e) {
+      console.error("Failed to load templates:", e);
+      setAlertData({ variant: "error", title: "Load Error", message: "Failed to load templates." });
+      setRows([]);
+      setTotalCount(0);
+    } finally {
+      setLoading(false);
     }
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [apiBase]);
+  }, [apiBase, page, size]);
 
-  // Derived lists
+  useEffect(() => {
+    // guard for apiBase absence
+    if (!apiBase) return;
+    // call loadPage for current page/size
+    void loadPage(page, size);
+    // no cleanup required
+  }, [apiBase, loadPage, page, size]);
+
+  // Auto-dismiss alerts after 4s
+  useEffect(() => {
+    if (alertData) {
+      const t = setTimeout(() => setAlertData(null), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [alertData]);
+
+  // Derived lists (from current page rows)
   const allLocations = useMemo(
     () => Array.from(new Set(rows.map((r) => r.locations))).sort(),
     [rows]
@@ -144,7 +178,9 @@ export default function Templates() {
     [rows]
   );
 
-  // Filter + search + sort
+  // When using server-side pagination rows represents the current page content.
+  // We still allow client-side query/filter for filtering within the page, but
+  // the primary pagination counts come from totalCount returned by server.
   const filtered = useMemo(() => {
     let list = [...rows];
 
@@ -172,12 +208,14 @@ export default function Templates() {
     return list;
   }, [rows, query, locationsFilter, typeFilter, sortKey, sortDir]);
 
-  const total = filtered.length;
+  const total = totalCount || 0;
   const totalPages = Math.max(1, Math.ceil(total / size));
-  const pageData = useMemo(() => {
-    const start = (page - 1) * size;
-    return filtered.slice(start, start + size);
-  }, [filtered, page, size]);
+  const pageData = filtered; // server already returned only current page rows
+
+  // If totalCount or size changes, ensure current page is within bounds
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [totalCount, size, totalPages, page]);
 
   // Actions
   const openCreate = () => {
@@ -196,17 +234,19 @@ export default function Templates() {
 
   const remove = async (id?: number | string) => {
     if (id == null) return;
-    if (!confirm("Delete this template?")) return;
     setDeletingId(id);
     try {
       const res = await fetch(`${apiBase}/api/admin/templates/${id}`, {
         method: "DELETE",
         headers: authHeaders(),
       });
-      if (!res.ok) throw new Error(`Delete failed (${res.status})`);
-      setRows((prev) => prev.filter((r) => r.id !== id));
+  if (!res.ok) throw new Error(`Delete failed (${res.status})`);
+  // refresh current page from server to keep pagination consistent
+  await loadPage(page, size);
+  setAlertData({ variant: "success", title: "Deleted", message: "Template deleted." });
     } catch (e) {
       console.error("Failed to delete template:", e);
+      setAlertData({ variant: "error", title: "Delete Failed", message: "Unable to delete template." });
     } finally {
       setDeletingId(null);
     }
@@ -242,15 +282,19 @@ export default function Templates() {
         body: JSON.stringify(draft),
       });
       if (!res.ok) throw new Error(`${isEdit ? "Update" : "Create"} failed (${res.status})`);
-      const json = await safeJson<any>(res);
-      const updated = (json?.data ?? json) as Template;
 
-      if (isEdit) setRows((prev) => prev.map((r) => (r.id === (editing?.id ?? draft.id) ? updated : r)));
-      else setRows((prev) => [updated, ...prev]);
+      // Refresh the current page — server assigns IDs and pagination must stay consistent
+      await loadPage(page, size);
+      if (isEdit) {
+        setAlertData({ variant: "success", title: "Updated", message: "Template updated." });
+      } else {
+        setAlertData({ variant: "success", title: "Created", message: "Template created." });
+      }
 
       setShowModal(false);
     } catch (e) {
       console.error("Failed to save template:", e);
+      setAlertData({ variant: "error", title: "Save Failed", message: "Unable to save template." });
     } finally {
       setSaving(false);
     }
@@ -268,6 +312,12 @@ export default function Templates() {
     <AdminLayout>
       <div className="min-h-screen bg-gray-50 text-gray-900 dark:bg-neutral-900 dark:text-neutral-100">
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+          {/* Alert */}
+          {alertData && (
+            <div className="mb-4">
+              <Alert variant={alertData.variant} title={alertData.title} message={alertData.message} />
+            </div>
+          )}
           {/* Header */}
           <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div>
@@ -412,7 +462,7 @@ export default function Templates() {
                           Edit
                         </button>
                         <button
-                          onClick={() => remove(t.id)}
+                          onClick={() => setConfirmDeleteId(t.id ?? null)}
                           disabled={deletingId === t.id}
                           className={
                             "rounded-xl border px-3 py-1 text-xs font-medium transition " +
@@ -493,17 +543,18 @@ export default function Templates() {
             )}
 
             <form onSubmit={upsert} className="space-y-3">
-              {/* ID is optional; backend will assign if absent. Shown as read-only when editing. */}
-              <div>
-                <label className="mb-1 block text-sm font-medium">Template ID</label>
-                <input
-                  value={String(form.id ?? "")}
-                  onChange={(e) => setForm({ ...form, id: e.target.value })}
-                  placeholder={editing ? undefined : "Leave blank to auto-assign"}
-                  disabled={Boolean(editing)}
-                  className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-black focus:outline-none focus:ring-1 focus:ring-black disabled:cursor-not-allowed disabled:bg-gray-100 dark:border-neutral-700 dark:bg-neutral-800 dark:focus:border-white dark:focus:ring-white"
-                />
-              </div>
+              {/* ID is optional; backend will assign if absent. Show only when editing. */}
+              {editing && (
+                <div>
+                  <label className="mb-1 block text-sm font-medium">Template ID</label>
+                  <input
+                    value={String(form.id ?? "")}
+                    onChange={(e) => setForm({ ...form, id: e.target.value })}
+                    disabled
+                    className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-black focus:outline-none focus:ring-1 focus:ring-black disabled:cursor-not-allowed disabled:bg-gray-100 dark:border-neutral-700 dark:bg-neutral-800 dark:focus:border-white dark:focus:ring-white"
+                  />
+                </div>
+              )}
               <div>
                 <label className="mb-1 block text-sm font-medium">Locations</label>
                 <input
@@ -553,6 +604,36 @@ export default function Templates() {
               </div>
             </form>
           </Modal>
+
+          {/* In-app Delete Confirmation Modal (replaces window.confirm) */}
+          {confirmDeleteId != null && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+              <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
+                <h3 className="text-lg font-semibold text-gray-900">Delete Template</h3>
+                <p className="mt-2 text-sm text-gray-600">Are you sure you want to delete this template?</p>
+
+                <div className="mt-6 flex justify-end gap-3">
+                  <button
+                    onClick={() => setConfirmDeleteId(null)}
+                    className="rounded-md border px-4 py-2 text-gray-700 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={async () => {
+                      // call existing remove() and close modal
+                      const id = confirmDeleteId as string | number;
+                      setConfirmDeleteId(null);
+                      await remove(id);
+                    }}
+                    className="rounded-md bg-rose-600 px-4 py-2 text-white hover:bg-rose-700"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </AdminLayout>

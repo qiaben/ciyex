@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import Alert from "../ui/alert/Alert";
 
 type Org = {
   id: number;
@@ -118,18 +119,29 @@ export default function OrganizationsTable() {
   const [pendingToggle, setPendingToggle] = useState<Record<number, boolean>>(
     {}
   );
+  const [alertData, setAlertData] = useState<{
+    variant: "success" | "error" | "warning" | "info";
+    title: string;
+    message: string;
+  } | null>(null);
 
   const getHeaders = () => {
     const token = localStorage.getItem("token");
     const facilityId = localStorage.getItem("facilityId") || "1";
     const role = localStorage.getItem("role") || "SUPER_ADMIN";
 
-    return {
-      Authorization: `Bearer ${token}`,
+    const headers: Record<string, string> = {
       "Content-Type": "application/json",
       "x-facility-id": facilityId,
       "x-role": role,
     };
+
+    // Only include Authorization header when a token exists
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    return headers;
   };
 
   // Load organizations
@@ -149,8 +161,19 @@ export default function OrganizationsTable() {
           setOrgs(data);
         }
       })
-      .catch((err) => console.error("Failed to load organizations:", err));
+      .catch((err) => {
+        console.error("Failed to load organizations:", err);
+        setAlertData({ variant: "error", title: "Load Error", message: "Failed to load organizations." });
+      });
   }, []);
+
+  // Auto-dismiss alerts after 4s
+  useEffect(() => {
+    if (alertData) {
+      const t = setTimeout(() => setAlertData(null), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [alertData]);
 
   // Toggle status
   const toggleStatus = (org: Org) => {
@@ -172,15 +195,20 @@ export default function OrganizationsTable() {
         return res.json();
       })
       .then((data) => {
-        setOrgs((prev) =>
-          prev.map((o) => (o.id === org.id && data?.data ? data.data : o))
-        );
+        if (data?.data) {
+          setOrgs((prev) => prev.map((o) => (o.id === org.id ? data.data : o)));
+        } else {
+          // keep optimistic change
+          setOrgs((prev) => prev.map((o) => (o.id === org.id ? { ...o, status: nextStatus } : o)));
+        }
+        setAlertData({ variant: "success", title: "Status Updated", message: `${org.orgName} is now ${nextStatus}` });
       })
       .catch((err) => {
         console.error("Failed to toggle status:", err);
         setOrgs((prev) =>
           prev.map((o) => (o.id === org.id ? { ...o, status: org.status } : o))
         );
+        setAlertData({ variant: "error", title: "Update Failed", message: "Unable to update status." });
       })
       .finally(() => setPendingToggle((p) => ({ ...p, [org.id]: false })));
   };
@@ -201,16 +229,9 @@ export default function OrganizationsTable() {
    setOrgs((prev) => prev.map((o) => (o.id === form.id ? form : o)));
    setShowModal(false);
 
-   const token = localStorage.getItem("token");
-   const role = localStorage.getItem("role") || "SUPER_ADMIN";
-
    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/orgs/${form.id}`, {
      method: "PUT",
-     headers: {
-       Authorization: `Bearer ${token}`,
-       "Content-Type": "application/json",
-       "x-role": role,
-     },
+     headers: getHeaders(),
      body: JSON.stringify(form),
    })
      .then((res) => {
@@ -218,11 +239,14 @@ export default function OrganizationsTable() {
        return res.json();
      })
      .then((data) => {
-       if (data?.data) {
-         setOrgs((prev) =>
-           prev.map((o) => (o.id === form.id ? data.data : o))
-         );
-       }
+      // If server returns updated entity in `data`, use it; otherwise keep optimistic value
+      if (data?.data) {
+        setOrgs((prev) => prev.map((o) => (o.id === form.id ? data.data : o)));
+      } else {
+        // ensure state reflects saved form (optimistic already applied above)
+        setOrgs((prev) => prev.map((o) => (o.id === form.id ? form : o)));
+      }
+      setAlertData({ variant: "success", title: "Saved", message: "Organization updated." });
      })
      .catch((err) => {
        console.error("Failed to save organization:", err);
@@ -230,12 +254,18 @@ export default function OrganizationsTable() {
        setOrgs((prev) =>
          prev.map((o) => (o.id === form.id ? editing! : o))
        );
+      setAlertData({ variant: "error", title: "Save Failed", message: "Unable to save organization." });
      });
  };
 
 
   return (
     <div className="p-6">
+      {alertData && (
+        <div className="mb-4">
+          <Alert variant={alertData.variant} title={alertData.title} message={alertData.message} />
+        </div>
+      )}
       <h2 className="mb-4 text-xl font-semibold">Organizations Table</h2>
       <div className="overflow-x-auto shadow-md sm:rounded-lg">
         <table className="min-w-full text-left text-sm text-gray-600 dark:text-gray-300">
