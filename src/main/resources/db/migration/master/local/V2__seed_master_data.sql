@@ -1,7 +1,7 @@
-INSERT INTO public.orgs (address, city, country, org_name, postal_code, state) VALUES
-                                                                                   ('123 Main St', 'Denver', 'USA', 'Qiaben Health', '80202', 'CO'),
-                                                                                   ('456 Elm St', 'Austin', 'USA', 'MediPlus', '73301', 'TX'),
-                                                                                   ('789 Oak St', 'Seattle', 'USA', 'CareWell', '98101', 'WA');
+INSERT INTO public.orgs (address, city, country, org_name, postal_code, state, status) VALUES
+                                                                                   ('123 Main St', 'Denver', 'USA', 'Qiaben Health', '80202', 'CO', 'ACTIVE'),
+                                                                                   ('456 Elm St', 'Austin', 'USA', 'MediPlus', '73301', 'TX', 'ACTIVE'),
+                                                                                   ('789 Oak St', 'Seattle', 'USA', 'CareWell', '98101', 'WA', 'ACTIVE');
 
 -- Password: Password@123
 INSERT INTO public.users (id, city, country, date_of_birth, email, first_name, last_name, middle_name, password, phone_number, postal_code, profile_image, security_answer, security_question, state, street, street2) VALUES (3, 'Seattle', 'USA', '1978-03-09', 'carol@example.com', 'Carol', 'Williams', 'A', '$2a$10$ahU0XEA0CXaNasoPiqjNXeoDi.YrFqyMo5RESPpzpCL5hvMe71dm2', '206-555-0122', '98101', 'carol.png', 'Green', 'What is your favorite color?', 'WA', '300 Maple Rd', null);
