@@ -58,16 +58,20 @@ export default function SuperAdminSignIn() {
       const data = await res.json();
 
       if (data.success && data.data) {
-          const { token, email, orgs, firstName, lastName, name } = data.data;
+          const { token, email, orgs = [], firstName, lastName, name, role, roles } = data.data;
 
-        // ✅ Keep only SUPER_ADMIN orgs
-      const superAdminOrgs = orgs.filter((org: Org) =>
-        org.roles.includes("SUPER_ADMIN")
-      );
+        // Keep only SUPER_ADMIN orgs (if any)
+        const superAdminOrgs = Array.isArray(orgs)
+          ? orgs.filter((org: Org) => Array.isArray(org.roles) && org.roles.includes("SUPER_ADMIN"))
+          : [];
 
+        // Determine if the user is a SUPER_ADMIN either at user-level or via org membership
+        const isUserSuperAdmin =
+          role === "SUPER_ADMIN" ||
+          (Array.isArray(roles) && roles.includes("SUPER_ADMIN")) ||
+          superAdminOrgs.length > 0;
 
-
-        if (superAdminOrgs.length === 0) {
+        if (!isUserSuperAdmin) {
           setError("⚠️ Only super admins can login here.");
           setLoading(false);
           return;
@@ -77,24 +81,22 @@ export default function SuperAdminSignIn() {
         localStorage.setItem("token", token);
         localStorage.setItem("userEmail", email);
         localStorage.setItem("role", "SUPER_ADMIN");
+        // store any SUPER_ADMIN orgs (may be empty)
         localStorage.setItem("orgs", JSON.stringify(superAdminOrgs));
         localStorage.setItem("user", JSON.stringify(data.data));
-          const fullName =
-              [firstName, lastName].filter(Boolean).join(" ") ||
-              name ||
-              email;
-          localStorage.setItem("userFullName", fullName);
+        const fullName = [firstName, lastName].filter(Boolean).join(" ") || name || email;
+        localStorage.setItem("userFullName", fullName);
 
-
-          if (superAdminOrgs.length === 1) {
-          // ✅ Go straight to the only SUPER_ADMIN org
+        // For SUPER_ADMIN users we do not require selecting/switching orgs — send them to dashboard.
+        // If there is exactly one SUPER_ADMIN org we optionally persist it locally for convenience.
+        if (superAdminOrgs.length === 1) {
           const org = superAdminOrgs[0];
           localStorage.setItem("orgId", org.orgId.toString());
           localStorage.setItem("orgName", org.orgName);
-            router.push(`/dashboard?orgId=${org.orgId}`);
-        } else {
-          // ✅ Multiple SUPER_ADMIN orgs → switch page
-            router.push("/super-admin-practice-switch");}
+        }
+
+        // Redirect to dashboard (no multi-org switch required for SUPER_ADMIN)
+        router.push("/dashboard");
       } else {
         setError(data.message || "Invalid credentials");
       }

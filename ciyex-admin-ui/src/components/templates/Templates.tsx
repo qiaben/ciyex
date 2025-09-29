@@ -1,0 +1,460 @@
+"use client";
+
+import React, { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+import AdminLayout from "@/app/(admin)/layout";
+
+// ------------------ Types ------------------
+export type Template = {
+  id: string;
+  locations: string; // logical grouping (formerly "classpath")
+  practiceType: string;
+};
+
+// ------------------ Mock Data ------------------
+const seedTemplates: Template[] = [
+  { id: "TPL-0001", locations: "IntakeForms", practiceType: "Medical" },
+  { id: "TPL-0002", locations: "ConsentForms", practiceType: "Dental" },
+  { id: "TPL-0003", locations: "ExamForms", practiceType: "Vision" },
+  { id: "TPL-0004", locations: "PediatricForms", practiceType: "Medical" },
+];
+
+// ------------------ Utils ------------------
+const classIf = (cond: boolean, yes: string, no = "") => (cond ? yes : no);
+
+// ------------------ Portal Modal ------------------
+function Modal({
+  open,
+  onClose,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    if (open) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = prev;
+      };
+    }
+  }, [open]);
+
+  if (!open || !mounted) return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl dark:bg-neutral-900"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {children}
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+// ------------------ Main Component ------------------
+export default function Templates() {
+  // In-memory only (no localStorage)
+  const [rows, setRows] = useState<Template[]>(() => seedTemplates);
+  const [query, setQuery] = useState("");
+  const [locationsFilter, setLocationsFilter] = useState("All Locations");
+  const [typeFilter, setTypeFilter] = useState("All Types");
+  const [sortKey, setSortKey] = useState<keyof Template>("id");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+  // Modal + form state
+  const [showModal, setShowModal] = useState(false);
+  const [editing, setEditing] = useState<Template | null>(null);
+  const [form, setForm] = useState<Template>({ id: "", locations: "", practiceType: "" });
+  const [error, setError] = useState<string>("");
+
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [size, setSize] = useState(10);
+
+  // Derived lists
+  const allLocations = useMemo(
+    () => Array.from(new Set(rows.map((r) => r.locations))).sort(),
+    [rows]
+  );
+  const allTypes = useMemo(
+    () => Array.from(new Set(rows.map((r) => r.practiceType))).sort(),
+    [rows]
+  );
+
+  // Filter + search + sort
+  const filtered = useMemo(() => {
+    let list = [...rows];
+
+    if (query.trim()) {
+      const q = query.trim().toLowerCase();
+      list = list.filter(
+        (r) =>
+          r.id.toLowerCase().includes(q) ||
+          r.locations.toLowerCase().includes(q) ||
+          r.practiceType.toLowerCase().includes(q)
+      );
+    }
+
+    if (locationsFilter !== "All Locations")
+      list = list.filter((r) => r.locations === locationsFilter);
+    if (typeFilter !== "All Types") list = list.filter((r) => r.practiceType === typeFilter);
+
+    list.sort((a, b) => {
+      const A = String(a[sortKey]).toLowerCase();
+      const B = String(b[sortKey]).toLowerCase();
+      if (A < B) return sortDir === "asc" ? -1 : 1;
+      if (A > B) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+
+    return list;
+  }, [rows, query, locationsFilter, typeFilter, sortKey, sortDir]);
+
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / size));
+  const pageData = useMemo(() => {
+    const start = (page - 1) * size;
+    return filtered.slice(start, start + size);
+  }, [filtered, page, size]);
+
+  // Actions
+  const openCreate = () => {
+    setEditing(null);
+    setForm({ id: "", locations: "", practiceType: "" });
+    setError("");
+    setShowModal(true);
+  };
+
+  const openEdit = (t: Template) => {
+    setEditing(t);
+    setForm({ ...t });
+    setError("");
+    setShowModal(true);
+  };
+
+  const remove = (id: string) => {
+    if (!confirm("Delete this template?")) return;
+    setRows((prev) => prev.filter((r) => r.id !== id));
+  };
+
+  const validate = (draft: Template) => {
+    if (!draft.locations.trim()) return "Locations is required";
+    if (!draft.practiceType.trim()) return "Practice type is required";
+    return "";
+  };
+
+  const upsert = (e: React.FormEvent) => {
+    e.preventDefault();
+    const draft: Template = {
+      ...form,
+      id: form.id?.trim() || generateId(),
+      locations: form.locations.trim(),
+      practiceType: form.practiceType.trim(),
+    };
+    const msg = validate(draft);
+    if (msg) return setError(msg);
+
+    setRows((prev) => {
+      const exists = prev.some((r) => r.id === draft.id);
+      if (exists) return prev.map((r) => (r.id === draft.id ? draft : r));
+      return [draft, ...prev];
+    });
+    setShowModal(false);
+  };
+
+  const generateId = () => {
+    const n = Math.floor(Math.random() * 9000) + 1000;
+    return `TPL-${n}`;
+  };
+
+  const toggleSort = (key: keyof Template) => {
+    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  };
+
+  return (
+    <AdminLayout>
+      <div className="min-h-screen bg-gray-50 text-gray-900 dark:bg-neutral-900 dark:text-neutral-100">
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+          {/* Header */}
+          <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight">Templates</h1>
+              <p className="mt-1 text-sm text-gray-600 dark:text-neutral-400">
+                Manage reusable templates with ID, locations and practice type.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={openCreate}
+                className="inline-flex items-center rounded-2xl border border-transparent bg-black px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-gray-800 dark:bg:white dark:text-black dark:hover:bg-neutral-200"
+              >
+                + New Template
+              </button>
+            </div>
+          </div>
+
+          {/* Toolbar */}
+          <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <label className="mb-1 block text-sm font-medium">Search</label>
+              <input
+                value={query}
+                onChange={(e) => {
+                  setPage(1);
+                  setQuery(e.target.value);
+                }}
+                placeholder="Search by id, locations or type"
+                className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-black focus:outline-none focus:ring-1 focus:ring-black dark:border-neutral-700 dark:bg-neutral-800 dark:focus:border-white dark:focus:ring-white"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium">Locations</label>
+              <select
+                value={locationsFilter}
+                onChange={(e) => {
+                  setPage(1);
+                  setLocationsFilter(e.target.value);
+                }}
+                className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-black focus:outline-none focus:ring-1 focus:ring-black dark:border-neutral-700 dark:bg-neutral-800 dark:focus:border-white dark:focus:ring-white"
+              >
+                <option>All Locations</option>
+                {allLocations.map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium">Practice Type</label>
+              <select
+                value={typeFilter}
+                onChange={(e) => {
+                  setPage(1);
+                  setTypeFilter(e.target.value);
+                }}
+                className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-black focus:outline-none focus:ring-1 focus:ring-black dark:border-neutral-700 dark:bg-neutral-800 dark:focus:border-white dark:focus:ring-white"
+              >
+                <option>All Types</option>
+                {allTypes.map((t) => (
+                  <option key={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium">Page Size</label>
+              <select
+                value={size}
+                onChange={(e) => {
+                  setPage(1);
+                  setSize(Number(e.target.value));
+                }}
+                className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-black focus:outline-none focus:ring-1 focus:ring-black dark:border-neutral-700 dark:bg-neutral-800 dark:focus:border-white dark:focus:ring-white"
+              >
+                {[5, 10, 20, 50].map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Table */}
+          <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-neutral-800">
+              <thead className="bg-gray-50/70 dark:bg-neutral-900/50">
+                <tr>
+                  {[
+                    { key: "id", label: "Template ID" },
+                    { key: "locations", label: "Locations" },
+                    { key: "practiceType", label: "Practice Type" },
+                    { key: "actions", label: "Actions" },
+                  ].map((col) => (
+                    <th
+                      key={col.key}
+                      className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-600 dark:text-neutral-400"
+                    >
+                      {col.key !== "actions" ? (
+                        <button
+                          onClick={() => toggleSort(col.key as keyof Template)}
+                          className="flex items-center gap-1 hover:underline"
+                        >
+                          {col.label}
+                          <span className="text-[10px] opacity-60">
+                            {sortKey === (col.key as keyof Template) ? (sortDir === "asc" ? "▲" : "▼") : ""}
+                          </span>
+                        </button>
+                      ) : (
+                        col.label
+                      )}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 dark:divide-neutral-800">
+                {pageData.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-10 text-center text-sm text-gray-500 dark:text-neutral-400">
+                      No templates found.
+                    </td>
+                  </tr>
+                )}
+                {pageData.map((t) => (
+                  <tr key={t.id} className="hover:bg-gray-50 dark:hover:bg-neutral-800/50">
+                    <td className="whitespace-nowrap px-4 py-3 text-sm font-medium">{t.id}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm">{t.locations}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm">{t.practiceType}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => openEdit(t)}
+                          className="rounded-xl border border-gray-300 px-3 py-1 text-xs font-medium transition hover:bg-gray-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => remove(t.id)}
+                          className="rounded-xl border border-red-300 px-3 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50 dark:border-red-800/60 dark:hover:bg-red-900/30"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Footer / Pagination */}
+          <div className="mt-4 flex flex-col items-center justify-between gap-3 sm:flex-row">
+            <div className="text-sm text-gray-600 dark:text-neutral-400">
+              Showing <span className="font-medium">{pageData.length}</span> of{" "}
+              <span className="font-medium">{total}</span> templates
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className={
+                  "rounded-xl border px-3 py-1 text-sm " +
+                  classIf(
+                    page <= 1,
+                    "cursor-not-allowed border-gray-200 text-gray-300 dark:border-neutral-800 dark:text-neutral-700",
+                    "border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                  )
+                }
+              >
+                Prev
+              </button>
+              <span className="text-sm">
+                Page <span className="font-medium">{page}</span> of <span className="font-medium">{totalPages}</span>
+              </span>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                className={
+                  "rounded-xl border px-3 py-1 text-sm " +
+                  classIf(
+                    page >= totalPages,
+                    "cursor-not-allowed border-gray-200 text-gray-300 dark:border-neutral-800 dark:text-neutral-700",
+                    "border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                  )
+                }
+              >
+                Next
+              </button>
+            </div>
+          </div>
+
+          {/* Modal (Portal) */}
+          <Modal open={showModal} onClose={() => setShowModal(false)}>
+            <div className="mb-4 flex items-start justify-between">
+              <h2 className="text-lg font-semibold">{editing ? "Edit Template" : "New Template"}</h2>
+              <button
+                onClick={() => setShowModal(false)}
+                className="rounded-full px-2 py-1 text-sm text-gray-500 hover:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
+              >
+                ✕
+              </button>
+            </div>
+
+            {error && (
+              <div className="mb-3 rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800/60 dark:bg-red-950/30 dark:text-red-300">
+                {error}
+              </div>
+            )}
+
+            <form onSubmit={upsert} className="space-y-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium">Template ID (optional)</label>
+                <input
+                  value={form.id}
+                  onChange={(e) => setForm({ ...form, id: e.target.value })}
+                  placeholder="e.g., TPL-1234 (auto if blank)"
+                  className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-black focus:outline-none focus:ring-1 focus:ring-black dark:border-neutral-700 dark:bg-neutral-800 dark:focus:border-white dark:focus:ring-white"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">Locations</label>
+                <input
+                  value={form.locations}
+                  onChange={(e) => setForm({ ...form, locations: e.target.value })}
+                  placeholder="e.g., IntakeForms"
+                  required
+                  className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-black focus:outline-none focus:ring-1 focus:ring-black dark:border-neutral-700 dark:bg-neutral-800 dark:focus:border-white dark:focus:ring-white"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">Practice Type</label>
+                <select
+                  value={form.practiceType}
+                  onChange={(e) => setForm({ ...form, practiceType: e.target.value })}
+                  required
+                  className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-black focus:outline-none focus:ring-1 focus:ring-black dark:border-neutral-700 dark:bg-neutral-800 dark:focus:border-white dark:focus:ring-white"
+                >
+                  <option value="">Select…</option>
+                  <option>Medical</option>
+                  <option>Dental</option>
+                  <option>Vision</option>
+                  <option>Other</option>
+                </select>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="rounded-xl border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-2xl bg-black px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
+                >
+                  {editing ? "Save Changes" : "Create"}
+                </button>
+              </div>
+            </form>
+          </Modal>
+        </div>
+      </div>
+    </AdminLayout>
+  );
+}
