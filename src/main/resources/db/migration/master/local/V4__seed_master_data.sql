@@ -15,4 +15,3 @@ INSERT INTO public.user_org_roles (role, org_id, user_id) VALUES
                                                               ('BILLER', 2, 2),
                                                               ('NURSE', 3, 1),
                                                               ('RECEPTIONIST', 3, 3);
-
