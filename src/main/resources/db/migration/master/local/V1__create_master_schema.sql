@@ -261,7 +261,6 @@ BEGIN
     ) THEN
         CREATE TABLE public.admin_templates (
             id bigint NOT NULL,
-            org_id bigint NOT NULL,
             locations character varying(255) NOT NULL,
             practice_type character varying(255) NOT NULL,
             created_at timestamp without time zone NOT NULL,
@@ -302,14 +301,7 @@ END
 $$;
 
 -- Foreign key to orgs
-DO $$
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_admin_templates_org_id') THEN
-        ALTER TABLE ONLY public.admin_templates
-            ADD CONSTRAINT fk_admin_templates_org_id FOREIGN KEY (org_id) REFERENCES public.orgs(id);
-    END IF;
-END
-$$;
+-- (removed fk_admin_templates_org_id since admin_templates no longer contains org_id)
 
 
 
