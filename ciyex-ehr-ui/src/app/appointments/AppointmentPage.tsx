@@ -646,7 +646,7 @@ import VitalsList from "@/components/encounter/Vitals/Vitalslist";
 export type AppointmentDTO = {
   id: number;
   visitType: string;
-  patientId: number; // still used for MRN
+  patientId: number;
   providerId: number;
   appointmentStartDate: string;
   appointmentEndDate: string;
@@ -657,7 +657,7 @@ export type AppointmentDTO = {
   status: string;
   reason: string;
   orgId: number;
-  patientName?: string; // resolved from patient API
+  patientName?: string;
   audit: {
     createdDate: string;
     lastModifiedDate: string;
@@ -712,7 +712,7 @@ const fetchPatientName = async (id: number): Promise<string> => {
   }
 };
 
-/** Right-side drawer (frame only) */
+
 function Drawer({
   open,
   onClose,
@@ -726,28 +726,28 @@ function Drawer({
 }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex">
-      <div className="flex-1 bg-black/40" onClick={onClose} />
-      <div className="w-[800px] max-w-full bg-white dark:bg-slate-900 shadow-xl p-6 overflow-y-auto animate-slideInRight">
-        <button className="mb-4 text-sm text-gray-500 hover:text-gray-700" onClick={onClose}>
-          ✕ Close
-        </button>
-        <h2 className="text-lg font-semibold mb-4">{title}</h2>
-        {children}
+      <div className="fixed inset-0 z-50 flex">
+        <div className="flex-1 bg-black/40" onClick={onClose} />
+        <div className="w-[800px] max-w-full bg-white dark:bg-slate-900 shadow-xl p-6 overflow-y-auto animate-slideInRight">
+          <button className="mb-4 text-sm text-gray-500 hover:text-gray-700" onClick={onClose}>
+            ✕ Close
+          </button>
+          <h2 className="text-lg font-semibold mb-4">{title}</h2>
+          {children}
+        </div>
       </div>
-    </div>
   );
 }
 
 export default function AppointmentPage() {
-  const [category, setCategory] = useState<string>("All Visit Categories");
+  const [category, setCategory] = useState("All Visit Categories");
   const [categories, setCategories] = useState<string[]>([]);
-  const [provider, setProvider] = useState<string>("All Providers");
+  const [provider, setProvider] = useState("All Providers");
   const [providers, setProviders] = useState<Provider[]>([]);
-  const [location, setLocation] = useState<string>("All Locations");
+  const [location, setLocation] = useState("All Locations");
   const [locations, setLocations] = useState<Location[]>([]);
-  const [from, setFrom] = useState<string>("");
-  const [to, setTo] = useState<string>("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const [patientName, setPatientName] = useState("");
   const [rows, setRows] = useState<AppointmentDTO[]>([]);
 
@@ -771,14 +771,13 @@ export default function AppointmentPage() {
   const [selectedRow, setSelectedRow] = useState<AppointmentDTO | null>(null);
   const [activeSection, setActiveSection] = useState<DrawerSection>("notes");
 
-  // Visit Categories (active only)
   useEffect(() => {
     const fetchCategories = async () => {
       try {
         const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/list-options/list/Visit Type`);
         if (!res.ok) throw new Error("Failed to fetch categories");
         const data = await res.json();
-        const active = (data as Category[]).filter((c) => c.activity === 1).map((c) => c.title || c.optionName);
+        const active = (data as Category[]).filter(c => c.activity === 1).map(c => c.title || c.optionName);
         setCategories(active);
       } catch { setCategories([]); }
       finally { setLoadingCategories(false); }
@@ -786,16 +785,15 @@ export default function AppointmentPage() {
     fetchCategories();
   }, []);
 
-  // Providers
   useEffect(() => {
     const fetchProviders = async () => {
       try {
         const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/providers`);
         if (!res.ok) throw new Error("Failed to fetch providers");
         const data = await res.json();
-        const list: Provider[] = data.data.map((p: { id: number; identification: { firstName: string; lastName: string } }) => ({
-          id: p.id,
-          name: `${p.identification.firstName} ${p.identification.lastName}`,
+        const list: Provider[] = data.data.map((p: {id:number;identification:{firstName:string;lastName:string}})=>({
+          id:p.id,
+          name:`${p.identification.firstName} ${p.identification.lastName}`,
         }));
         setProviders(list);
       } catch { setProviders([]); }
@@ -804,14 +802,13 @@ export default function AppointmentPage() {
     fetchProviders();
   }, []);
 
-  // Locations
   useEffect(() => {
     const fetchLocations = async () => {
       try {
         const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/locations`);
         if (!res.ok) throw new Error("Failed to fetch locations");
         const data = await res.json();
-        const list: Location[] = data.data.map((l: { id: number; name: string }) => ({ id: l.id, name: l.name }));
+        const list: Location[] = data.data.map((l:{id:number;name:string})=>({id:l.id,name:l.name}));
         setLocations(list);
       } catch { setLocations([]); }
       finally { setLoadingLocations(false); }
@@ -819,17 +816,15 @@ export default function AppointmentPage() {
     fetchLocations();
   }, []);
 
-  // Default date range: last month -> today
   useEffect(() => {
     const today = new Date();
     const lastMonth = new Date(today);
     lastMonth.setMonth(today.getMonth() - 1);
-    const fmt = (d: Date) => `${pad(d.getMonth() + 1)}/${pad(d.getDate())}/${d.getFullYear()}`;
+    const fmt = (d:Date)=>`${pad(d.getMonth()+1)}/${pad(d.getDate())}/${d.getFullYear()}`;
     setFrom(fmt(lastMonth));
     setTo(fmt(today));
   }, []);
 
-  // ---- Appointments loader ----
   const loadAppointments = useCallback(async () => {
     setLoadingAppointments(true);
     try {
@@ -874,10 +869,9 @@ export default function AppointmentPage() {
     }
   }, [currentPage, pageSize, statusFilter]);
 
-  // Initial & pagination fetch
-  useEffect(() => { loadAppointments(); }, [loadAppointments]);
+  useEffect(()=>{ loadAppointments(); },[loadAppointments]);
 
-  const onRefresh = () => { loadAppointments(); };
+  const onRefresh = () => loadAppointments();
   const onPrint = () => window.print();
   const onKiosk = () => {
     const el = tableRef.current as FullscreenElement | null;
@@ -1026,19 +1020,31 @@ export default function AppointmentPage() {
               className="rounded-md border px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600" />
           </div>
 
-          <div className="flex gap-2">
-            <button onClick={onRefresh} disabled={loadingAppointments}
-              className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60" title="Refresh table data">
-              Refresh
-            </button>
-            <button onClick={onPrint} className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">
-              Print
-            </button>
-            <button onClick={onKiosk} className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">
-              Kiosk
-            </button>
+          {/* Filters */}
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 w-full">
+              <select value={category} onChange={e=>setCategory(e.target.value)} className="rounded-md border px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600">
+                <option value="All Visit Categories">All Visit Categories</option>
+                {loadingCategories?<option disabled>Loading...</option>:categories.map((c,idx)=>(<option key={idx} value={c}>{c}</option>))}
+              </select>
+              <select value={provider} onChange={e=>setProvider(e.target.value)} className="rounded-md border px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600">
+                <option value="All Providers">All Providers</option>
+                {loadingProviders?<option disabled>Loading...</option>:providers.map(p=>(<option key={p.id} value={p.id}>{p.name}</option>))}
+              </select>
+              <select value={location} onChange={e=>setLocation(e.target.value)} className="rounded-md border px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600">
+                <option value="All Locations">All Locations</option>
+                {loadingLocations?<option disabled>Loading...</option>:locations.map(l=>(<option key={l.id} value={l.id}>{l.name}</option>))}
+              </select>
+              <input type="text" placeholder="MM/DD/YYYY" value={from} onChange={e=>setFrom(e.target.value)} className="rounded-md border px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600"/>
+              <input type="text" placeholder="MM/DD/YYYY" value={to} onChange={e=>setTo(e.target.value)} className="rounded-md border px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600"/>
+              <input type="text" placeholder="Patient Name" value={patientName} onChange={e=>setPatientName(e.target.value)} className="rounded-md border px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600"/>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={onRefresh} disabled={loadingAppointments} className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60">Refresh</button>
+              <button onClick={onPrint} className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">Print</button>
+              <button onClick={onKiosk} className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">Kiosk</button>
+            </div>
           </div>
-        </div>
 
         {/* Table */}
         <div ref={tableRef} className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-md">
@@ -1188,22 +1194,8 @@ export default function AppointmentPage() {
                   </tr>
                 ))
               )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination */}
-        <div className="mt-3 flex items-center justify-between px-3 py-2 border-t bg-white dark:bg-gray-900 dark:border-gray-700 text-sm">
-          <div className="flex items-center gap-3">
-            <button disabled={currentPage === 1 || loadingAppointments} onClick={handlePrevious}
-              className="px-3 py-1.5 border rounded disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800">
-              Prev
-            </button>
-            <div>Page {currentPage} of {totalPages}</div>
-            <button disabled={currentPage === totalPages || loadingAppointments} onClick={handleNext}
-              className="px-3 py-1.5 border rounded disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800">
-              Next
-            </button>
+              </tbody>
+            </table>
           </div>
           <div className="flex items-center gap-4">
             <div>Showing {loadingAppointments ? "…" : filtered.length} of {totalItems}</div>

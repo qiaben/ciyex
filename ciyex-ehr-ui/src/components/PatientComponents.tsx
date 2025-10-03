@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { fetchWithAuth } from "@/utils/fetchWithAuth";
+import VideoCallButton from "@/components/telehealth/VideoCallButton";
 
 /* ---------------- TYPES ---------------- */
 interface AppointmentDTO {
@@ -180,6 +181,7 @@ export const AppointmentsFlat: React.FC<{
                         <th className="px-4 py-2 text-left">Provider</th>
                         <th className="px-4 py-2 text-left">Visit Type</th>
                         <th className="px-4 py-2 text-left">Status</th>
+                        <th className="px-4 py-2 text-left">Video Call</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -211,11 +213,20 @@ export const AppointmentsFlat: React.FC<{
                       {appt.status}
                     </span>
                                 </td>
+                                <td className="px-4 py-2">
+                                    {(appt.status === "Scheduled" && (appt.visitType === "Telehealth" || appt.visitType === "Video Consultation")) ? (
+                                        <VideoCallButton 
+                                            patientId={appt.patientId}
+                                            appointmentId={appt.id} providerId={0}                                        />
+                                    ) : (
+                                        "—"
+                                    )}
+                                </td>
                             </tr>
                         ))
                     ) : (
                         <tr>
-                            <td colSpan={5} className="px-4 py-6 text-center text-gray-400">
+                            <td colSpan={6} className="px-4 py-6 text-center text-gray-400">
                                 {searchTerm
                                     ? "No matching appointments found"
                                     : "No appointments scheduled"}
