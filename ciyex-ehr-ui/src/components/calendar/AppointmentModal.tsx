@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -627,23 +628,25 @@ const AppointmentModal: React.FC = () => {
                 </DialogHeader>
 
                 {/* Video Call Section - Show for existing appointments */}
-                {selectedEvent && selectedPatientId && providerId && (
+                {/* If you want to show telehealth options for new appointments, remove the selectedEvent check */}
+                {selectedPatientId && providerId && (
                     <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
                         <div className="flex items-center justify-between">
-                            <div>
-                                <h4 className="font-medium text-blue-900 text-sm">Telehealth Options</h4>
-                                <p className="text-blue-700 text-xs mt-1">
-                                    Start a video call for this appointment
-                                </p>
-                            </div>
-                            <VideoCallButton
-                                appointmentId={selectedEvent.id ? Number(selectedEvent.id) : undefined}
-                                patientId={Number(selectedPatientId)}
-                                providerId={Number(providerId)}
-                                patientName={selectedPatientName}
-                                variant="primary"
-                                size="sm"
-                            />
+                        <div>
+                            <h4 className="font-medium text-blue-900 text-sm">Telehealth Options</h4>
+                            <p className="text-blue-700 text-xs mt-1">
+                            Click &quot;Join&quot; to connect with your provider.  
+                            Please ensure you click &quot;Allow&quot; when your browser asks for camera and microphone access.
+                            </p>
+                        </div>
+                        <VideoCallButton
+                            appointmentId={undefined}
+                            patientId={Number(selectedPatientId)}
+                            providerId={Number(providerId)}
+                            patientName={selectedPatientName}
+                            variant="primary"
+                            size="sm"
+                        />
                         </div>
                     </div>
                 )}

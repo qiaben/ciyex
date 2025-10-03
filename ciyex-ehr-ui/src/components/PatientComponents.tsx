@@ -233,9 +233,8 @@ export const AppointmentsFlat: React.FC<{
                                 <td className="px-4 py-2">
                                     {(appt.status === "Scheduled" && (appt.visitType === "Telehealth" || appt.visitType === "Video Consultation")) ? (
                                         <VideoCallButton 
-                                            patientId={appt.patientId} 
-                                            appointmentId={appt.id}
-                                        />
+                                            patientId={appt.patientId}
+                                            appointmentId={appt.id} providerId={0}                                        />
                                     ) : (
                                         "—"
                                     )}

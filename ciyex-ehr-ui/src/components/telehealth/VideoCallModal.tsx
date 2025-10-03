@@ -207,15 +207,11 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
 
                     {/* Error/Success Messages */}
                     {error && (
-                        <Alert type="error" title="Error">
-                            {error}
-                        </Alert>
+                        <Alert variant="error" title="Error" message={error} />
                     )}
                     
                     {success && (
-                        <Alert type="success" title="Success">
-                            {success}
-                        </Alert>
+                        <Alert variant="success" title="Success" message={success} />
                     )}
 
                     {/* Actions */}
@@ -261,20 +257,23 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
 
                     {/* Instructions */}
                     <div className="bg-blue-50 p-4 rounded-lg">
-                        <h4 className="font-medium text-blue-900 mb-2">Instructions</h4>
-                        <ul className="text-sm text-blue-800 space-y-1">
-                            <li>• Click "Start Video Call" to create the meeting room</li>
-                            <li>• Use "Join Meeting as Provider" to enter the call</li>
-                            <li>• Copy the patient link and send it to the patient via SMS/email</li>
-                            <li>• The meeting room will be available for 1 hour</li>
-                        </ul>
-                    </div>
-                </div>
+  <h4 className="font-medium text-blue-900 mb-2">Instructions</h4>
+  <ul className="text-sm text-blue-800 space-y-1">
+    <li>• Click &quot;Start Video Call&quot; to create the meeting room</li>
+    <li>• Use &quot;Join Meeting as Provider&quot; to enter the call</li>
+    <li>• Copy the patient link and send it to the patient via SMS/email</li>
+    <li>• The meeting room will be available for 1 hour</li>
+    <li>• Click &quot;Start Video Call&quot; to create the meeting room</li>
+    <li>• Use &quot;Join Meeting as Provider&quot; to enter the call</li>
+  </ul>
+</div>
 
-                <div className="flex justify-end space-x-2 pt-4">
-                    <Button variant="outline" onClick={handleClose}>
-                        Close
-                    </Button>
+
+                    <div className="flex justify-end space-x-2 pt-4">
+                        <Button variant="outline" onClick={handleClose}>
+                            Close
+                        </Button>
+                    </div>
                 </div>
             </DialogContent>
         </Dialog>

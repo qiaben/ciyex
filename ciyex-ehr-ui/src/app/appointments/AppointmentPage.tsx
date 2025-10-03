@@ -1,4 +1,3 @@
-
 "use client";
 import React, {useEffect, useState, useMemo, useCallback, useRef} from "react";
 import AdminLayout from "@/app/(admin)/layout";
@@ -12,7 +11,7 @@ import VitalsList from "@/components/encounter/Vitals/Vitalslist";
 export type AppointmentDTO = {
   id: number;
   visitType: string;
-  patientId: number; // still used for MRN
+  patientId: number;
   providerId: number;
   appointmentStartDate: string;
   appointmentEndDate: string;
@@ -23,7 +22,7 @@ export type AppointmentDTO = {
   status: string;
   reason: string;
   orgId: number;
-  patientName?: string; // resolved from patient API
+  patientName?: string;
   audit: {
     createdDate: string;
     lastModifiedDate: string;
@@ -38,7 +37,6 @@ interface FullscreenElement extends HTMLElement {
   webkitRequestFullscreen?: () => Promise<void>;
   msRequestFullscreen?: () => Promise<void>;
 }
-
 
 const pad = (n: number) => n.toString().padStart(2, "0");
 
@@ -77,10 +75,9 @@ const fetchPatientName = async (id: number): Promise<string> => {
   }
 };
 
-/** Right-side drawer (single) that shows Notes + Procedures + Vitals together */
 function Drawer({
-  open, onClose, title, children,
-}: {
+                  open, onClose, title, children,
+                }: {
   open: boolean;
   onClose: () => void;
   title: React.ReactNode;
@@ -88,28 +85,28 @@ function Drawer({
 }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex">
-      <div className="flex-1 bg-black/40" onClick={onClose} />
-      <div className="w-[800px] max-w-full bg-white dark:bg-slate-900 shadow-xl p-6 overflow-y-auto animate-slideInRight">
-        <button className="mb-4 text-sm text-gray-500 hover:text-gray-700" onClick={onClose}>
-          ✕ Close
-        </button>
-        <h2 className="text-lg font-semibold mb-4">{title}</h2>
-        {children}
+      <div className="fixed inset-0 z-50 flex">
+        <div className="flex-1 bg-black/40" onClick={onClose} />
+        <div className="w-[800px] max-w-full bg-white dark:bg-slate-900 shadow-xl p-6 overflow-y-auto animate-slideInRight">
+          <button className="mb-4 text-sm text-gray-500 hover:text-gray-700" onClick={onClose}>
+            ✕ Close
+          </button>
+          <h2 className="text-lg font-semibold mb-4">{title}</h2>
+          {children}
+        </div>
       </div>
-    </div>
   );
 }
 
 export default function AppointmentPage() {
-  const [category, setCategory] = useState<string>("All Visit Categories");
+  const [category, setCategory] = useState("All Visit Categories");
   const [categories, setCategories] = useState<string[]>([]);
-  const [provider, setProvider] = useState<string>("All Providers");
+  const [provider, setProvider] = useState("All Providers");
   const [providers, setProviders] = useState<Provider[]>([]);
-  const [location, setLocation] = useState<string>("All Locations");
+  const [location, setLocation] = useState("All Locations");
   const [locations, setLocations] = useState<Location[]>([]);
-  const [from, setFrom] = useState<string>("");
-  const [to, setTo] = useState<string>("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const [patientName, setPatientName] = useState("");
   const [rows, setRows] = useState<AppointmentDTO[]>([]);
 
@@ -124,18 +121,16 @@ export default function AppointmentPage() {
   const [totalItems, setTotalItems] = useState(0);
   const tableRef = useRef<HTMLDivElement>(null);
 
-  // drawer state (single drawer)
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState<AppointmentDTO | null>(null);
 
-  // Visit Categories (active only)
   useEffect(() => {
     const fetchCategories = async () => {
       try {
         const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/list-options/list/Visit Type`);
         if (!res.ok) throw new Error("Failed to fetch categories");
         const data = await res.json();
-        const active = (data as Category[]).filter((c) => c.activity === 1).map((c) => c.title || c.optionName);
+        const active = (data as Category[]).filter(c => c.activity === 1).map(c => c.title || c.optionName);
         setCategories(active);
       } catch { setCategories([]); }
       finally { setLoadingCategories(false); }
@@ -143,16 +138,15 @@ export default function AppointmentPage() {
     fetchCategories();
   }, []);
 
-  // Providers
   useEffect(() => {
     const fetchProviders = async () => {
       try {
         const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/providers`);
         if (!res.ok) throw new Error("Failed to fetch providers");
         const data = await res.json();
-        const list: Provider[] = data.data.map((p: { id: number; identification: { firstName: string; lastName: string } }) => ({
-          id: p.id,
-          name: `${p.identification.firstName} ${p.identification.lastName}`,
+        const list: Provider[] = data.data.map((p: {id:number;identification:{firstName:string;lastName:string}})=>({
+          id:p.id,
+          name:`${p.identification.firstName} ${p.identification.lastName}`,
         }));
         setProviders(list);
       } catch { setProviders([]); }
@@ -161,14 +155,13 @@ export default function AppointmentPage() {
     fetchProviders();
   }, []);
 
-  // Locations
   useEffect(() => {
     const fetchLocations = async () => {
       try {
         const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/locations`);
         if (!res.ok) throw new Error("Failed to fetch locations");
         const data = await res.json();
-        const list: Location[] = data.data.map((l: { id: number; name: string }) => ({ id: l.id, name: l.name }));
+        const list: Location[] = data.data.map((l:{id:number;name:string})=>({id:l.id,name:l.name}));
         setLocations(list);
       } catch { setLocations([]); }
       finally { setLoadingLocations(false); }
@@ -176,31 +169,29 @@ export default function AppointmentPage() {
     fetchLocations();
   }, []);
 
-  // Default date range: last month -> today
   useEffect(() => {
     const today = new Date();
     const lastMonth = new Date(today);
     lastMonth.setMonth(today.getMonth() - 1);
-    const fmt = (d: Date) => `${pad(d.getMonth() + 1)}/${pad(d.getDate())}/${d.getFullYear()}`;
+    const fmt = (d:Date)=>`${pad(d.getMonth()+1)}/${pad(d.getDate())}/${d.getFullYear()}`;
     setFrom(fmt(lastMonth));
     setTo(fmt(today));
   }, []);
 
-  // ---- Appointments loader ----
   const loadAppointments = useCallback(async () => {
     setLoadingAppointments(true);
     try {
       const res = await fetchWithAuth(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/appointments?page=${currentPage - 1}&size=${pageSize}`
+          `${process.env.NEXT_PUBLIC_API_URL}/api/appointments?page=${currentPage - 1}&size=${pageSize}`
       );
       if (!res.ok) throw new Error("Failed to fetch appointments");
       const data = await res.json();
       if (data.success && data.data?.content) {
         const enriched = await Promise.all(
-          data.data.content.map(async (appt: AppointmentDTO) => {
-            const name = await fetchPatientName(appt.patientId);
-            return { ...appt, patientName: name };
-          })
+            data.data.content.map(async (appt: AppointmentDTO) => {
+              const name = await fetchPatientName(appt.patientId);
+              return {...appt, patientName:name};
+            })
         );
         setRows(enriched);
         setTotalPages(data.data.totalPages);
@@ -208,18 +199,13 @@ export default function AppointmentPage() {
       } else {
         setRows([]);
       }
-    } catch (err) {
-      console.error(err);
-      setRows([]);
-    } finally {
-      setLoadingAppointments(false);
-    }
+    } catch { setRows([]); }
+    finally { setLoadingAppointments(false); }
   }, [currentPage, pageSize]);
 
-  // Initial & pagination fetch
-  useEffect(() => { loadAppointments(); }, [loadAppointments]);
+  useEffect(()=>{ loadAppointments(); },[loadAppointments]);
 
-  const onRefresh = () => { loadAppointments(); };
+  const onRefresh = () => loadAppointments();
   const onPrint = () => window.print();
   const onKiosk = () => {
     const el = tableRef.current as FullscreenElement | null;
@@ -229,119 +215,79 @@ export default function AppointmentPage() {
     else if (el.msRequestFullscreen) el.msRequestFullscreen();
   };
 
-  const filtered = useMemo(() => {
+  const filtered = useMemo(()=>{
     if (!Array.isArray(rows)) return [];
-    const fromTime = from ? timeFromMMDDYYYY(from, -Infinity) : -Infinity;
-    const toTime = to ? timeFromMMDDYYYY(to, Infinity) : Infinity;
-    return rows.filter((r) => {
+    const fromTime = from ? timeFromMMDDYYYY(from,-Infinity):-Infinity;
+    const toTime = to ? timeFromMMDDYYYY(to,Infinity):Infinity;
+    return rows.filter(r=>{
       const d = new Date(r.appointmentStartDate).getTime();
-      const matchDate = d >= fromTime && d <= toTime;
-      const matchProvider = provider === "All Providers" ? true : r.providerId === Number(provider);
-      const matchCategory = category === "All Visit Categories" ? true : r.visitType === category;
-      const matchLocation = location === "All Locations" ? true : r.locationId === Number(location);
-      const matchPatient = patientName ? r.patientName?.toLowerCase().includes(patientName.trim().toLowerCase()) : true;
-      return matchDate && matchProvider && matchCategory && matchLocation && matchPatient;
+      const matchDate = d>=fromTime && d<=toTime;
+      const matchProvider = provider==="All Providers"?true:r.providerId===Number(provider);
+      const matchCategory = category==="All Visit Categories"?true:r.visitType===category;
+      const matchLocation = location==="All Locations"?true:r.locationId===Number(location);
+      const matchPatient = patientName? r.patientName?.toLowerCase().includes(patientName.trim().toLowerCase()):true;
+      return matchDate&&matchProvider&&matchCategory&&matchLocation&&matchPatient;
     });
-  }, [rows, from, to, provider, category, location, patientName]);
+  },[rows,from,to,provider,category,location,patientName]);
 
   const total = filtered.length;
-  const handlePrevious = () => currentPage > 1 && setCurrentPage(currentPage - 1);
-  const handleNext = () => currentPage < totalPages && setCurrentPage(currentPage + 1);
+  const handlePrevious = () => currentPage>1 && setCurrentPage(currentPage-1);
+  const handleNext = () => currentPage<totalPages && setCurrentPage(currentPage+1);
 
-  const getStatusClass = (status: string) => {
-    switch (status) {
-      case "Confirmed": return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
-      case "Scheduled": return "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200";
-      case "Pending": return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200";
-      case "Cancelled": return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
-      default: return "bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-200";
+  const getStatusClass = (status:string) => {
+    switch(status){
+      case "Confirmed":return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
+      case "Scheduled":return "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200";
+      case "Pending":return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200";
+      case "Cancelled":return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
+      default:return "bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-200";
     }
   };
 
-  const openDrawer = (row: AppointmentDTO) => {
-    setSelectedRow(row);
-    setDrawerOpen(true);
-  };
-
-  const encounterUrl = (row: AppointmentDTO) =>
-    // use your working route to avoid 404
-    `/patients/${row.patientId}/encounters/${row.id}`;
+  const openDrawer = (row:AppointmentDTO)=>{ setSelectedRow(row); setDrawerOpen(true); };
+  const encounterUrl = (row:AppointmentDTO)=>`/patients/${row.patientId}/encounters/${row.id}`;
 
   return (
-    <AdminLayout>
-      <div className="container mx-auto p-6 overflow-x-hidden text-gray-800 dark:text-gray-200">
-        {/* Heading */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="text-sm">
-            <span className="italic font-semibold">Total appointments:</span>{" "}
-            {loadingAppointments ? "…" : total}
-          </div>
-        </div>
-
-        {/* Filters */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 w-full">
-            <select value={category} onChange={(e) => setCategory(e.target.value)}
-              className="rounded-md border px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600">
-              <option value="All Visit Categories">All Visit Categories</option>
-              {loadingCategories ? <option disabled>Loading...</option> :
-                categories.map((c, idx) => (<option key={idx} value={c}>{c}</option>))}
-            </select>
-
-            <select value={provider} onChange={(e) => setProvider(e.target.value)}
-              className="rounded-md border px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600">
-              <option value="All Providers">All Providers</option>
-              {loadingProviders ? <option disabled>Loading...</option> :
-                providers.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
-            </select>
-
-            <select value={location} onChange={(e) => setLocation(e.target.value)}
-              className="rounded-md border px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600">
-              <option value="All Locations">All Locations</option>
-              {loadingLocations ? <option disabled>Loading...</option> :
-                locations.map((l) => (<option key={l.id} value={l.id}>{l.name}</option>))}
-            </select>
-
-            <input type="text" placeholder="MM/DD/YYYY" value={from} onChange={(e) => setFrom(e.target.value)}
-              className="rounded-md border px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600" />
-
-            <input type="text" placeholder="MM/DD/YYYY" value={to} onChange={(e) => setTo(e.target.value)}
-              className="rounded-md border px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600" />
-
-            <input type="text" placeholder="Patient Name" value={patientName} onChange={(e) => setPatientName(e.target.value)}
-              className="rounded-md border px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600" />
+      <AdminLayout>
+        <div className="container mx-auto p-6 overflow-x-hidden text-gray-800 dark:text-gray-200">
+          {/* Heading */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="text-sm">
+              <span className="italic font-semibold">Total appointments:</span>{" "}
+              {loadingAppointments?"…":total}
+            </div>
           </div>
 
-          <div className="flex gap-2">
-            <button onClick={onRefresh} disabled={loadingAppointments}
-              className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60" title="Refresh table data">
-              Refresh
-            </button>
-            <button onClick={onPrint} className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">
-              Print
-            </button>
-            <button onClick={onKiosk} className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">
-              Kiosk
-            </button>
+          {/* Filters */}
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 w-full">
+              <select value={category} onChange={e=>setCategory(e.target.value)} className="rounded-md border px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600">
+                <option value="All Visit Categories">All Visit Categories</option>
+                {loadingCategories?<option disabled>Loading...</option>:categories.map((c,idx)=>(<option key={idx} value={c}>{c}</option>))}
+              </select>
+              <select value={provider} onChange={e=>setProvider(e.target.value)} className="rounded-md border px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600">
+                <option value="All Providers">All Providers</option>
+                {loadingProviders?<option disabled>Loading...</option>:providers.map(p=>(<option key={p.id} value={p.id}>{p.name}</option>))}
+              </select>
+              <select value={location} onChange={e=>setLocation(e.target.value)} className="rounded-md border px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600">
+                <option value="All Locations">All Locations</option>
+                {loadingLocations?<option disabled>Loading...</option>:locations.map(l=>(<option key={l.id} value={l.id}>{l.name}</option>))}
+              </select>
+              <input type="text" placeholder="MM/DD/YYYY" value={from} onChange={e=>setFrom(e.target.value)} className="rounded-md border px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600"/>
+              <input type="text" placeholder="MM/DD/YYYY" value={to} onChange={e=>setTo(e.target.value)} className="rounded-md border px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600"/>
+              <input type="text" placeholder="Patient Name" value={patientName} onChange={e=>setPatientName(e.target.value)} className="rounded-md border px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600"/>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={onRefresh} disabled={loadingAppointments} className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60">Refresh</button>
+              <button onClick={onPrint} className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">Print</button>
+              <button onClick={onKiosk} className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">Kiosk</button>
+            </div>
           </div>
-        </div>
 
-        {/* Table */}
-        <div ref={tableRef} className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-md">
-          <table className="w-full table-auto">
-            <colgroup>
-              <col className="w-20" />
-              <col className="w-48" />
-              <col className="w-48" />
-              <col />
-              <col className="w-32" />
-              <col className="w-32" />
-              <col className="w-28" />
-              <col className="w-28" />
-              <col className="w-28" />
-              <col className="w-[220px]" /> {/* Action column */}
-            </colgroup>
-            <thead className="bg-gray-100 dark:bg-gray-800">
+          {/* Table */}
+          <div ref={tableRef} className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-md">
+            <table className="w-full table-auto">
+              <thead className="bg-gray-100 dark:bg-gray-800">
               <tr>
                 <th className="py-3 px-6 text-left text-sm font-medium">MRN</th>
                 <th className="py-3 px-6 text-left text-sm font-medium">Patient Name</th>
@@ -354,138 +300,86 @@ export default function AppointmentPage() {
                 <th className="py-3 px-6 text-left text-sm font-medium">Status</th>
                 <th className="py-3 px-6 text-left text-sm font-medium">Action</th>
               </tr>
-            </thead>
-            <tbody>
-              {loadingAppointments ? (
-                <tr>
-                  <td colSpan={10} className="py-8 text-center text-sm text-gray-500 dark:text-gray-400" />
-                </tr>
-              ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={10} className="py-10 text-center text-sm text-gray-500 dark:text-gray-400">
-                    No appointments match your filters.
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((r) => (
-                  <tr key={`${r.patientId}-${r.id}`} className="hover:bg-gray-50 dark:hover:bg-gray-800 border-b dark:border-gray-700">
-                    <td className="py-3 px-6 text-sm whitespace-nowrap">{r.patientId}</td>
-                    <td className="py-3 px-6 text-sm">{r.patientName || "—"}</td>
-                    <td className="py-3 px-6 text-sm">
-                      {providers.find((p) => p.id === r.providerId)?.name || r.providerId}
-                    </td>
-                    <td className="py-3 px-6 text-sm">
-                      {locations.find((l) => l.id === r.locationId)?.name || "—"}
-                    </td>
-                    <td className="py-3 px-6 text-sm">{r.visitType}</td>
-                    <td className="py-3 px-6 text-sm">{formatToMMDDYYYY(r.appointmentStartDate)}</td>
-                    <td className="py-3 px-6 text-sm">{r.appointmentStartTime}</td>
-                    <td className="py-3 px-6 text-sm">{r.priority}</td>
-                    <td className="py-3 px-6 text-sm">
-                      <span className={["inline-flex items-center rounded-full text-[11px] font-semibold px-2 py-0.5 whitespace-nowrap", getStatusClass(r.status)].join(" ")}>
-                        {r.status}
-                      </span>
-                    </td>
-                    <td className="py-3 px-6 text-sm">
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          className="px-3 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-700"
-                          onClick={() => window.location.assign(encounterUrl(r))}
-                          title="Open encounters for this appointment"
-                        >
-                          Encounter
-                        </button>
-                        <button
-                          className="px-3 py-1 rounded bg-emerald-600 text-white hover:bg-emerald-700"
-                          onClick={() => openDrawer(r)}
-                          title="Open notes, procedures, and vitals"
-                        >
-                          +
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+              </thead>
+              <tbody>
+              {loadingAppointments?(
+                  <tr><td colSpan={10} className="py-8 text-center text-sm text-gray-500 dark:text-gray-400"/></tr>
+              ):filtered.length===0?(
+                  <tr><td colSpan={10} className="py-10 text-center text-sm text-gray-500 dark:text-gray-400">No appointments match your filters.</td></tr>
+              ):(
+                  filtered.map(r=>(
+                      <tr key={`${r.patientId}-${r.id}`} className="hover:bg-gray-50 dark:hover:bg-gray-800 border-b dark:border-gray-700">
+                        <td className="py-3 px-6 text-sm whitespace-nowrap">{r.patientId}</td>
+                        <td className="py-3 px-6 text-sm">{r.patientName||"—"}</td>
+                        <td className="py-3 px-6 text-sm">{providers.find(p=>p.id===r.providerId)?.name||r.providerId}</td>
+                        <td className="py-3 px-6 text-sm">{locations.find(l=>l.id===r.locationId)?.name||"—"}</td>
+                        <td className="py-3 px-6 text-sm">{r.visitType}</td>
+                        <td className="py-3 px-6 text-sm">{formatToMMDDYYYY(r.appointmentStartDate)}</td>
+                        <td className="py-3 px-6 text-sm">{r.appointmentStartTime}</td>
+                        <td className="py-3 px-6 text-sm">{r.priority}</td>
+                        <td className="py-3 px-6 text-sm"><span className={["inline-flex items-center rounded-full text-[11px] font-semibold px-2 py-0.5 whitespace-nowrap",getStatusClass(r.status)].join(" ")}>{r.status}</span></td>
+                        <td className="py-3 px-6 text-sm">
+                          <div className="flex flex-wrap gap-2">
+                            <button className="px-3 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-700" onClick={()=>window.location.assign(encounterUrl(r))}>Encounter</button>
+                            {/* Drawer button always */}
+                            <button className="px-3 py-1 rounded bg-emerald-600 text-white hover:bg-emerald-700" onClick={()=>openDrawer(r)} title="Open notes, procedures, and vitals">+</button>
+                            {/* Telehealth button only for Virtual/Telehealth */}
+                            {(r.visitType==="Virtual"||r.visitType==="Telehealth")&&(
+                                <button className="p-2 rounded bg-emerald-600 text-white hover:bg-emerald-700" onClick={()=>window.location.assign(`telehealth/${r.id}`)} title="Start Telehealth Call">
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M15 10.5V6a2 2 0 0 0-2-2H5C3.9 4 3 4.9 3 6v12c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2v-4.5l5 5v-13l-5 5z"/></svg>
+                                </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                  ))
               )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination */}
-        <div className="mt-3 flex items-center justify-between px-3 py-2 border-t bg-white dark:bg-gray-900 dark:border-gray-700 text-sm">
-          <div className="flex items-center gap-3">
-            <button disabled={currentPage === 1 || loadingAppointments} onClick={handlePrevious}
-              className="px-3 py-1.5 border rounded disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800">
-              Prev
-            </button>
-            <div>Page {currentPage} of {totalPages}</div>
-            <button disabled={currentPage === totalPages || loadingAppointments} onClick={handleNext}
-              className="px-3 py-1.5 border rounded disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800">
-              Next
-            </button>
+              </tbody>
+            </table>
           </div>
-          <div className="flex items-center gap-4">
-            <div>Showing {loadingAppointments ? "…" : filtered.length} of {totalItems}</div>
-            <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
-              className="border rounded px-3 py-1.5 bg-white dark:bg-gray-800 dark:border-gray-600 text-sm">
-              <option value={5}>5</option>
-              <option value={10}>10</option>
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-            </select>
+
+          {/* Pagination */}
+          <div className="mt-3 flex items-center justify-between px-3 py-2 border-t bg-white dark:bg-gray-900 dark:border-gray-700 text-sm">
+            <div className="flex items-center gap-3">
+              <button disabled={currentPage===1||loadingAppointments} onClick={handlePrevious} className="px-3 py-1.5 border rounded disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800">Prev</button>
+              <div>Page {currentPage} of {totalPages}</div>
+              <button disabled={currentPage===totalPages||loadingAppointments} onClick={handleNext} className="px-3 py-1.5 border rounded disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800">Next</button>
+            </div>
+            <div className="flex items-center gap-4">
+              <div>Showing {loadingAppointments?"…":filtered.length} of {totalItems}</div>
+              <select value={pageSize} onChange={e=>{setPageSize(Number(e.target.value));setCurrentPage(1);}} className="border rounded px-3 py-1.5 bg-white dark:bg-gray-800 dark:border-gray-600 text-sm">
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+              </select>
+            </div>
           </div>
+
+          {/* Drawer */}
+          <Drawer
+              open={drawerOpen}
+              onClose={()=>setDrawerOpen(false)}
+              title={selectedRow?(<>Appointment #{selectedRow.id} — Patient {selectedRow.patientName??selectedRow.patientId}</>):""}
+          >
+            {selectedRow&&(
+                <>
+                  <section className="mb-8">
+                    <h3 className="text-base font-semibold mb-2">Provider Notes</h3>
+                    <ProviderNoteList patientId={selectedRow.patientId} encounterId={selectedRow.id}/>
+                  </section>
+                  <section className="mb-8">
+                    <h3 className="text-base font-semibold mb-2">Procedures</h3>
+                    <ProcedureList patientId={selectedRow.patientId} encounterId={selectedRow.id}/>
+                  </section>
+                  <section className="mb-8">
+                    <h3 className="text-base font-semibold mb-2">Vitals</h3>
+                    <VitalsList patientId={selectedRow.patientId} encounterId={selectedRow.id}/>
+                  </section>
+                </>
+            )}
+          </Drawer>
         </div>
-
-        {/* Drawer: shows all three sections together */}
-        <Drawer
-          open={drawerOpen}
-          onClose={() => setDrawerOpen(false)}
-          title={
-            selectedRow ? (
-              <>
-                Appointment #{selectedRow.id} — Patient {selectedRow.patientName ?? selectedRow.patientId}
-              </>
-            ) : ("")
-          }
-        >
-          {selectedRow && (
-            <>
-              {/* Provider Notes */}
-              <section className="mb-8">
-                <div className="mb-2 flex items-center justify-between">
-                  <h3 className="text-base font-semibold">Provider Notes</h3>
-                </div>
-                <ProviderNoteList
-                  patientId={selectedRow.patientId}
-                  encounterId={selectedRow.id}
-                />
-              </section>
-
-              {/* Procedures */}
-              <section className="mb-8">
-                <div className="mb-2 flex items-center justify-between">
-                  <h3 className="text-base font-semibold">Procedures</h3>
-                </div>
-                <ProcedureList
-                  patientId={selectedRow.patientId}
-                  encounterId={selectedRow.id}
-                />
-              </section>
-
-              {/* Vitals */}
-              <section className="mb-8">
-                <div className="mb-2 flex items-center justify-between">
-                  <h3 className="text-base font-semibold">Vitals</h3>
-                </div>
-                <VitalsList
-                  patientId={selectedRow.patientId}
-                  encounterId={selectedRow.id}
-                />
-              </section>
-            </>
-          )}
-        </Drawer>
-      </div>
-    </AdminLayout>
+      </AdminLayout>
   );
 }
