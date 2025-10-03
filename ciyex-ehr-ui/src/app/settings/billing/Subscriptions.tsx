@@ -101,7 +101,6 @@ function SubscriptionForm({
 
             const res = await fetchWithAuth(url, {
                 method: mode === "add" ? "POST" : "PUT",
-                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ service, billingCycle, startDate, price }),
             });
 
@@ -229,8 +228,18 @@ export default function SubscriptionsPage() {
             const res = await fetchWithAuth(
                 `${process.env.NEXT_PUBLIC_API_URL}/api/subscriptions`
             );
-            const json = await safeJson<Subscription[]>(res);
-            if (json?.success) setSubscriptions(json.data);
+
+            const text = await res.text();
+            console.log("Subscriptions API response:", text);
+
+            const parsed = text ? JSON.parse(text) : null;
+            const data =
+                parsed?.data && Array.isArray(parsed.data)
+                    ? parsed.data
+                    : Array.isArray(parsed)
+                        ? parsed
+                        : [];
+            setSubscriptions(data);
         } catch (err) {
             console.error("Error fetching subscriptions:", err);
         }

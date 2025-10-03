@@ -10,14 +10,9 @@ import {
   ChevronDownIcon,
   GridIcon,
   HorizontaLDots,
-  ListIcon,
-  PageIcon,
-  PieChartIcon,
-  PlugInIcon,
   SettingsIcon, // ensure this exists in ../icons/index
-  TableIcon,
   RecallIcon,
-  AppointmentIcon, MessagingIcon, InventoryIcon,
+  AppointmentIcon, InventoryIcon,
 } from "../icons/index";
 
 
@@ -52,6 +47,12 @@ const navItems: NavItem[] = [
     path: "/calendar",
   },
 
+{
+    icon: <AppointmentIcon />,
+    name: "Appointments",
+    path: "/appointments", //  top-level now
+  },
+
   {
     // Updated Patients icon with SVG path
     icon: (
@@ -74,25 +75,14 @@ const navItems: NavItem[] = [
     ),
     name: "Patients", // New menu item for Patients
     subItems: [
-      { name: "Patients List", path: "/patients" },
+      { name: "Patient List", path: "/patients" },
+      { name: "Encounters", path: "/all-encounters" },
+      {name:"Messaging",path: "/messaging"},
       { name: "Education", path: "/patient_education" },
-      { name: "All Encounters", path: "/all-encounters" },
+
     ],
   },
 
-  {
-    icon: <AppointmentIcon />,
-    name: "Appointments",
-    path: "/appointments", //  top-level now
-  },
-
-  // Settings with nested Forms -> Lists
-
-  {
-    icon: <MessagingIcon />,
-    name: "Messaging",
-    subItems: [{ name: "Inbox", path: "/messaging/inbox" }],
-  },
 
   {
     icon: <InventoryIcon />, // swap MessagingIcon → better inventory icon
@@ -108,23 +98,7 @@ const navItems: NavItem[] = [
     ],
   },
 
-  {
-    // Simple credit-card icon (inline SVG, like your Patients item)
-    icon: (
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="24" height="24" viewBox="0 0 24 24"
-        fill="none" stroke="currentColor" strokeWidth="2"
-        className="h-6 w-6"
-      >
-        <rect x="3" y="5" width="18" height="14" rx="2" ry="2"></rect>
-        <line x1="3" y1="10" x2="21" y2="10"></line>
-        <line x1="7" y1="15" x2="11" y2="15"></line>
-      </svg>
-    ),
-    name: "Invoice",
-    path: "/billing",
-  },
+
 
   {
     icon: <RecallIcon />,
@@ -155,25 +129,6 @@ const navItems: NavItem[] = [
   },
 
   {
-    name: "Forms",
-    icon: <ListIcon />,
-    subItems: [{ name: "Form Elements", path: "/form-elements", pro: false }],
-  },
-  {
-    name: "Tables",
-    icon: <TableIcon />,
-    subItems: [{ name: "Basic Tables", path: "/basic-tables", pro: false }],
-  },
-  {
-    name: "Pages",
-    icon: <PageIcon />,
-    subItems: [
-      { name: "Blank Page", path: "/blank", pro: false },
-      { name: "404 Error", path: "/error-404", pro: false },
-    ],
-  },
-
-  {
     name: "Labs",
     icon: <BoxCubeIcon />,
     subItems: [
@@ -186,36 +141,6 @@ const navItems: NavItem[] = [
   },
 ];
 
-const othersItems: NavItem[] = [
-  {
-    icon: <PieChartIcon />,
-    name: "Charts",
-    subItems: [
-      { name: "Line Chart", path: "/line-chart", pro: false },
-      { name: "Bar Chart", path: "/bar-chart", pro: false },
-    ],
-  },
-  {
-    icon: <BoxCubeIcon />,
-    name: "UI Elements",
-    subItems: [
-      { name: "Alerts", path: "/alerts", pro: false },
-      { name: "Avatar", path: "/avatars", pro: false },
-      { name: "Badge", path: "/badge", pro: false },
-      { name: "Buttons", path: "/buttons", pro: false },
-      { name: "Images", path: "/images", pro: false },
-      { name: "Videos", path: "/videos", pro: false },
-    ],
-  },
-  {
-    icon: <PlugInIcon />,
-    name: "Authentication",
-    subItems: [
-      { name: "Sign In", path: "/signin", pro: false },
-      { name: "Sign Up", path: "/signup", pro: false },
-    ],
-  },
-];
 
 // ===== Component =====
 const AppSidebar: React.FC = () => {
@@ -254,8 +179,6 @@ const AppSidebar: React.FC = () => {
 
   // Auto-open parents when current route is inside them
   useEffect(() => {
-    let topFound = false;
-
     const checkDescActive = (items: SubItem[]): boolean => {
       for (const it of items) {
         if (it.path && isActive(it.path)) return true;
@@ -264,26 +187,26 @@ const AppSidebar: React.FC = () => {
       return false;
     };
 
-    (["main", "others"] as const).forEach((type) => {
-      const items = type === "main" ? navItems : othersItems;
-      items.forEach((nav, topIdx) => {
-        if (!nav.subItems) return;
-        if (checkDescActive(nav.subItems)) {
-          setOpenTop({ type, index: topIdx });
-          topFound = true;
+    let found = false;
+    for (let i = 0; i < navItems.length; i++) {
+      const nav = navItems[i];
 
-          // open any level-2 that contains active descendant
-          nav.subItems.forEach((sub, subIdx) => {
-            if (sub.subItems && checkDescActive(sub.subItems)) {
-              const k = keyL2(type, topIdx, subIdx);
-              setOpenL2((prev) => ({ ...prev, [k]: true }));
-            }
-          });
-        }
-      });
-    });
+      // direct match on top-level path
+      if (nav.path && isActive(nav.path)) {
+        setOpenTop({ type: "main", index: i });
+        found = true;
+        break;
+      }
 
-    if (!topFound) setOpenTop(null);
+      // match inside sub-items
+      if (nav.subItems && checkDescActive(nav.subItems)) {
+        setOpenTop({ type: "main", index: i });
+        found = true;
+        break;
+      }
+    }
+
+    if (!found) setOpenTop(null);
   }, [pathname, isActive]);
 
   // Renderer
@@ -531,9 +454,7 @@ const AppSidebar: React.FC = () => {
                   !isExpanded && !isHovered ? "lg:justify-center" : "justify-start"
                 }`}
               >
-                {isExpanded || isHovered || isMobileOpen ? "Others" : <HorizontaLDots />}
               </h2>
-              {renderMenuItems(othersItems, "others")}
             </div>
           </div>
         </nav>
