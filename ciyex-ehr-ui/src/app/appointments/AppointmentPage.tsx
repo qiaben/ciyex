@@ -712,10 +712,7 @@ const fetchPatientName = async (id: number): Promise<string> => {
   }
 };
 
-function Drawer({
-                  open, onClose, title, children,
-                }: {
-/** Right-side drawer (frame only) */
+
 function Drawer({
   open,
   onClose,
