@@ -27,6 +27,7 @@ import {
 } from "@/components/PatientComponents";
 import EncounterTableExpandable from "@/components/encounter/EncounterTableExpandable";
 
+import PatientBilling from "@/components/billing/PatientBilling";
 
 interface Patient {
     id: string;
@@ -889,6 +890,7 @@ export default function PatientDashboardPage() {
         { key: "demographics", label: "Demographics" },
         { key: "appointments", label: "Appointments" },
         { key: "encounters", label: "Encounters" },
+        { key: "billing", label: "Billing" },
         { key: "insurance", label: "Insurance" },
         { key: "history", label: "History" },
         { key: "documents", label: "Documents" },
@@ -1111,6 +1113,16 @@ export default function PatientDashboardPage() {
                         <EncounterTableExpandable patientId={Number(patient.id)} />
                     </div>
                 );
+              case "billing":
+  return (
+    <div className="min-w-0">
+      <PatientBilling
+        patientId={Number(patient.id)}
+        patientName={`${patient.firstName ?? ""} ${patient.lastName ?? ""}`.trim()}
+      />
+    </div>
+  );
+
 
 
             case "documents":
@@ -1379,7 +1391,7 @@ function EncounterForm({ onCancel, onSave }: EncounterFormProps) {
 
     return (
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-            <h3 className="text-lg font-semibold mb-4">New Encounter</h3>
+            {/*<h3 className="text-lg font-semibold mb-4">New Encounter</h3>*/}
 
             {/* --- Encounter Fields --- */}
             <div className="grid md:grid-cols-2 gap-4 mb-6">
