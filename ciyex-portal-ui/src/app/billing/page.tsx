@@ -12,7 +12,7 @@ type Invoice = {
   amount: number;
   balance: number;
   status: "Open" | "Closed" | "Pending";
-  createdDate: string;
+  createdDate: string | string[] | number[];
 };
 
 export default function BillingPage() {
@@ -130,7 +130,32 @@ export default function BillingPage() {
                   >
                     {inv.status}
                   </td>
-                  <td className="px-4 py-2">{inv.createdDate}</td>
+                  <td className="px-4 py-2">{
+                    // Normalize a few possible formats we receive from backend: 
+                    // - date-only string (yyyy-MM-dd)
+                    // - full ISO datetime (yyyy-MM-ddTHH:mm:ss...)
+                    // - array from some serializers [yyyy,MM,dd,...]
+                    (() => {
+                      const val = inv.createdDate as any;
+                      try {
+                        if (Array.isArray(val)) {
+                          // try to interpret [yyyy,MM,dd,...]
+                          const [y, m, d] = val;
+                          if (y && m && d) return `${String(y).padStart(4, "0")}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+                          return String(val);
+                        }
+                        if (typeof val === "string") {
+                          // if ISO datetime, split at 'T'
+                          if (val.includes("T")) return val.split("T")[0];
+                          // if already date-only
+                          return val;
+                        }
+                        return String(val ?? "");
+                      } catch (e) {
+                        return String(inv.createdDate ?? "");
+                      }
+                    })()
+                  }</td>
                 </tr>
               ))}
             </tbody>

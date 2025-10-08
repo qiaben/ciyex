@@ -73,14 +73,40 @@ function SubscriptionForm({
                     ? `${process.env.NEXT_PUBLIC_API_URL}/api/subscriptions`
                     : `${process.env.NEXT_PUBLIC_API_URL}/api/subscriptions/${subscription?.id}`;
 
+            // normalize date to ISO datetime
+            function normalizeStartDateForApi(s: string) {
+                if (!s) return s;
+                const ddmmyyyy = /^(\d{2})-(\d{2})-(\d{4})$/;
+                const ymd = /^\d{4}-\d{2}-\d{2}$/;
+                const iso = /^\d{4}-\d{2}-\d{2}T/;
+                if (iso.test(s)) return s;
+                const m = s.match(ddmmyyyy);
+                if (m) return `${m[3]}-${m[2]}-${m[1]}T00:00:00`;
+                if (ymd.test(s)) return `${s}T00:00:00`;
+                const d = new Date(s);
+                if (!isNaN(d.getTime())) {
+                    const yyyy = d.getFullYear();
+                    const mm = String(d.getMonth() + 1).padStart(2, "0");
+                    const dd = String(d.getDate()).padStart(2, "0");
+                    const hh = String(d.getHours()).padStart(2, "0");
+                    const mi = String(d.getMinutes()).padStart(2, "0");
+                    const ss = String(d.getSeconds()).padStart(2, "0");
+                    return `${yyyy}-${mm}-${dd}T${hh}:${mi}:${ss}`;
+                }
+                return s;
+            }
+
+            const normalizedStartDate = normalizeStartDateForApi(startDate);
+
             const res = await fetchWithAuth(url, {
                 method: mode === "add" ? "POST" : "PUT",
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     service,
                     billingCycle,
                     scope,
                     status,
-                    startDate,
+                    startDate: normalizedStartDate,
                     price,
                 }),
             });
