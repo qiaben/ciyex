@@ -136,7 +136,7 @@ export default function BillingPage() {
                     // - full ISO datetime (yyyy-MM-ddTHH:mm:ss...)
                     // - array from some serializers [yyyy,MM,dd,...]
                     (() => {
-                      const val = inv.createdDate as any;
+                      const val = inv.createdDate as string | string[] | number[];
                       try {
                         if (Array.isArray(val)) {
                           // try to interpret [yyyy,MM,dd,...]
@@ -151,7 +151,7 @@ export default function BillingPage() {
                           return val;
                         }
                         return String(val ?? "");
-                      } catch (e) {
+                      } catch {
                         return String(inv.createdDate ?? "");
                       }
                     })()
@@ -217,7 +217,17 @@ export default function BillingPage() {
                   <input
                     type="date"
                     name="createdDate"
-                    value={form.createdDate || ""}
+                    value={
+                      Array.isArray(form.createdDate)
+                        ? (() => {
+                            const [y, m, d] = form.createdDate;
+                            if (y && m && d) return `${String(y).padStart(4, "0")}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+                            return "";
+                          })()
+                        : typeof form.createdDate === "string"
+                        ? form.createdDate
+                        : ""
+                    }
                     onChange={handleChange}
                     className="w-full border rounded px-2 py-1 text-sm"
                   />
