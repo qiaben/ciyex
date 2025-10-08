@@ -114,10 +114,12 @@ const navItems: NavItem[] = [
       { name: "Insurance companies", path: "/settings/insurance" },
       { name: "Documents", path: "/settings/documents" },
       {
-        name: "Codes",
-        path: "/settings/codes",
+        name: "Codes", path: "/settings/codes",
       },
       { name: "Integration", path: "/settings/config" },
+        { name: "Services", path: "/settings/services" },
+        { name: "Billing", path: "/settings/billing" },
+
       {
         name: "Forms",
         subItems: [
