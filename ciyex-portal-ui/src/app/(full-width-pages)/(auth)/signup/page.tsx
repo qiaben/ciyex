@@ -152,11 +152,29 @@ export default function SignUpPage() {
       const data: PortalApiResponse<PortalUserDto> = JSON.parse(text);
       if (!data.success || !data.data) throw new Error(data.message);
 
-      localStorage.setItem("user", JSON.stringify(data.data));
-      localStorage.setItem("orgId", data.data.orgId.toString());
-      localStorage.setItem("role", data.data.role || "PATIENT");
-
-      router.push("/dashboard");
+      // For portal patient registration, show success message about approval process
+      if (data.data.role === "PATIENT") {
+        // Clear form and show success message
+        setForm({
+          firstName: "", middleName: "", lastName: "", email: "", password: "",
+          dateOfBirth: "", gender: "", phoneNumber: "", street: "", city: "",
+          state: "", country: "", postalCode: "", securityQuestion: "",
+          securityAnswer: "", orgId: ""
+        });
+        setOrgSearch("");
+        setCaptchaToken(null);
+        
+        alert("Registration successful! Your account is pending approval. You will receive an email notification once your account is approved by the healthcare provider.");
+        
+        // Redirect to signin page
+        router.push("/signin");
+      } else {
+        // For non-patient users, proceed normally
+        localStorage.setItem("user", JSON.stringify(data.data));
+        localStorage.setItem("orgId", data.data.orgId.toString());
+        localStorage.setItem("role", data.data.role || "PATIENT");
+        router.push("/dashboard");
+      }
     } catch (err: unknown) {
       setError(getErrorMessage(err) || "Something went wrong.");
     } finally {
@@ -194,11 +212,11 @@ export default function SignUpPage() {
       const data: PortalApiResponse<PortalUserDto> = JSON.parse(text);
       if (!data.success || !data.data) throw new Error(data.message);
 
-      localStorage.setItem("user", JSON.stringify(data.data));
-      localStorage.setItem("orgId", data.data.orgId.toString());
-      localStorage.setItem("role", "PATIENT");
-
-      router.push("/dashboard");
+      // Show success message about approval process for Google signup
+      alert("Registration successful! Your account is pending approval. You will receive an email notification once your account is approved by the healthcare provider.");
+      
+      // Redirect to signin page
+      router.push("/signin");
     } catch (err: unknown) {
       setError(getErrorMessage(err) || "Google signup failed");
     }

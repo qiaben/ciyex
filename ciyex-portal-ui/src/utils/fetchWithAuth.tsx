@@ -3,13 +3,31 @@ export async function fetchWithAuth(
   init: RequestInit = {}
 ): Promise<Response> {
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : undefined;
-  const orgId = typeof window !== "undefined" ? localStorage.getItem("orgId") : undefined;
+  let orgId = typeof window !== "undefined" ? localStorage.getItem("orgId") : undefined;
+
+  // If orgId not in localStorage, try to extract from JWT token
+  if (!orgId && token) {
+    const { getOrgIdsFromToken } = await import('./jwtHelper');
+    const orgIds = getOrgIdsFromToken();
+    if (orgIds.length > 0) {
+      orgId = orgIds[0].toString();
+    }
+  }
+
+  // Debug logging
+  console.log('🔍 fetchWithAuth debug:', {
+    hasToken: !!token,
+    tokenLength: token?.length,
+    hasOrgId: !!orgId,
+    orgId,
+    url: typeof input === "string" ? input : input.url
+  });
 
   const authHeaders: Record<string, string> = {
     "Content-Type": "application/json",
     "Accept": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...(orgId ? { "X-Org-Id": orgId } : {}),   // ✅ add this
+    ...(orgId ? { "x-org-id": orgId } : {}),   // ✅ use lowercase x-org-id
   };
 
   const mergedHeaders = new Headers(init.headers || {});
@@ -26,5 +44,5 @@ export async function fetchWithAuth(
     url = (input as Request).url;
   }
 
-  return fetch(url, { ...init, headers: mergedHeaders });
+  return fetch(url, { ...init, headers: mergedHeaders, credentials: 'include' });
 }
