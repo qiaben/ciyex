@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 import AdminLayout from "@/app/(admin)/layout";
 import Alert from "@/components/ui/alert/Alert";
@@ -44,12 +44,7 @@ export default function PatientEducationPage() {
     message: string;
   } | null>(null);
 
-  useEffect(() => {
-    loadTopics();
-    loadAssignments();
-  }, []);
-
-  const loadTopics = async () => {
+  const loadTopics = useCallback(async () => {
     try {
       const res = await fetchWithAuth(
         `${process.env.NEXT_PUBLIC_API_URL}/api/patient-education`
@@ -59,9 +54,9 @@ export default function PatientEducationPage() {
     } catch {
       showAlert("error", "Failed to load topics");
     }
-  };
+  }, []);
 
-  const loadAssignments = async () => {
+  const loadAssignments = useCallback(async () => {
     try {
       const res = await fetchWithAuth(
         `${process.env.NEXT_PUBLIC_API_URL}/api/patient-education-assignments`
@@ -71,7 +66,12 @@ export default function PatientEducationPage() {
     } catch {
       showAlert("error", "Failed to load assignments");
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadTopics();
+    loadAssignments();
+  }, [loadTopics, loadAssignments]);
 
   const assignTopic = async (topicId: string) => {
     try {

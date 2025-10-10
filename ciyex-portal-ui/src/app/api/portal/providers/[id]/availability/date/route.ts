@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8080';
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const authHeader = request.headers.get('authorization');
     if (!authHeader) {
@@ -23,8 +23,10 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       );
     }
 
+    const { id } = await params;
+
     const response = await fetch(
-      `${BACKEND_URL}/api/portal/providers/${params.id}/availability/date?date=${date}&limit=${limit}`,
+      `${BACKEND_URL}/api/portal/providers/${id}/availability/date?date=${date}&limit=${limit}`,
       {
         method: 'GET',
         headers: {
