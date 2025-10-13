@@ -1,6 +1,4 @@
 
-
-
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -79,6 +77,7 @@ type Claim = {
 };
 
 type InsuranceRemitLine = {
+     id: number;
     invoiceLineId: number;
     submitted: number;
     balance: number;
@@ -94,6 +93,12 @@ type InsuranceRemitLine = {
 type PatientPaymentAllocation = {
     invoiceLineId: number;
     amount: number;
+};
+
+type PatientPayment = {
+  id: number;                 // <-- paymentId
+  amount: number;
+  paymentMethod?: PaymentMethod | string;
 };
 
 type AccountCredit = { balance: number };
@@ -206,6 +211,159 @@ const StyleInjector: React.FC = () => (
    Component
 ========================================================= */
 export default function PatientBilling({ patientId, patientName }: Props) {
+    // Edit modals for insurance and patient payments
+    const [editInsuranceModal, setEditInsuranceModal] = useState<{invoiceId: number, remit: InsuranceRemitLine} | null>(null);
+    const [editPatientModal, setEditPatientModal] = useState<{invoiceId: number, payment: PatientPayment} | null>(null);
+    // Notes modal state for invoice inline rows
+    // =====================
+    // Insurance Payment Actions
+    // =====================
+    async function editInsuranceRemitLine(invoiceId: number, remitId: number, body: Partial<InsuranceRemitLine>) {
+        const res = await fetchWithAuth(`${API}/invoices/${invoiceId}/insurance-payments/${remitId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (!data?.success) throw new Error(data?.message || "Failed to edit insurance payment");
+        await loadAll();
+    }
+
+    async function voidInsurancePayment(invoiceId: number, remitId: number, reason?: string) {
+        const res = await fetchWithAuth(`${API}/invoices/${invoiceId}/insurance-payments/${remitId}/void`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: reason ? JSON.stringify({ reason }) : undefined,
+        });
+        const data = await res.json();
+        if (!data?.success) throw new Error(data?.message || "Failed to void insurance payment");
+        await loadAll();
+    }
+
+    async function refundInsurancePayment(invoiceId: number, remitId: number, amount: number, reason: string) {
+        const res = await fetchWithAuth(`${API}/invoices/${invoiceId}/insurance-payments/${remitId}/refund`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ amount, reason }),
+        });
+        const data = await res.json();
+        if (!data?.success) throw new Error(data?.message || "Failed to refund insurance payment");
+        await loadAll();
+    }
+
+    async function transferInsuranceCreditToPatient(invoiceId: number, remitId: number, amount: number, note: string) {
+        const res = await fetchWithAuth(`${API}/invoices/${invoiceId}/insurance-payments/${remitId}/transfer-credit-to-patient`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ amount, note }),
+        });
+        const data = await res.json();
+        if (!data?.success) throw new Error(data?.message || "Failed to transfer insurance credit");
+        await loadAll();
+    }
+
+    // =====================
+    // Patient Payment Actions
+    // =====================
+    async function editPatientPayment(invoiceId: number, paymentId: number, body: Partial<PatientPayment>) {
+        const res = await fetchWithAuth(`${API}/invoices/${invoiceId}/patient-payments/${paymentId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (!data?.success) throw new Error(data?.message || "Failed to edit patient payment");
+        await loadAll();
+    }
+
+    async function voidPatientPayment(invoiceId: number, paymentId: number, reason?: string) {
+        const res = await fetchWithAuth(`${API}/invoices/${invoiceId}/patient-payments/${paymentId}/void`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: reason ? JSON.stringify({ reason }) : undefined,
+        });
+        const data = await res.json();
+        if (!data?.success) throw new Error(data?.message || "Failed to void patient payment");
+        await loadAll();
+    }
+
+    async function refundPatientPayment(invoiceId: number, paymentId: number, amount: number, reason: string) {
+        const res = await fetchWithAuth(`${API}/invoices/${invoiceId}/patient-payments/${paymentId}/refund`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ amount, reason }),
+        });
+        const data = await res.json();
+        if (!data?.success) throw new Error(data?.message || "Failed to refund patient payment");
+        await loadAll();
+    }
+
+    async function transferPatientCreditToPatient(fromPatientId: number, toPatientId: number, amount: number, note: string) {
+        const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/patient-billing/patients/${fromPatientId}/transfer-credit/${toPatientId}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ amount, note }),
+        });
+        const data = await res.json();
+        if (!data?.success) throw new Error(data?.message || "Failed to transfer patient credit");
+        await loadAll();
+    }
+    const [showNotesFor, setShowNotesFor] = useState<{ key: string, anchor: HTMLElement | null } | null>(null); // key: e.g. 'inv-23', 'ins-23', 'pt-23', anchor: icon element
+    const [notesText, setNotesText] = useState<string>("");
+    // Dummy: In real app, fetch/save notes per line from backend
+    const handleOpenNotes = (key: string, e?: React.MouseEvent) => {
+        setShowNotesFor({ key, anchor: e?.currentTarget as HTMLElement || null });
+        setNotesText(""); // TODO: fetch notes for this key
+    };
+    const handleCloseNotes = () => {
+        setShowNotesFor(null);
+        setNotesText("");
+    };
+    const handleSaveNotes = () => {
+        // TODO: save notesText for showNotesFor
+        setShowNotesFor(null);
+    };
+
+    // Notes Popover
+    const NotesPopover = ({ open, anchor, onClose, onSave, value, onChange }: {
+        open: boolean;
+        anchor: HTMLElement | null;
+        onClose: () => void;
+        onSave: () => void;
+        value: string;
+        onChange: (v: string) => void;
+    }) => {
+        const [pos, setPos] = useState<{ top: number, left: number }>({ top: 0, left: 0 });
+        React.useEffect(() => {
+            if (open && anchor) {
+                const rect = anchor.getBoundingClientRect();
+                setPos({
+                    top: rect.bottom + 8,
+                    left: rect.left - 40
+                });
+            }
+        }, [open, anchor]);
+        if (!open) return null;
+        return (
+            <div style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 1000 }}>
+                <div className="bg-white rounded-lg shadow-lg p-4 min-w-[260px] border">
+                    <h4 className="text-base font-semibold mb-2">Notes</h4>
+                    <textarea
+                        className="w-full border rounded p-2 mb-3"
+                        rows={3}
+                        value={value}
+                        onChange={e => onChange(e.target.value)}
+                        placeholder="Enter notes..."
+                        autoFocus
+                    />
+                    <div className="flex justify-end gap-2">
+                        <button className="btn-light" onClick={onClose}>Cancel</button>
+                        <button className="btn-primary" onClick={onSave}>Save</button>
+                    </div>
+                </div>
+            </div>
+        );
+    };
     if (!Number.isFinite(Number(patientId))) {
         return (
             <div className="p-6">
@@ -218,7 +376,7 @@ export default function PatientBilling({ patientId, patientName }: Props) {
 
     const API = `${process.env.NEXT_PUBLIC_API_URL}/api/patient-billing/${patientId}`;
 
-    const [tab, setTab] = useState<"INVOICE" | "CLAIM" | "INS" | "PATIENT">("INVOICE");
+    const [tab, setTab] = useState<"INVOICE" | "CLAIM" | "INS" | "PATIENT" | "DEPOSIT">("INVOICE");
 
     const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [claims, setClaims] = useState<Record<number, Claim>>({});
@@ -226,25 +384,6 @@ export default function PatientBilling({ patientId, patientName }: Props) {
     const selectedInvoice =
         invoices.find((x) => x.id === selectedInvoiceId) ?? (invoices.length ? invoices[0] : undefined);
     const selectedClaim = selectedInvoice ? claims[selectedInvoice.id] : undefined;
-
-    const [accountCredit, setAccountCredit] = useState<AccountCredit>({ balance: 0 });
-
-    // Insurance remit state – per selected invoice
-    const [remits, setRemits] = useState<InsuranceRemitLine[]>([]);
-    useEffect(() => {
-        if (!selectedInvoice) return;
-        setRemits(
-            selectedInvoice.lines.map((l) => ({
-                invoiceLineId: l.id,
-                submitted: Number(l.charge ?? 0),
-                balance: 0,
-                deductible: 0,
-                allowed: Number(l.allowed ?? l.charge ?? 0),
-                insWriteOff: 0,
-                insPay: Number(l.charge ?? 0),
-            }))
-        );
-    }, [selectedInvoice?.id]); // eslint-disable-line
 
     // Pre-fetched payment summaries per invoice
     const [insPayMap, setInsPayMap] = useState<Record<number, InsuranceRemitLine[]>>({});
@@ -262,6 +401,44 @@ export default function PatientBilling({ patientId, patientName }: Props) {
             }))
         );
     }, [selectedInvoice?.id, selectedInvoice?.lines]);
+
+    // --- Calculate PT PAID and INS PAID for summary bar ---
+    // Use ptPayMap and insPayMap if invoice-level values are missing or zero
+    const invoicePtPaid = useMemo(() => {
+        if (!selectedInvoice) return 0;
+        if (Number(selectedInvoice.ptPaid) > 0) return Number(selectedInvoice.ptPaid);
+        const pp = ptPayMap[selectedInvoice.id] ?? [];
+        return sum(pp.map((p: any) => Number(p.amount ?? p.payment ?? p.paid ?? 0)));
+    }, [selectedInvoice, ptPayMap]);
+
+    const invoiceInsPaid = useMemo(() => {
+        if (!selectedInvoice) return 0;
+        if (Number(selectedInvoice.insPaid) > 0) return Number(selectedInvoice.insPaid);
+        const ip = insPayMap[selectedInvoice.id] ?? [];
+        return sum(ip.map((r: any) => Number(r.insPay ?? 0)));
+    }, [selectedInvoice, insPayMap]);
+
+    const [accountCredit, setAccountCredit] = useState<AccountCredit>({ balance: 0 });
+
+    // Insurance remit state – per selected invoice
+    const [remits, setRemits] = useState<InsuranceRemitLine[]>([]);
+    useEffect(() => {
+        if (!selectedInvoice) return;
+        setRemits(
+            selectedInvoice.lines.map((l) => ({
+                id: l.id, // Add id property as required by InsuranceRemitLine
+                invoiceLineId: l.id,
+                submitted: Number(l.charge ?? 0),
+                balance: 0,
+                deductible: 0,
+                allowed: Number(l.allowed ?? l.charge ?? 0),
+                insWriteOff: 0,
+                insPay: Number(l.charge ?? 0),
+            }))
+        );
+    }, [selectedInvoice?.id]); // eslint-disable-line
+
+    // Removed duplicate declarations of insPayMap, ptPayMap, payMethod, allocs, and their useEffect
 
     /* -------- Derived ---------- */
     const patientOwing = useMemo(
@@ -540,6 +717,7 @@ export default function PatientBilling({ patientId, patientName }: Props) {
         const inv = mapServerInvoice(body.data);
         setInvoices((list) => list.map((x) => (x.id === inv.id ? inv : x)));
 
+
         setAllocs(inv.lines.map((l) => ({ invoiceLineId: l.id, amount: Number(l.patientPortion ?? 0) })));
         setSelectedInvoiceId(inv.id);
         setTab("PATIENT");
@@ -559,6 +737,7 @@ export default function PatientBilling({ patientId, patientName }: Props) {
         if (!body?.success) throw new Error(body?.message || "Failed to apply patient payment");
         const inv = mapServerInvoice(body.data);
         setInvoices((list) => list.map((x) => (x.id === inv.id ? inv : x)));
+
 
         // refresh allocations & credit
         setAllocs(inv.lines.map((l) => ({ invoiceLineId: l.id, amount: Number(l.patientPortion ?? 0) })));
@@ -592,9 +771,39 @@ export default function PatientBilling({ patientId, patientName }: Props) {
         setAccountCredit({ balance: body.data?.balance ?? 0 });
     }
 
+    const [showDepositType, setShowDepositType] = useState<"PATIENT" | "INSURANCE" | "COURTESY" | null>(null);
+
     /* =========================================================
        UI
     ========================================================== */
+    // Payment methods for deposit modals
+    const paymentMethods = [
+        { value: "CREDIT_CARD", label: "Credit Card" },
+        { value: "CHECK", label: "Check" },
+        { value: "DEBIT_CARD", label: "Debit Card" },
+        { value: "EFT", label: "EFT" },
+        { value: "CASH", label: "Cash" },
+        { value: "CARE_CREDIT", label: "Care Credit" },
+        { value: "MASTERCARD", label: "Master Card" },
+        { value: "VISA", label: "Visa" },
+        { value: "DISCOVER", label: "Discover" },
+        { value: "AMEX", label: "Amex" },
+    ];
+
+    // Deposit modal state variables
+    const [depositMethod, setDepositMethod] = useState<string>("CREDIT_CARD");
+    const [depositTo, setDepositTo] = useState<string>("");
+    const [depositAmount, setDepositAmount] = useState<string>("");
+    const [depositDesc, setDepositDesc] = useState<string>("");
+    const [depositPolicy, setDepositPolicy] = useState<string>("");
+    const [courtesyType, setCourtesyType] = useState<string>("Un-Collected");
+    const courtesyTypes = ["Un-Collected", "Professional Courtesy", "Migrated", "MembershipPlan"];
+
+    // Dummy user options for deposit "to" dropdown
+    const userOptions = ["User1", "User2", "User3"];
+    // Dummy policy options for insurance deposit
+    const policyOptions = ["Policy1", "Policy2", "Policy3"];
+
     return (
         <div className="p-6 space-y-6">
             <StyleInjector />
@@ -640,16 +849,127 @@ export default function PatientBilling({ patientId, patientName }: Props) {
             </div>
 
             {/* Tabs */}
+            {/* Tabs with Deposit */}
             <SegmentedTabs
                 tabs={[
                     { id: "INVOICE", label: "Invoice(s)" },
                     { id: "CLAIM", label: "Claim (selected)" },
                     { id: "INS", label: "Insurance Payment" },
                     { id: "PATIENT", label: "Patient Payment" },
+                    { id: "DEPOSIT", label: "Deposit" },
                 ]}
                 value={tab}
-                onChange={(id) => setTab(id as any)}
+                onChange={(id) => { setTab(id as any); setShowDepositType(null); }}
             />
+            {/* Deposit Tab Implementation */}
+            {tab === "DEPOSIT" && (
+                <div className="space-y-4">
+                    <div className="flex gap-4">
+                        <button className="btn-light" onClick={() => { setShowDepositType && setShowDepositType("PATIENT"); }}>Add Patient Deposit</button>
+                        <button className="btn-light" onClick={() => { setShowDepositType && setShowDepositType("INSURANCE"); }}>Add Insurance Deposit</button>
+                        <button className="btn-light" onClick={() => { setShowDepositType && setShowDepositType("COURTESY"); }}>Add Courtesy Credit</button>
+                    </div>
+
+                    {/* Patient Deposit Modal */}
+                    {showDepositType === "PATIENT" && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+                            <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md">
+                                <div className="font-semibold text-lg mb-2">Patient Deposit</div>
+                                <div className="text-sm text-gray-500 mb-4">{new Date().toLocaleDateString()} Deposit #XXXXX from {patientName} with Credit Card to
+                                    <select className="input ml-2" value={depositTo || ""} onChange={e => setDepositTo && setDepositTo(e.target.value)}>
+                                        <option value="">Select User</option>
+                                        {userOptions && userOptions.map(u => <option key={u} value={u}>{u}</option>)}
+                                    </select>
+                                </div>
+                                <div className="mb-3">
+                                    <label className="label">Deposit Amount:</label>
+                                    <input className="input w-full" type="number" value={depositAmount || ""} onChange={e => setDepositAmount && setDepositAmount(e.target.value)} />
+                                </div>
+                                <div className="mb-3">
+                                    <label className="label">Payment Method:</label>
+                                    <select className="input w-full" value={depositMethod || "CREDIT_CARD"} onChange={e => setDepositMethod && setDepositMethod(e.target.value)}>
+                                        {paymentMethods && paymentMethods.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                                    </select>
+                                </div>
+                                <div className="mb-3">
+                                    <label className="label">Add description</label>
+                                    <input className="input w-full" value={depositDesc || ""} onChange={e => setDepositDesc && setDepositDesc(e.target.value)} />
+                                </div>
+                                <div className="flex gap-2 mt-4">
+                                    <button className="btn-primary" onClick={() => { /* handle add deposit */ }}>Add Deposit</button>
+                                    <button className="btn-light" onClick={() => setShowDepositType && setShowDepositType(null)}>Cancel</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Insurance Deposit Modal */}
+                    {showDepositType === "INSURANCE" && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+                            <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md">
+                                <div className="font-semibold text-lg mb-2">Insurance Deposit</div>
+                                <div className="text-sm text-gray-500 mb-2">{new Date().toLocaleDateString()} Deposit #XXXXX from {patientName} with
+                                    <select className="input ml-2" value={depositMethod || "CREDIT_CARD"} onChange={e => setDepositMethod && setDepositMethod(e.target.value)}>
+                                        {paymentMethods && paymentMethods.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                                    </select>
+                                    to
+                                    <select className="input ml-2" value={depositTo || ""} onChange={e => setDepositTo && setDepositTo(e.target.value)}>
+                                        <option value="">Select User</option>
+                                        {userOptions && userOptions.map(u => <option key={u} value={u}>{u}</option>)}
+                                    </select>
+                                </div>
+                                <div className="mb-2">
+                                    <label className="label">Policy</label>
+                                    <select className="input w-full" value={depositPolicy || ""} onChange={e => setDepositPolicy && setDepositPolicy(e.target.value)}>
+                                        <option value="">Select Policy</option>
+                                        {policyOptions && policyOptions.map(p => <option key={p} value={p}>{p}</option>)}
+                                    </select>
+                                </div>
+                                <div className="mb-3">
+                                    <label className="label">Deposit Amount:</label>
+                                    <input className="input w-full" type="number" value={depositAmount || ""} onChange={e => setDepositAmount && setDepositAmount(e.target.value)} />
+                                </div>
+                                <div className="mb-3">
+                                    <label className="label">Add description</label>
+                                    <input className="input w-full" value={depositDesc || ""} onChange={e => setDepositDesc && setDepositDesc(e.target.value)} />
+                                </div>
+                                <div className="flex gap-2 mt-4">
+                                    <button className="btn-primary" onClick={() => { /* handle add deposit */ }}>Add Deposit</button>
+                                    <button className="btn-light" onClick={() => setShowDepositType && setShowDepositType(null)}>Cancel</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Courtesy Credit Modal */}
+                    {showDepositType === "COURTESY" && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+                            <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md">
+                                <div className="font-semibold text-lg mb-2">Courtesy Credit</div>
+                                <div className="text-sm text-gray-500 mb-2">{new Date().toLocaleDateString()}</div>
+                                <div className="mb-2">
+                                    <label className="label">Adjustment Type</label>
+                                    <select className="input w-full" value={courtesyType || "Un-Collected"} onChange={e => setCourtesyType && setCourtesyType(e.target.value)}>
+                                        {courtesyTypes && courtesyTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                                    </select>
+                                </div>
+                                <div className="mb-3">
+                                    <label className="label">Courtesy Credit Amount:</label>
+                                    <input className="input w-full" type="number" value={depositAmount || ""} onChange={e => setDepositAmount && setDepositAmount(e.target.value)} />
+                                </div>
+                                <div className="mb-3">
+                                    <label className="label">Add description</label>
+                                    <input className="input w-full" value={depositDesc || ""} onChange={e => setDepositDesc && setDepositDesc(e.target.value)} />
+                                </div>
+                                <div className="flex gap-2 mt-4">
+                                    <button className="btn-primary" onClick={() => { /* handle add courtesy */ }}>Add Courtesy</button>
+                                    <button className="btn-light" onClick={() => setShowDepositType && setShowDepositType(null)}>Cancel</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* ================= INVOICE LIST ================= */}
             {tab === "INVOICE" && (
@@ -667,6 +987,9 @@ export default function PatientBilling({ patientId, patientName }: Props) {
                                     : "bg-green-50";
                         const ip = insPayMap[inv.id] ?? [];
                         const pp = ptPayMap[inv.id] ?? [];
+                        // Calculate PT PAID and INS PAID for this invoice
+                        const ptPaid = Number(inv.ptPaid) > 0 ? Number(inv.ptPaid) : sum(pp.map((p: any) => Number(p.amount ?? p.payment ?? p.paid ?? 0)));
+                        const insPaid = Number(inv.insPaid) > 0 ? Number(inv.insPaid) : sum(ip.map((r: any) => Number(r.insPay ?? 0)));
                         // Always show insurance payment summary if any insurance payment exists
                         const showInsuranceSummary = ip.length > 0;
                         // Always show patient payment summary if any patient payment exists
@@ -682,25 +1005,10 @@ export default function PatientBilling({ patientId, patientName }: Props) {
                                     <div className="ml-2 grid flex-1 grid-cols-4 gap-3 md:grid-cols-6">
                                         <RowStat label="Pt Balance" value={currency(Number(inv.ptBalance ?? 0))} tone="red" />
                                         <RowStat label="Ins Balance" value={currency(Number(inv.insBalance ?? 0))} />
-                                        <RowStat
-                                            label="Invoice Balance"
-                                            value={currency(Number(inv.ptBalance ?? 0) + Number(inv.insBalance ?? 0))}
-                                            bold
-                                        />
-                                        <RowStat
-                                            label="Ins WO"
-                                            value={currency(
-                                                Number(
-                                                    inv.insWO ??
-                                                    inv.lines.reduce(
-                                                        (a, l) => a + Math.max(0, Number(l.charge || 0) - Number(l.allowed || 0)),
-                                                        0
-                                                    )
-                                                )
-                                            )}
-                                        />
-                                        <RowStat label="Pt Paid" value={currency(Number(inv.ptPaid ?? 0))} hideOnSmall />
-                                        <RowStat label="Ins Paid" value={currency(Number(inv.insPaid ?? 0))} hideOnSmall />
+                                        <RowStat label="Invoice Balance" value={currency(Number(inv.ptBalance ?? 0) + Number(inv.insBalance ?? 0))} bold />
+                                        <RowStat label="Ins WO" value={currency(Number(inv.insWO ?? inv.lines.reduce((a, l) => a + Math.max(0, Number(l.charge || 0) - Number(l.allowed || 0)), 0)))} />
+                                        <RowStat label="Pt Paid" value={currency(ptPaid)} />
+                                        <RowStat label="Ins Paid" value={currency(insPaid)} />
                                     </div>
                                     <div className="ml-auto flex items-center gap-2">
                                         <IconBtn title="Print" onClick={() => window.print()}>🖨️</IconBtn>
@@ -712,6 +1020,16 @@ export default function PatientBilling({ patientId, patientName }: Props) {
                                 {/* Claim summary row (if exists) */}
                                 {claim && claim.status !== "DRAFT" ? (
                                     <div className="flex items-start gap-3 border-b px-3 py-2 text-sm">
+                                        <button
+                                            className="mr-2 p-1 rounded-full hover:bg-amber-100"
+                                            title="View/Add Notes"
+                                            onClick={e => handleOpenNotes(`claim-${inv.id}`, e)}
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-amber-600">
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 20.25c4.556 0 8.25-3.694 8.25-8.25S16.556 3.75 12 3.75 3.75 7.444 3.75 12s3.694 8.25 8.25 8.25z" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-3-3v6" />
+                                            </svg>
+                                        </button>
                                         <div className="min-w-[100px] text-gray-500">{claim.createdOn || first?.dos}</div>
                                         <div className="flex-1">
                                             <div className="flex flex-wrap items-center gap-2">
@@ -752,6 +1070,16 @@ export default function PatientBilling({ patientId, patientName }: Props) {
                                 {/* Insurance payment summary (inline, only after insurance paid) */}
                                 {showInsuranceSummary && (
                                     <div className="flex items-start gap-3 border-b px-3 py-2 text-sm bg-blue-50/40">
+                                        <button
+                                            className="mr-2 p-1 rounded-full hover:bg-blue-100"
+                                            title="View/Add Notes"
+                                            onClick={e => handleOpenNotes(`ins-${inv.id}`, e)}
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-blue-600">
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 20.25c4.556 0 8.25-3.694 8.25-8.25S16.556 3.75 12 3.75 3.75 7.444 3.75 12s3.694 8.25 8.25 8.25z" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-3-3v6" />
+                                            </svg>
+                                        </button>
                                         <div className="min-w-[100px] text-gray-500">Insurance</div>
                                         <div className="flex-1">
                                             <div className="flex flex-wrap items-center gap-2">
@@ -763,16 +1091,28 @@ export default function PatientBilling({ patientId, patientName }: Props) {
                                         </div>
                                         {/* Inline action icons for insurance payment */}
                                         <div className="ml-auto flex items-center gap-2">
-                                            <IconBtn title="Void Insurance Payment" onClick={() => {/* TODO: implement void insurance payment */}}>
+                                            <IconBtn title="Void Insurance Payment" onClick={() => {
+                                                const remit = ip[0];
+                                                if (remit) void voidInsurancePayment(inv.id, remit.id, "Payer reversal / posted in error");
+                                            }}>
                                                 <span role="img" aria-label="void">🚫</span>
                                             </IconBtn>
-                                            <IconBtn title="Edit Insurance Payment" onClick={() => {/* TODO: implement edit insurance payment */}}>
+                                            <IconBtn title="Edit Insurance Payment" onClick={() => {
+                                                const remit = ip[0];
+                                                if (remit) setEditInsuranceModal({ invoiceId: inv.id, remit });
+                                            }}>
                                                 <span role="img" aria-label="edit">✏️</span>
                                             </IconBtn>
-                                            <IconBtn title="Refund Insurance Payment" onClick={() => {/* TODO: implement refund insurance payment */}}>
+                                            <IconBtn title="Refund Insurance Payment" onClick={() => {
+                                                const remit = ip[0];
+                                                if (remit) void refundInsurancePayment(inv.id, remit.id, 10, "Overpayment per EOB");
+                                            }}>
                                                 <span role="img" aria-label="refund">⋯</span>
                                             </IconBtn>
-                                            <IconBtn title="Transfer Credit to Patient" onClick={() => {/* TODO: implement transfer credit to patient */}}>
+                                            <IconBtn title="Transfer Credit to Patient" onClick={() => {
+                                                const remit = ip[0];
+                                                if (remit) void transferInsuranceCreditToPatient(inv.id, remit.id, 20, "Move insurance overpay to patient account credit");
+                                            }}>
                                                 <span role="img" aria-label="transfer">🔁</span>
                                             </IconBtn>
                                         </div>
@@ -781,6 +1121,16 @@ export default function PatientBilling({ patientId, patientName }: Props) {
                                 {/* Patient payment summary (inline, only after insurance paid) */}
                                 {showPatientSummary && (
                                     <div className="flex items-start gap-3 border-b px-3 py-2 text-sm bg-purple-50/40">
+                                        <button
+                                            className="mr-2 p-1 rounded-full hover:bg-purple-100"
+                                            title="View/Add Notes"
+                                            onClick={e => handleOpenNotes(`pt-${inv.id}`, e)}
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-purple-600">
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 20.25c4.556 0 8.25-3.694 8.25-8.25S16.556 3.75 12 3.75 3.75 7.444 3.75 12s3.694 8.25 8.25 8.25z" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-3-3v6" />
+                                            </svg>
+                                        </button>
                                         <div className="min-w-[100px] text-gray-500">Patient</div>
                                         <div className="flex-1">
                                             <div className="flex flex-wrap items-center gap-2">
@@ -790,16 +1140,129 @@ export default function PatientBilling({ patientId, patientName }: Props) {
                                         </div>
                                         {/* Inline action icons for patient payment */}
                                         <div className="ml-auto flex items-center gap-2">
-                                            <IconBtn title="Void Patient Payment" onClick={() => {/* TODO: implement void patient payment */}}>
+                                            <IconBtn title="Void Patient Payment" onClick={() => {
+                                                const pay = pp[0];
+                                                if (pay) void voidPatientPayment(inv.id, pay.id, "Duplicate collection at front desk");
+                                            }}>
                                                 <span role="img" aria-label="void">🚫</span>
                                             </IconBtn>
-                                            <IconBtn title="Edit Patient Payment" onClick={() => {/* TODO: implement edit patient payment */}}>
+                                            <IconBtn title="Edit Patient Payment" onClick={() => {
+                                                const pay = pp[0];
+                                                if (pay) setEditPatientModal({ invoiceId: inv.id, payment: pay });
+                                            }}>
                                                 <span role="img" aria-label="edit">✏️</span>
                                             </IconBtn>
-                                            <IconBtn title="Refund Patient Payment" onClick={() => {/* TODO: implement refund patient payment */}}>
+    {/* Edit Insurance Payment Modal */}
+    {editInsuranceModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+            <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-lg">
+                <h3 className="text-lg font-semibold mb-4">Edit Insurance Payment</h3>
+                <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    const form = e.target as typeof e.target & {
+                        submitted: { value: string },
+                        balance: { value: string },
+                        deductible: { value: string },
+                        allowed: { value: string },
+                        insWriteOff: { value: string },
+                        insPay: { value: string },
+                        updateAllowed: { checked: boolean },
+                        updateFlatPortion: { checked: boolean },
+                        applyWriteoff: { checked: boolean },
+                    };
+                    await editInsuranceRemitLine(
+                        editInsuranceModal.invoiceId,
+                        editInsuranceModal.remit.id,
+                        {
+                            invoiceLineId: editInsuranceModal.remit.invoiceLineId,
+                            submitted: Number(form.submitted.value),
+                            balance: Number(form.balance.value),
+                            deductible: Number(form.deductible.value),
+                            allowed: Number(form.allowed.value),
+                            insWriteOff: Number(form.insWriteOff.value),
+                            insPay: Number(form.insPay.value),
+                            updateAllowed: form.updateAllowed.checked,
+                            updateFlatPortion: form.updateFlatPortion.checked,
+                            applyWriteoff: form.applyWriteoff.checked,
+                        }
+                    );
+                    setEditInsuranceModal(null);
+                }}>
+                    <div className="grid grid-cols-2 gap-3">
+                        <label>Submitted<input name="submitted" type="number" className="input w-full" defaultValue={editInsuranceModal.remit.submitted} /></label>
+                        <label>Balance<input name="balance" type="number" className="input w-full" defaultValue={editInsuranceModal.remit.balance} /></label>
+                        <label>Deductible<input name="deductible" type="number" className="input w-full" defaultValue={editInsuranceModal.remit.deductible} /></label>
+                        <label>Allowed<input name="allowed" type="number" className="input w-full" defaultValue={editInsuranceModal.remit.allowed} /></label>
+                        <label>Ins WriteOff<input name="insWriteOff" type="number" className="input w-full" defaultValue={editInsuranceModal.remit.insWriteOff} /></label>
+                        <label>Ins Pay<input name="insPay" type="number" className="input w-full" defaultValue={editInsuranceModal.remit.insPay} /></label>
+                        <label className="col-span-2"><input name="updateAllowed" type="checkbox" defaultChecked={!!editInsuranceModal.remit.updateAllowed} /> Update Allowed</label>
+                        <label className="col-span-2"><input name="updateFlatPortion" type="checkbox" defaultChecked={!!editInsuranceModal.remit.updateFlatPortion} /> Update Flat Portion</label>
+                        <label className="col-span-2"><input name="applyWriteoff" type="checkbox" defaultChecked={!!editInsuranceModal.remit.applyWriteoff} /> Apply Writeoff</label>
+                    </div>
+                    <div className="flex justify-end gap-2 mt-4">
+                        <button type="button" className="btn-light" onClick={() => setEditInsuranceModal(null)}>Cancel</button>
+                        <button type="submit" className="btn-primary">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    )}
+
+    {/* Edit Patient Payment Modal */}
+    {editPatientModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+            <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-lg">
+                <h3 className="text-lg font-semibold mb-4">Edit Patient Payment</h3>
+                <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    const form = e.target as typeof e.target & {
+                        amount: { value: string },
+                        paymentMethod: { value: string },
+                    };
+                    await editPatientPayment(
+                        editPatientModal.invoiceId,
+                        editPatientModal.payment.id,
+                        {
+                            amount: Number(form.amount.value),
+                            paymentMethod: form.paymentMethod.value,
+                        }
+                    );
+                    setEditPatientModal(null);
+                }}>
+                    <div className="grid grid-cols-2 gap-3">
+                        <label>Amount<input name="amount" type="number" className="input w-full" defaultValue={editPatientModal.payment.amount} /></label>
+                        <label>Payment Method
+                            <select name="paymentMethod" className="input w-full" defaultValue={editPatientModal.payment.paymentMethod}>
+                                <option value="CREDIT_CARD">Credit Card</option>
+                                <option value="CHECK">Check</option>
+                                <option value="DEBIT_CARD">Debit Card</option>
+                                <option value="EFT">EFT</option>
+                                <option value="CASH">Cash</option>
+                                <option value="CARE_CREDIT">Care Credit</option>
+                                <option value="MASTERCARD">Master Card</option>
+                                <option value="VISA">Visa</option>
+                                <option value="DISCOVER">Discover</option>
+                                <option value="AMEX">Amex</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div className="flex justify-end gap-2 mt-4">
+                        <button type="button" className="btn-light" onClick={() => setEditPatientModal(null)}>Cancel</button>
+                        <button type="submit" className="btn-primary">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    )}
+                                            <IconBtn title="Refund Patient Payment" onClick={() => {
+                                                const pay = pp[0];
+                                                if (pay) void refundPatientPayment(inv.id, pay.id, 10, "Partial refund");
+                                            }}>
                                                 <span role="img" aria-label="refund">⋯</span>
                                             </IconBtn>
-                                            <IconBtn title="Transfer Credit to Insurance" onClick={() => {/* TODO: implement transfer credit to insurance */}}>
+                                            <IconBtn title="Transfer Credit to Insurance" onClick={() => {
+                                                // Not implemented: transfer patient credit to insurance
+                                            }}>
                                                 <span role="img" aria-label="transfer">🔁</span>
                                             </IconBtn>
                                         </div>
@@ -808,6 +1271,16 @@ export default function PatientBilling({ patientId, patientName }: Props) {
                                 {/* Mini invoice line row */}
                                 {first && (
                                     <div className="flex items-start gap-3 px-3 py-2 text-sm">
+                                        <button
+                                            className="mr-2 p-1 rounded-full hover:bg-gray-100"
+                                            title="View/Add Notes"
+                                            onClick={e => handleOpenNotes(`inv-${inv.id}`, e)}
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-600">
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 20.25c4.556 0 8.25-3.694 8.25-8.25S16.556 3.75 12 3.75 3.75 7.444 3.75 12s3.694 8.25 8.25 8.25z" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-3-3v6" />
+                                            </svg>
+                                        </button>
                                         <div className="min-w-[100px] text-gray-500">{first.dos}</div>
                                         <div className="flex-1">
                                             <span className="text-gray-700">
@@ -822,6 +1295,15 @@ export default function PatientBilling({ patientId, patientName }: Props) {
                                         </div>
                                     </div>
                                 )}
+            {/* Notes Popover for inline notes */}
+            <NotesPopover
+                open={!!showNotesFor}
+                anchor={showNotesFor?.anchor ?? null}
+                onClose={handleCloseNotes}
+                onSave={handleSaveNotes}
+                value={notesText}
+                onChange={setNotesText}
+            />
                                 {transferOpenFor === inv.id && (
                                     <div className="relative">
                                         <div className="absolute z-10 ml-3 mt-2 w-64 rounded-md border bg-white p-1 shadow">
@@ -1572,10 +2054,6 @@ export default function PatientBilling({ patientId, patientName }: Props) {
         </div>
     );
 }
-
-
-
-
 
 
 
