@@ -1,5 +1,6 @@
 "use client";
 
+
 import AllergiesSummary from "@/components/patients/AllergiesSummary";
 import MedicalProblemsSummary from "@/components/patients/MedicalProblemsSummary";
 import InsuranceSummary from "@/components/patients/InsuranceSummary";
