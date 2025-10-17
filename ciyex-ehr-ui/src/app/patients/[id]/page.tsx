@@ -1294,7 +1294,7 @@ export default function PatientDashboardPage() {
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-3 shrink-0">
+                        {/* <div className="flex items-center gap-3 shrink-0">
                             <button
                                 className="h-8 px-3 rounded bg-blue-600 hover:bg-blue-700 text-xs font-medium text-white shadow-sm inline-flex items-center"
                                 onClick={handleOpenEncounter}
@@ -1304,7 +1304,7 @@ export default function PatientDashboardPage() {
                                 </svg>
                                 New Encounter
                             </button>
-                        </div>
+                        </div> */}
                     </div>
 
                     <div className="mt-1.5">

@@ -1,4 +1,4 @@
-
+    
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -34,6 +34,20 @@ type PaymentMethod =
     | "VISA"
     | "DISCOVER"
     | "AMEX";
+
+type NoteTargetType = "INVOICE" | "CLAIM" | "INSURANCE_PAYMENT" | "PATIENT_PAYMENT";
+
+type Note = {
+    id: number;
+    patientId: number;
+    invoiceId?: number;
+    type: NoteTargetType;
+    targetId: number;
+    text: string;
+    createdBy?: string;
+    createdAt: string;
+    updatedAt: string;
+};
 
 type InvoiceLine = {
     id: number;
@@ -102,6 +116,21 @@ type PatientPayment = {
 };
 
 type AccountCredit = { balance: number };
+
+type Provider = {
+    id: number;
+    name: string;
+};
+
+type Patient = {
+    id: number;
+    name: string;
+};
+
+type InsuranceCompany = {
+    id: number;
+    name: string;
+};
 
 /* =========================================================
    Small UI helpers
@@ -214,7 +243,38 @@ export default function PatientBilling({ patientId, patientName }: Props) {
     // Edit modals for insurance and patient payments
     const [editInsuranceModal, setEditInsuranceModal] = useState<{invoiceId: number, remit: InsuranceRemitLine} | null>(null);
     const [editPatientModal, setEditPatientModal] = useState<{invoiceId: number, payment: PatientPayment} | null>(null);
-    // Notes modal state for invoice inline rows
+    // Notes state
+    const [currentNotes, setCurrentNotes] = useState<Note[]>([]);
+    const [editingNote, setEditingNote] = useState<Note | null>(null);
+    const [notesText, setNotesText] = useState<string>("");
+    const [showNotesFor, setShowNotesFor] = useState<{ invoiceId: number; anchor: HTMLElement | null } | null>(null); // Updated to use invoiceId directly
+    // Dropdown data
+    const [providers, setProviders] = useState<Provider[]>([]);
+    const [patients, setPatients] = useState<Patient[]>([]);
+    const [insuranceCompanies, setInsuranceCompanies] = useState<InsuranceCompany[]>([]);
+
+    // Preview modal state
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+    const [previewType, setPreviewType] = useState<string | null>(null);
+    const [previewOpen, setPreviewOpen] = useState(false);
+
+    // Fetch providers and patients for dropdowns
+    useEffect(() => {
+        fetchWithAuth("/api/providers")
+            .then((res) => res.json())
+            .then((data) => {
+                if (data && data.success && Array.isArray(data.data)) {
+                    setProviders(data.data.map((p: any) => ({ id: p.id, name: (p.identification?.firstName || '') + ' ' + (p.identification?.lastName || '') })));
+                }
+            });
+        fetchWithAuth("/api/patients")
+            .then((res) => res.json())
+            .then((data) => {
+                if (data && data.success && Array.isArray(data.data)) {
+                    setPatients(data.data.map((p: any) => ({ id: p.id, name: (p.firstName || '') + ' ' + (p.lastName || '') })));
+                }
+            });
+    }, []);
     // =====================
     // Insurance Payment Actions
     // =====================
@@ -308,62 +368,161 @@ export default function PatientBilling({ patientId, patientName }: Props) {
         if (!data?.success) throw new Error(data?.message || "Failed to transfer patient credit");
         await loadAll();
     }
-    const [showNotesFor, setShowNotesFor] = useState<{ key: string, anchor: HTMLElement | null } | null>(null); // key: e.g. 'inv-23', 'ins-23', 'pt-23', anchor: icon element
-    const [notesText, setNotesText] = useState<string>("");
-    // Dummy: In real app, fetch/save notes per line from backend
-    const handleOpenNotes = (key: string, e?: React.MouseEvent) => {
-        setShowNotesFor({ key, anchor: e?.currentTarget as HTMLElement || null });
-        setNotesText(""); // TODO: fetch notes for this key
-    };
-    const handleCloseNotes = () => {
-        setShowNotesFor(null);
+
+    // =====================
+    // Notes Actions
+    // =====================
+    async function fetchNotes(invoiceId: number) {
+        const res = await fetchWithAuth(`${API}/invoices/${invoiceId}/notes`);
+        const data = await res.json();
+        if (data?.success) {
+            setCurrentNotes(data.data || []);
+        } else {
+            setCurrentNotes([]);
+        }
+    }
+
+    async function createNote(invoiceId: number, text: string) {
+        const res = await fetchWithAuth(`${API}/invoices/${invoiceId}/notes`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text }),
+        });
+        const data = await res.json();
+        if (data?.success) {
+            await fetchNotes(invoiceId); // Refresh list
+            setNotesText(""); // Clear textarea
+        } else {
+            throw new Error(data?.message || "Failed to create note");
+        }
+    }
+
+    async function updateNote(invoiceId: number, noteId: number, text: string) {
+        const res = await fetchWithAuth(`${API}/invoices/${invoiceId}/notes/${noteId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text }),
+        });
+        const data = await res.json();
+        if (data?.success) {
+            await fetchNotes(invoiceId); // Refresh list
+            setEditingNote(null);
+            setNotesText(""); // Clear textarea
+        } else {
+            throw new Error(data?.message || "Failed to update note");
+        }
+    }
+
+    async function deleteNote(invoiceId: number, noteId: number) {
+        const res = await fetchWithAuth(`${API}/invoices/${invoiceId}/notes/${noteId}`, {
+            method: "DELETE",
+        });
+        const data = await res.json();
+        if (data?.success) {
+            await fetchNotes(invoiceId); // Refresh list
+        } else {
+            throw new Error(data?.message || "Failed to delete note");
+        }
+    }
+
+    const handleOpenNotes = async (invoiceId: number, e?: React.MouseEvent) => {
+        setShowNotesFor({ invoiceId, anchor: e?.currentTarget as HTMLElement || null });
+        setEditingNote(null);
         setNotesText("");
-    };
-    const handleSaveNotes = () => {
-        // TODO: save notesText for showNotesFor
-        setShowNotesFor(null);
+        await fetchNotes(invoiceId);
     };
 
-    // Notes Popover
-    const NotesPopover = ({ open, anchor, onClose, onSave, value, onChange }: {
-        open: boolean;
-        anchor: HTMLElement | null;
-        onClose: () => void;
-        onSave: () => void;
-        value: string;
-        onChange: (v: string) => void;
-    }) => {
-        const [pos, setPos] = useState<{ top: number, left: number }>({ top: 0, left: 0 });
-        React.useEffect(() => {
-            if (open && anchor) {
-                const rect = anchor.getBoundingClientRect();
-                setPos({
-                    top: rect.bottom + 8,
-                    left: rect.left - 40
-                });
+    const handleCloseNotes = () => {
+        setShowNotesFor(null);
+        setCurrentNotes([]);
+        setEditingNote(null);
+        setNotesText("");
+    };
+
+    const handleSaveNote = async () => {
+        if (!showNotesFor) return;
+        if (editingNote) {
+            await updateNote(showNotesFor.invoiceId, editingNote.id, notesText.trim());
+        } else {
+            if (notesText.trim()) {
+                await createNote(showNotesFor.invoiceId, notesText.trim());
             }
-        }, [open, anchor]);
+        }
+    };
+
+    const handleEditNote = (note: Note) => {
+        setEditingNote(note);
+        setNotesText(note.text);
+    };
+
+    const handleDeleteNote = async (noteId: number) => {
+        if (!showNotesFor) return;
+        if (confirm("Are you sure you want to delete this note?")) {
+            await deleteNote(showNotesFor.invoiceId, noteId);
+        }
+    };
+
+    // Notes Popover/Modal - Enhanced to use portal, anchor to row, and smooth input
+  
+    // Notes Modal - Rendered as fixed overlay, no anchor, smooth controlled textarea
+    const NotesModal = ({ open, invoiceId, onClose, notes, editingNote, notesText, onNotesChange, onSave, onEdit, onDelete }: {
+        open: boolean;
+        invoiceId: number;
+        onClose: () => void;
+        notes: Note[];
+        editingNote: Note | null;
+        notesText: string;
+        onNotesChange: (v: string) => void;
+        onSave: () => void;
+        onEdit: (note: Note) => void;
+        onDelete: (noteId: number) => void;
+    }) => {
         if (!open) return null;
         return (
-            <div style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 1000 }}>
-                <div className="bg-white rounded-lg shadow-lg p-4 min-w-[260px] border">
-                    <h4 className="text-base font-semibold mb-2">Notes</h4>
+            <div style={{
+                position: "fixed",
+                top: 0,
+                left: 0,
+                width: "100vw",
+                height: "100vh",
+                background: "rgba(0,0,0,0.15)",
+                zIndex: 1000,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center"
+            }} onClick={onClose}>
+                <div style={{ background: "#fff", borderRadius: 8, minWidth: 340, maxWidth: 400, padding: 20, boxShadow: "0 2px 16px #0002" }} onClick={e => e.stopPropagation()}>
+                    <div style={{ fontWeight: 600, marginBottom: 8 }}>Notes for Invoice #{invoiceId}</div>
+                    <div style={{ maxHeight: 180, overflowY: "auto", marginBottom: 8 }}>
+                        {notes.length === 0 && <div style={{ color: "#888", fontSize: 13 }}>No notes yet.</div>}
+                        {notes.map(note => (
+                            <div key={note.id} style={{ borderBottom: "1px solid #eee", padding: "4px 0" }}>
+                                <div style={{ fontSize: 13, color: "#333" }}>{note.text}</div>
+                                <div style={{ fontSize: 11, color: "#888" }}>{note.createdBy || ""} {note.createdAt && (new Date(note.createdAt)).toLocaleString()}</div>
+                                <div style={{ marginTop: 2 }}>
+                                    <button className="btn-light" style={{ fontSize: 11, marginRight: 4 }} onClick={() => onEdit(note)}>Edit</button>
+                                    <button className="btn-danger" style={{ fontSize: 11 }} onClick={() => onDelete(note.id)}>Delete</button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                     <textarea
-                        className="w-full border rounded p-2 mb-3"
-                        rows={3}
-                        value={value}
-                        onChange={e => onChange(e.target.value)}
-                        placeholder="Enter notes..."
+                        className="input"
+                        style={{ width: "100%", minHeight: 60, marginBottom: 8, resize: "vertical" }}
+                        placeholder={editingNote ? "Edit note..." : "Enter new note..."}
+                        value={notesText}
+                        onChange={e => onNotesChange(e.target.value)}
                         autoFocus
                     />
-                    <div className="flex justify-end gap-2">
+                    <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
                         <button className="btn-light" onClick={onClose}>Cancel</button>
-                        <button className="btn-primary" onClick={onSave}>Save</button>
+                        <button className="btn-primary" onClick={onSave} disabled={!notesText.trim()}>{editingNote ? "Update" : "Save"}</button>
                     </div>
                 </div>
             </div>
         );
     };
+
     if (!Number.isFinite(Number(patientId))) {
         return (
             <div className="p-6">
@@ -482,6 +641,15 @@ export default function PatientBilling({ patientId, patientName }: Props) {
     const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
     const [eobFile, setEobFile] = useState<File | null>(null);
 
+    const [showDepositType, setShowDepositType] = useState<"PATIENT" | "INSURANCE" | "COURTESY" | null>(null);
+
+    // New modals for update
+    const [showBackdateFor, setShowBackdateFor] = useState<number | null>(null);
+    const [showAccountAdjustmentFor, setShowAccountAdjustmentFor] = useState<number | null>(null);
+    const [showAdjustmentInvoiceFor, setShowAdjustmentInvoiceFor] = useState<number | null>(null);
+    const [showInsuranceWriteOffFor, setShowInsuranceWriteOffFor] = useState<number | null>(null);
+    const [showMembershipAdjustmentFor, setShowMembershipAdjustmentFor] = useState<number | null>(null);
+
     /* =========================================================
        Load data (invoices, credit + payment GETs)
     ========================================================== */
@@ -587,8 +755,52 @@ export default function PatientBilling({ patientId, patientName }: Props) {
         } catch {}
     }
 
+    async function loadDropdowns() {
+        try {
+            const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
+            const [provRes, patRes, insRes] = await Promise.all([
+                fetchWithAuth(`${API_URL}/api/providers`),
+                fetchWithAuth(`${API_URL}/api/patients`),
+                fetchWithAuth(`${API_URL}/api/insurance-companies`)
+            ]);
+            const provData = await provRes.json();
+            const patData = await patRes.json();
+            const insData = await insRes.json();
+
+            // Providers: expect data.data to be an array
+            setProviders(
+                provData.success && Array.isArray(provData.data)
+                    ? provData.data.map((p: any) => ({
+                        id: p.id,
+                        name: `${p.identification?.firstName ?? ""} ${p.identification?.lastName ?? ""}`.trim()
+                    }))
+                    : []
+            );
+            // Patients: expect data.data.content to be an array (paginated)
+            setPatients(
+                patData.success && patData.data && Array.isArray(patData.data.content)
+                    ? patData.data.content.map((p: any) => ({
+                        id: p.id,
+                        name: `${p.firstName ?? ""} ${p.lastName ?? ""}`.trim()
+                    }))
+                    : []
+            );
+            setInsuranceCompanies(
+                insData.success && Array.isArray(insData.data)
+                    ? insData.data.map((i: any) => ({
+                        id: i.id,
+                        name: i.name
+                    }))
+                    : []
+            );
+        } catch (error) {
+            setProviders([]); setPatients([]); setInsuranceCompanies([]);
+        }
+    }
+
     useEffect(() => {
         void loadAll();
+        void loadDropdowns();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [patientId]);
 
@@ -771,11 +983,6 @@ export default function PatientBilling({ patientId, patientName }: Props) {
         setAccountCredit({ balance: body.data?.balance ?? 0 });
     }
 
-    const [showDepositType, setShowDepositType] = useState<"PATIENT" | "INSURANCE" | "COURTESY" | null>(null);
-
-    /* =========================================================
-       UI
-    ========================================================== */
     // Payment methods for deposit modals
     const paymentMethods = [
         { value: "CREDIT_CARD", label: "Credit Card" },
@@ -790,19 +997,20 @@ export default function PatientBilling({ patientId, patientName }: Props) {
         { value: "AMEX", label: "Amex" },
     ];
 
-    // Deposit modal state variables
+    // Deposit modal state variables (enhanced)
     const [depositMethod, setDepositMethod] = useState<string>("CREDIT_CARD");
-    const [depositTo, setDepositTo] = useState<string>("");
+    const [depositFromPatientId, setDepositFromPatientId] = useState<number | null>(null); // For insurance/patient deposit
+    const [depositToProviderId, setDepositToProviderId] = useState<number | null>(null); // For insurance deposit
+    const [depositPolicyId, setDepositPolicyId] = useState<number | null>(null); // For insurance policy
     const [depositAmount, setDepositAmount] = useState<string>("");
     const [depositDesc, setDepositDesc] = useState<string>("");
-    const [depositPolicy, setDepositPolicy] = useState<string>("");
     const [courtesyType, setCourtesyType] = useState<string>("Un-Collected");
-    const courtesyTypes = ["Un-Collected", "Professional Courtesy", "Migrated", "MembershipPlan"];
-
-    // Dummy user options for deposit "to" dropdown
-    const userOptions = ["User1", "User2", "User3"];
-    // Dummy policy options for insurance deposit
-    const policyOptions = ["Policy1", "Policy2", "Policy3"];
+    const courtesyTypes = [
+        "Un-Collected",
+        "Professional Courtesy",
+        "Migrated",
+        "MembershipPlan"
+    ];
 
     return (
         <div className="p-6 space-y-6">
@@ -865,9 +1073,9 @@ export default function PatientBilling({ patientId, patientName }: Props) {
             {tab === "DEPOSIT" && (
                 <div className="space-y-4">
                     <div className="flex gap-4">
-                        <button className="btn-light" onClick={() => { setShowDepositType && setShowDepositType("PATIENT"); }}>Add Patient Deposit</button>
-                        <button className="btn-light" onClick={() => { setShowDepositType && setShowDepositType("INSURANCE"); }}>Add Insurance Deposit</button>
-                        <button className="btn-light" onClick={() => { setShowDepositType && setShowDepositType("COURTESY"); }}>Add Courtesy Credit</button>
+                        <button className="btn-light" onClick={() => { setShowDepositType("PATIENT"); }}>Add Patient Deposit</button>
+                        <button className="btn-light" onClick={() => { setShowDepositType("INSURANCE"); }}>Add Insurance Deposit</button>
+                        <button className="btn-light" onClick={() => { setShowDepositType("COURTESY"); }}>Add Courtesy Credit</button>
                     </div>
 
                     {/* Patient Deposit Modal */}
@@ -875,29 +1083,31 @@ export default function PatientBilling({ patientId, patientName }: Props) {
                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
                             <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md">
                                 <div className="font-semibold text-lg mb-2">Patient Deposit</div>
-                                <div className="text-sm text-gray-500 mb-4">{new Date().toLocaleDateString()} Deposit #XXXXX from {patientName} with Credit Card to
-                                    <select className="input ml-2" value={depositTo || ""} onChange={e => setDepositTo && setDepositTo(e.target.value)}>
-                                        <option value="">Select User</option>
-                                        {userOptions && userOptions.map(u => <option key={u} value={u}>{u}</option>)}
+                                <div className="text-sm text-gray-500 mb-4">{new Date().toLocaleDateString()} Deposit #XXXXX from {patientName}</div>
+                                <div className="mb-3">
+                                    <label className="label">Select Patient</label>
+                                    <select className="input w-full" value={depositFromPatientId ?? ''} onChange={e => setDepositFromPatientId(Number(e.target.value) || null)}>
+                                        <option value="">Select Patient</option>
+                                        {patients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                                     </select>
                                 </div>
                                 <div className="mb-3">
                                     <label className="label">Deposit Amount:</label>
-                                    <input className="input w-full" type="number" value={depositAmount || ""} onChange={e => setDepositAmount && setDepositAmount(e.target.value)} />
+                                    <input className="input w-full" type="number" value={depositAmount} onChange={e => setDepositAmount(e.target.value)} />
                                 </div>
                                 <div className="mb-3">
                                     <label className="label">Payment Method:</label>
-                                    <select className="input w-full" value={depositMethod || "CREDIT_CARD"} onChange={e => setDepositMethod && setDepositMethod(e.target.value)}>
-                                        {paymentMethods && paymentMethods.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                                    <select className="input w-full" value={depositMethod} onChange={e => setDepositMethod(e.target.value)}>
+                                        {paymentMethods.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                                     </select>
                                 </div>
                                 <div className="mb-3">
                                     <label className="label">Add description</label>
-                                    <input className="input w-full" value={depositDesc || ""} onChange={e => setDepositDesc && setDepositDesc(e.target.value)} />
+                                    <input className="input w-full" value={depositDesc} onChange={e => setDepositDesc(e.target.value)} />
                                 </div>
                                 <div className="flex gap-2 mt-4">
                                     <button className="btn-primary" onClick={() => { /* handle add deposit */ }}>Add Deposit</button>
-                                    <button className="btn-light" onClick={() => setShowDepositType && setShowDepositType(null)}>Cancel</button>
+                                    <button className="btn-light" onClick={() => setShowDepositType(null)}>Cancel</button>
                                 </div>
                             </div>
                         </div>
@@ -908,34 +1118,51 @@ export default function PatientBilling({ patientId, patientName }: Props) {
                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
                             <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md">
                                 <div className="font-semibold text-lg mb-2">Insurance Deposit</div>
-                                <div className="text-sm text-gray-500 mb-2">{new Date().toLocaleDateString()} Deposit #XXXXX from {patientName} with
-                                    <select className="input ml-2" value={depositMethod || "CREDIT_CARD"} onChange={e => setDepositMethod && setDepositMethod(e.target.value)}>
-                                        {paymentMethods && paymentMethods.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-                                    </select>
-                                    to
-                                    <select className="input ml-2" value={depositTo || ""} onChange={e => setDepositTo && setDepositTo(e.target.value)}>
-                                        <option value="">Select User</option>
-                                        {userOptions && userOptions.map(u => <option key={u} value={u}>{u}</option>)}
-                                    </select>
-                                </div>
-                                <div className="mb-2">
-                                    <label className="label">Policy</label>
-                                    <select className="input w-full" value={depositPolicy || ""} onChange={e => setDepositPolicy && setDepositPolicy(e.target.value)}>
-                                        <option value="">Select Policy</option>
-                                        {policyOptions && policyOptions.map(p => <option key={p} value={p}>{p}</option>)}
+                                <div className="text-sm text-gray-500 mb-2">{new Date().toLocaleDateString()} Deposit #XXXXX</div>
+                                <div className="mb-3">
+                                    <label className="label">Select Patient</label>
+                                    <select className="input w-full" value={depositFromPatientId ?? ''} onChange={e => setDepositFromPatientId(Number(e.target.value) || null)}>
+                                        <option value="">Select Patient</option>
+                                        {patients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                                     </select>
                                 </div>
                                 <div className="mb-3">
-                                    <label className="label">Deposit Amount:</label>
-                                    <input className="input w-full" type="number" value={depositAmount || ""} onChange={e => setDepositAmount && setDepositAmount(e.target.value)} />
+                                    <label className="label">Payment Method</label>
+                                    <select className="input w-full" value={depositMethod} onChange={e => setDepositMethod(e.target.value)}>
+                                        {paymentMethods.map(pm => (
+                                            <option key={pm.value} value={pm.value}>{pm.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="mb-3">
+                                    <label className="label">Select Policy</label>
+                                    <select className="input w-full" value={depositPolicyId ?? ''} onChange={e => setDepositPolicyId(Number(e.target.value) || null)}>
+                                        <option value="">Select Policy</option>
+                                        {insuranceCompanies.map(ic => (
+                                            <option key={ic.id} value={ic.id}>{ic.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="mb-3">
+                                    <label className="label">Deposit Amount</label>
+                                    <input className="input w-full" type="number" value={depositAmount} onChange={e => setDepositAmount(e.target.value)} />
+                                </div>
+                                <div className="mb-3">
+                                    <label className="label">Select Provider</label>
+                                    <select className="input w-full" value={depositToProviderId ?? ''} onChange={e => setDepositToProviderId(Number(e.target.value) || null)}>
+                                        <option value="">Select Provider</option>
+                                        {providers.map(p => (
+                                            <option key={p.id} value={p.id}>{p.name}</option>
+                                        ))}
+                                    </select>
                                 </div>
                                 <div className="mb-3">
                                     <label className="label">Add description</label>
-                                    <input className="input w-full" value={depositDesc || ""} onChange={e => setDepositDesc && setDepositDesc(e.target.value)} />
+                                    <input className="input w-full" value={depositDesc} onChange={e => setDepositDesc(e.target.value)} />
                                 </div>
                                 <div className="flex gap-2 mt-4">
                                     <button className="btn-primary" onClick={() => { /* handle add deposit */ }}>Add Deposit</button>
-                                    <button className="btn-light" onClick={() => setShowDepositType && setShowDepositType(null)}>Cancel</button>
+                                    <button className="btn-light" onClick={() => setShowDepositType(null)}>Cancel</button>
                                 </div>
                             </div>
                         </div>
@@ -949,21 +1176,21 @@ export default function PatientBilling({ patientId, patientName }: Props) {
                                 <div className="text-sm text-gray-500 mb-2">{new Date().toLocaleDateString()}</div>
                                 <div className="mb-2">
                                     <label className="label">Adjustment Type</label>
-                                    <select className="input w-full" value={courtesyType || "Un-Collected"} onChange={e => setCourtesyType && setCourtesyType(e.target.value)}>
-                                        {courtesyTypes && courtesyTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                                    <select className="input w-full" value={courtesyType} onChange={e => setCourtesyType(e.target.value)}>
+                                        {courtesyTypes.map(t => <option key={t} value={t}>{t}</option>)}
                                     </select>
                                 </div>
                                 <div className="mb-3">
                                     <label className="label">Courtesy Credit Amount:</label>
-                                    <input className="input w-full" type="number" value={depositAmount || ""} onChange={e => setDepositAmount && setDepositAmount(e.target.value)} />
+                                    <input className="input w-full" type="number" value={depositAmount} onChange={e => setDepositAmount(e.target.value)} />
                                 </div>
                                 <div className="mb-3">
                                     <label className="label">Add description</label>
-                                    <input className="input w-full" value={depositDesc || ""} onChange={e => setDepositDesc && setDepositDesc(e.target.value)} />
+                                    <input className="input w-full" value={depositDesc} onChange={e => setDepositDesc(e.target.value)} />
                                 </div>
                                 <div className="flex gap-2 mt-4">
                                     <button className="btn-primary" onClick={() => { /* handle add courtesy */ }}>Add Courtesy</button>
-                                    <button className="btn-light" onClick={() => setShowDepositType && setShowDepositType(null)}>Cancel</button>
+                                    <button className="btn-light" onClick={() => setShowDepositType(null)}>Cancel</button>
                                 </div>
                             </div>
                         </div>
@@ -974,353 +1201,306 @@ export default function PatientBilling({ patientId, patientName }: Props) {
             {/* ================= INVOICE LIST ================= */}
             {tab === "INVOICE" && (
                 <div className="space-y-4">
-                    {invoices.map((inv) => {
-                        const first = inv.lines[0];
-                        const claim = claims[inv.id];
-                        const effectiveStatus: InvoiceStatus =
-                            ((Number(inv.ptBalance ?? 0) + Number(inv.insBalance ?? 0)) === 0 ? "PAID" : inv.status);
-                        const rowTone =
-                            effectiveStatus === "OPEN"
-                                ? "bg-red-50"
-                                : effectiveStatus === "PARTIALLY_PAID"
-                                    ? "bg-amber-50"
-                                    : "bg-green-50";
-                        const ip = insPayMap[inv.id] ?? [];
-                        const pp = ptPayMap[inv.id] ?? [];
-                        // Calculate PT PAID and INS PAID for this invoice
-                        const ptPaid = Number(inv.ptPaid) > 0 ? Number(inv.ptPaid) : sum(pp.map((p: any) => Number(p.amount ?? p.payment ?? p.paid ?? 0)));
-                        const insPaid = Number(inv.insPaid) > 0 ? Number(inv.insPaid) : sum(ip.map((r: any) => Number(r.insPay ?? 0)));
-                        // Always show insurance payment summary if any insurance payment exists
-                        const showInsuranceSummary = ip.length > 0;
-                        // Always show patient payment summary if any patient payment exists
-                        const showPatientSummary = pp.length > 0;
-                        return (
-                            <div key={inv.id} className="rounded-2xl border border-gray-200 bg-white shadow-sm">
-                                <div className={`flex items-center gap-4 border-b px-3 py-2 text-sm ${rowTone}`}>
-                                    <Badge
-                                        tone={effectiveStatus === "OPEN" ? "red" : effectiveStatus === "PARTIALLY_PAID" ? "amber" : "green"}
-                                    >
-                                        INVOICE #{inv.id} ({first?.dos ?? "—"})
-                                    </Badge>
-                                    <div className="ml-2 grid flex-1 grid-cols-4 gap-3 md:grid-cols-6">
-                                        <RowStat label="Pt Balance" value={currency(Number(inv.ptBalance ?? 0))} tone="red" />
-                                        <RowStat label="Ins Balance" value={currency(Number(inv.insBalance ?? 0))} />
-                                        <RowStat label="Invoice Balance" value={currency(Number(inv.ptBalance ?? 0) + Number(inv.insBalance ?? 0))} bold />
-                                        <RowStat label="Ins WO" value={currency(Number(inv.insWO ?? inv.lines.reduce((a, l) => a + Math.max(0, Number(l.charge || 0) - Number(l.allowed || 0)), 0)))} />
-                                        <RowStat label="Pt Paid" value={currency(ptPaid)} />
-                                        <RowStat label="Ins Paid" value={currency(insPaid)} />
-                                    </div>
-                                    <div className="ml-auto flex items-center gap-2">
-                                        <IconBtn title="Print" onClick={() => window.print()}>🖨️</IconBtn>
-                                        <IconBtn title="Transfer Outstanding" onClick={() => setTransferOpenFor(inv.id)}>🔁</IconBtn>
-                                        <IconBtn title="Edit" onClick={() => setShowEditLinesFor(inv.id)}>✏️</IconBtn>
-                                        <IconBtn title="Adjustment" onClick={() => setShowAdjustmentFor(inv.id)}>➖</IconBtn>
+                    {selectedInvoiceId === null ? (
+                        invoices.map((inv) => {
+                            const first = inv.lines[0];
+                            const claim = claims[inv.id];
+                            const effectiveStatus: InvoiceStatus =
+                                ((Number(inv.ptBalance ?? 0) + Number(inv.insBalance ?? 0)) === 0 ? "PAID" : inv.status);
+                            const rowTone =
+                                effectiveStatus === "OPEN"
+                                    ? "bg-red-50"
+                                    : effectiveStatus === "PARTIALLY_PAID"
+                                        ? "bg-amber-50"
+                                        : "bg-green-50";
+                            const ip = insPayMap[inv.id] ?? [];
+                            const pp = ptPayMap[inv.id] ?? [];
+                            const ptPaid = Number(inv.ptPaid) > 0 ? Number(inv.ptPaid) : sum(pp.map((p: any) => Number(p.amount ?? p.payment ?? p.paid ?? 0)));
+                            const insPaid = Number(inv.insPaid) > 0 ? Number(inv.insPaid) : sum(ip.map((r: any) => Number(r.insPay ?? 0)));
+                            const showInsuranceSummary = ip.length > 0;
+                            const showPatientSummary = pp.length > 0;
+                            return (
+                                <div key={inv.id} className="rounded-2xl border border-gray-200 bg-white shadow-sm cursor-pointer" onClick={() => setSelectedInvoiceId(inv.id)}>
+                                    <div className={`flex items-center gap-4 border-b px-3 py-2 text-sm ${rowTone}`}>
+                                        <Badge
+                                            tone={effectiveStatus === "OPEN" ? "red" : effectiveStatus === "PARTIALLY_PAID" ? "amber" : "green"}
+                                        >
+                                            INVOICE #{inv.id} ({first?.dos ?? "—"})
+                                        </Badge>
+                                        <div className="ml-2 grid flex-1 grid-cols-4 gap-3 md:grid-cols-6">
+                                            <RowStat label="Pt Balance" value={currency(Number(inv.ptBalance ?? 0))} tone="red" />
+                                            <RowStat label="Ins Balance" value={currency(Number(inv.insBalance ?? 0))} />
+                                            <RowStat label="Invoice Balance" value={currency(Number(inv.ptBalance ?? 0) + Number(inv.insBalance ?? 0))} bold />
+                                            <RowStat label="Ins WO" value={currency(Number(inv.insWO ?? inv.lines.reduce((a, l) => a + Math.max(0, Number(l.charge || 0) - Number(l.allowed || 0)), 0)))} />
+                                            <RowStat label="Pt Paid" value={currency(ptPaid)} />
+                                            <RowStat label="Ins Paid" value={currency(insPaid)} />
+                                        </div>
+                                        {/* Four action icons: Backdate, Account Adjustment, Adjustment Invoice, Statement */}
+                                        <div className="ml-auto flex items-center gap-2">
+                                            <IconBtn title="Backdate Invoice" onClick={() => setShowBackdateFor(inv.id)}>
+                                                <span role="img" aria-label="backdate">📅</span>
+                                            </IconBtn>
+                                            <IconBtn title="Account Adjustment" onClick={() => setShowAccountAdjustmentFor(inv.id)}>
+                                                <span role="img" aria-label="account-adjustment">💲</span>
+                                            </IconBtn>
+                                            <IconBtn title="Adjustment Invoice" onClick={() => setShowAdjustmentInvoiceFor(inv.id)}>
+                                                <span role="img" aria-label="adjustment-invoice">📝</span>
+                                            </IconBtn>
+                                            <IconBtn title="Statement" onClick={() => alert(`Statement for Invoice #${inv.id}`)}>
+                                                <span role="img" aria-label="statement">📄</span>
+                                            </IconBtn>
+                                        </div>
                                     </div>
                                 </div>
-                                {/* Claim summary row (if exists) */}
-                                {claim && claim.status !== "DRAFT" ? (
-                                    <div className="flex items-start gap-3 border-b px-3 py-2 text-sm">
-                                        <button
-                                            className="mr-2 p-1 rounded-full hover:bg-amber-100"
-                                            title="View/Add Notes"
-                                            onClick={e => handleOpenNotes(`claim-${inv.id}`, e)}
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-amber-600">
-                                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 20.25c4.556 0 8.25-3.694 8.25-8.25S16.556 3.75 12 3.75 3.75 7.444 3.75 12s3.694 8.25 8.25 8.25z" />
-                                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-3-3v6" />
-                                            </svg>
+                            );
+                        })
+                    ) : (
+                        (() => {
+                            const inv = invoices.find(i => i.id === selectedInvoiceId);
+                            if (!inv) return null;
+                            const first = inv.lines[0];
+                            const claim = claims[inv.id];
+                            const effectiveStatus: InvoiceStatus =
+                                ((Number(inv.ptBalance ?? 0) + Number(inv.insBalance ?? 0)) === 0 ? "PAID" : inv.status);
+                            const rowTone =
+                                effectiveStatus === "OPEN"
+                                    ? "bg-red-50"
+                                    : effectiveStatus === "PARTIALLY_PAID"
+                                        ? "bg-amber-50"
+                                        : "bg-green-50";
+                            const ip = insPayMap[inv.id] ?? [];
+                            const pp = ptPayMap[inv.id] ?? [];
+                            const ptPaid = Number(inv.ptPaid) > 0 ? Number(inv.ptPaid) : sum(pp.map((p: any) => Number(p.amount ?? p.payment ?? p.paid ?? 0)));
+                            const insPaid = Number(inv.insPaid) > 0 ? Number(inv.insPaid) : sum(ip.map((r: any) => Number(r.insPay ?? 0)));
+                            const showInsuranceSummary = ip.length > 0;
+                            const showPatientSummary = pp.length > 0;
+                            return (
+                                <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
+                                    <div className="flex items-center gap-4 border-b px-3 py-2 text-sm">
+                                        <button className="btn-light mr-2" onClick={() => setSelectedInvoiceId(null)}>
+                                            ← Back to Invoice List
                                         </button>
-                                        <div className="min-w-[100px] text-gray-500">{claim.createdOn || first?.dos}</div>
-                                        <div className="flex-1">
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                <span className="text-gray-600">
-                                                    <b>Claim #{claim.id}</b> to <b>{claim.payerName ?? "—"}</b> :
+                                        <Badge
+                                            tone={effectiveStatus === "OPEN" ? "red" : effectiveStatus === "PARTIALLY_PAID" ? "amber" : "green"}
+                                        >
+                                            INVOICE #{inv.id} ({first?.dos ?? "—"})
+                                        </Badge>
+                                        <div className="ml-2 grid flex-1 grid-cols-4 gap-3 md:grid-cols-6">
+                                            <RowStat label="Pt Balance" value={currency(Number(inv.ptBalance ?? 0))} tone="red" />
+                                            <RowStat label="Ins Balance" value={currency(Number(inv.insBalance ?? 0))} />
+                                            <RowStat label="Invoice Balance" value={currency(Number(inv.ptBalance ?? 0) + Number(inv.insBalance ?? 0))} bold />
+                                            <RowStat label="Ins WO" value={currency(Number(inv.insWO ?? inv.lines.reduce((a, l) => a + Math.max(0, Number(l.charge || 0) - Number(l.allowed || 0)), 0)))} />
+                                            <RowStat label="Pt Paid" value={currency(ptPaid)} />
+                                            <RowStat label="Ins Paid" value={currency(insPaid)} />
+                                        </div>
+                                    </div>
+                                    {/* Claim summary row (if exists) */}
+                                    {claim && claim.status !== "DRAFT" ? (
+                                        <div className="flex items-start gap-3 border-b px-3 py-2 text-sm">
+                                            <button
+                                                className="mr-2 p-1 rounded-full hover:bg-amber-100"
+                                                title="View/Add Notes"
+                                                onClick={e => handleOpenNotes(inv.id, e)}
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-amber-600">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 20.25c4.556 0 8.25-3.694 8.25-8.25S16.556 3.75 12 3.75 3.75 7.444 3.75 12s3.694 8.25 8.25 8.25z" />
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-3-3v6" />
+                                                </svg>
+                                            </button>
+                                            <div className="min-w-[100px] text-gray-500">{claim.createdOn || first?.dos}</div>
+                                            <div className="flex-1">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <span className="text-gray-600">
+                                                        <b>Claim #{claim.id}</b> to <b>{claim.payerName ?? "—"}</b> :
+                                                    </span>
+                                                    <Badge tone="amber">
+                                                        {claim.status === "IN_PROCESS"
+                                                            ? "Claim in process"
+                                                            : claim.status.replaceAll("_", " ").toLowerCase()}
+                                                    </Badge>
+                                                    <Badge tone="blue">Status Response (A1): Th…</Badge>
+                                                </div>
+                                            </div>
+                                            <div className="ml-auto flex items-center gap-2">
+                                                <IconBtn title="Print" onClick={() => window.print()}>🖨️</IconBtn>
+                                                <IconBtn title="Edit" onClick={() => setShowClaimEditFor(inv.id)}>✏️</IconBtn>
+                                                <IconBtn title="Close Claim" onClick={() => { void closeClaim(inv.id); }}>✅</IconBtn>
+                                                <IconBtn title="Attachments" onClick={() => setShowAttachmentFor(inv.id)}>📎</IconBtn>
+                                                <IconBtn title="Void & Re-Create" onClick={() => setShowVoidFor(inv.id)}>🗑️</IconBtn>
+                                                <IconBtn title="EOB" onClick={() => setShowEobFor(inv.id)}>📄</IconBtn>
+                                                <IconBtn title="Submit Claim" onClick={() => { void submitClaim(inv.id); }}>📤</IconBtn>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center justify-between border-b px-3 py-2 text-sm">
+                                            <div className="text-gray-600">No active claim yet for invoice #{inv.id}.</div>
+                                            <div className="flex items-center gap-2">
+                                                <button className="btn-light" onClick={() => setShowClaimComposeFor(inv.id)}>
+                                                    + Add note/narrative
+                                                </button>
+                                                <button className="btn-primary" onClick={() => { void promoteClaim(inv.id); }}>
+                                                    Create Claim
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {/* Insurance payment summary (inline, only after insurance paid) */}
+                                    {showInsuranceSummary && (
+                                        <div className="flex items-start gap-3 border-b px-3 py-2 text-sm bg-blue-50/40">
+                                            <button
+                                                className="mr-2 p-1 rounded-full hover:bg-blue-100"
+                                                title="View/Add Notes"
+                                                onClick={e => handleOpenNotes(inv.id, e)}
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-blue-600">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 20.25c4.556 0 8.25-3.694 8.25-8.25S16.556 3.75 12 3.75 3.75 7.444 3.75 12s3.694 8.25 8.25 8.25z" />
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-3-3v6" />
+                                                </svg>
+                                            </button>
+                                            <div className="min-w-[100px] text-gray-500">Insurance</div>
+                                            <div className="flex-1">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <Badge tone="blue">Submitted {currency(Number(sum(ip.map(r => r.submitted))))}</Badge>
+                                                    <Badge tone="gray">Allowed {currency(Number(sum(ip.map(r => r.allowed))))}</Badge>
+                                                    <Badge tone="green">Paid {currency(Number(sum(ip.map(r => r.insPay))))}</Badge>
+                                                    <Badge tone="purple">Write-off {currency(Number(sum(ip.map(r => r.insWriteOff))))}</Badge>
+                                                </div>
+                                            </div>
+                                            <div className="ml-auto flex items-center gap-2">
+                                                <IconBtn title="Void Insurance Payment" onClick={() => {
+                                                    const remit = ip[0];
+                                                    if (remit) void voidInsurancePayment(inv.id, remit.id, "Payer reversal / posted in error");
+                                                }}>
+                                                    <span role="img" aria-label="void">🚫</span>
+                                                </IconBtn>
+                                                <IconBtn title="Edit Insurance Payment" onClick={() => {
+                                                    const remit = ip[0];
+                                                    if (remit) setEditInsuranceModal({ invoiceId: inv.id, remit });
+                                                }}>
+                                                    <span role="img" aria-label="edit">✏️</span>
+                                                </IconBtn>
+                                                <IconBtn title="Refund Insurance Payment" onClick={() => {
+                                                    const remit = ip[0];
+                                                    if (remit) void refundInsurancePayment(inv.id, remit.id, 10, "Overpayment per EOB");
+                                                }}>
+                                                    <span role="img" aria-label="refund">⋯</span>
+                                                </IconBtn>
+                                                <IconBtn title="Transfer Credit to Patient" onClick={() => {
+                                                    const remit = ip[0];
+                                                    if (remit) void transferInsuranceCreditToPatient(inv.id, remit.id, 20, "Move insurance overpay to patient account credit");
+                                                }}>
+                                                    <span role="img" aria-label="transfer">🔁</span>
+                                                </IconBtn>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {/* Patient payment summary (inline, only after insurance paid) */}
+                                    {showPatientSummary && (
+                                        <div className="flex items-start gap-3 border-b px-3 py-2 text-sm bg-purple-50/40">
+                                            <button
+                                                className="mr-2 p-1 rounded-full hover:bg-purple-100"
+                                                title="View/Add Notes"
+                                                onClick={e => handleOpenNotes(inv.id, e)}
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-purple-600">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 20.25c4.556 0 8.25-3.694 8.25-8.25S16.556 3.75 12 3.75 3.75 7.444 3.75 12s3.694 8.25 8.25 8.25z" />
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-3-3v6" />
+                                                </svg>
+                                            </button>
+                                            <div className="min-w-[100px] text-gray-500">Patient</div>
+                                            <div className="flex-1">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <Badge tone="green">Payments {currency(sum(pp.map((p: any) => Number(p.amount ?? p.payment ?? p.paid ?? 0))) )}</Badge>
+                                                    <Badge tone="gray">{pp.length} entr{pp.length === 1 ? "y" : "ies"}</Badge>
+                                                </div>
+                                            </div>
+                                            <div className="ml-auto flex items-center gap-2">
+                                                <IconBtn title="Void Patient Payment" onClick={() => {
+                                                    const pay = pp[0];
+                                                    if (pay) void voidPatientPayment(inv.id, pay.id, "Duplicate collection at front desk");
+                                                }}>
+                                                    <span role="img" aria-label="void">🚫</span>
+                                                </IconBtn>
+                                                <IconBtn title="Edit Patient Payment" onClick={() => {
+                                                    const pay = pp[0];
+                                                    if (pay) setEditPatientModal({ invoiceId: inv.id, payment: pay });
+                                                }}>
+                                                    <span role="img" aria-label="edit">✏️</span>
+                                                </IconBtn>
+                                                <IconBtn title="Refund Patient Payment" onClick={() => {
+                                                    const pay = pp[0];
+                                                    if (pay) void refundPatientPayment(inv.id, pay.id, 10, "Partial refund");
+                                                }}>
+                                                    <span role="img" aria-label="refund">⋯</span>
+                                                </IconBtn>
+                                                <IconBtn title="Transfer Credit to Insurance" onClick={() => {
+                                                    // Not implemented: transfer patient credit to insurance
+                                                }}>
+                                                    <span role="img" aria-label="transfer">🔁</span>
+                                                </IconBtn>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {/* Mini invoice line row */}
+                                    {first && (
+                                        <div className="flex items-start gap-3 px-3 py-2 text-sm">
+                                            <button
+                                                className="mr-2 p-1 rounded-full hover:bg-gray-100"
+                                                title="View/Add Notes"
+                                                onClick={e => handleOpenNotes(inv.id, e)}
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-600">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 20.25c4.556 0 8.25-3.694 8.25-8.25S16.556 3.75 12 3.75 3.75 7.444 3.75 12s3.694 8.25 8.25 8.25z" />
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-3-3v6" />
+                                                </svg>
+                                            </button>
+                                            <div className="min-w-[100px] text-gray-500">{first.dos}</div>
+                                            <div className="flex-1">
+                                                <span className="text-gray-700">
+                                                    Invoice #{inv.id}: [ {first.treatment} ] <b>{currency(Number(first.charge ?? 0))}</b>
                                                 </span>
-                                                <Badge tone="amber">
-                                                    {claim.status === "IN_PROCESS"
-                                                        ? "Claim in process"
-                                                        : claim.status.replaceAll("_", " ").toLowerCase()}
-                                                </Badge>
-                                                <Badge tone="blue">Status Response (A1): Th…</Badge>
+                                            </div>
+                                            <div className="ml-auto flex items-center gap-2">
+                                                <IconBtn title="Print" onClick={() => window.print()}>🖨️</IconBtn>
+                                                <IconBtn title="Edit" onClick={() => setShowEditLinesFor(inv.id)}>✏️</IconBtn>
+                                                <IconBtn title="Transfer Outstanding" onClick={() => setTransferOpenFor(inv.id)}>🔁</IconBtn>
+                                                <IconBtn title="Adjustment" onClick={() => setShowAdjustmentFor(inv.id)}>➖</IconBtn>
                                             </div>
                                         </div>
-                                        <div className="ml-auto flex items-center gap-2">
-                                            <IconBtn title="Print" onClick={() => window.print()}>🖨️</IconBtn>
-                                            <IconBtn title="Edit" onClick={() => setShowClaimEditFor(inv.id)}>✏️</IconBtn>
-                                            <IconBtn title="Close Claim" onClick={() => { void closeClaim(inv.id); }}>✅</IconBtn>
-                                            <IconBtn title="Attachments" onClick={() => setShowAttachmentFor(inv.id)}>📎</IconBtn>
-                                            <IconBtn title="Void & Re-Create" onClick={() => setShowVoidFor(inv.id)}>🗑️</IconBtn>
-                                            <IconBtn title="EOB" onClick={() => setShowEobFor(inv.id)}>📄</IconBtn>
-                                            <IconBtn title="Submit Claim" onClick={() => { void submitClaim(inv.id); }}>📤</IconBtn>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="flex items-center justify-between border-b px-3 py-2 text-sm">
-                                        <div className="text-gray-600">No active claim yet for invoice #{inv.id}.</div>
-                                        <div className="flex items-center gap-2">
-                                            <button className="btn-light" onClick={() => setShowClaimComposeFor(inv.id)}>
-                                                + Add note/narrative
-                                            </button>
-                                            <button className="btn-primary" onClick={() => { void promoteClaim(inv.id); }}>
-                                                Create Claim
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
-                                {/* Insurance payment summary (inline, only after insurance paid) */}
-                                {showInsuranceSummary && (
-                                    <div className="flex items-start gap-3 border-b px-3 py-2 text-sm bg-blue-50/40">
-                                        <button
-                                            className="mr-2 p-1 rounded-full hover:bg-blue-100"
-                                            title="View/Add Notes"
-                                            onClick={e => handleOpenNotes(`ins-${inv.id}`, e)}
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-blue-600">
-                                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 20.25c4.556 0 8.25-3.694 8.25-8.25S16.556 3.75 12 3.75 3.75 7.444 3.75 12s3.694 8.25 8.25 8.25z" />
-                                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-3-3v6" />
-                                            </svg>
-                                        </button>
-                                        <div className="min-w-[100px] text-gray-500">Insurance</div>
-                                        <div className="flex-1">
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                <Badge tone="blue">Submitted {currency(Number(sum(ip.map(r => r.submitted))))}</Badge>
-                                                <Badge tone="gray">Allowed {currency(Number(sum(ip.map(r => r.allowed))))}</Badge>
-                                                <Badge tone="green">Paid {currency(Number(sum(ip.map(r => r.insPay))))}</Badge>
-                                                <Badge tone="purple">Write-off {currency(Number(sum(ip.map(r => r.insWriteOff))))}</Badge>
+                                    )}
+                                    {transferOpenFor === inv.id && (
+                                        <div className="relative">
+                                            <div className="absolute z-10 ml-3 mt-2 w-64 rounded-md border bg-white p-1 shadow">
+                                                <button className="w-full rounded px-3 py-2 text-left hover:bg-gray-50">
+                                                    Transfer Outstanding To Patient
+                                                </button>
+                                                <button className="w-full rounded px-3 py-2 text-left hover:bg-gray-50">
+                                                    Transfer Outstanding To Insurance
+                                                </button>
                                             </div>
                                         </div>
-                                        {/* Inline action icons for insurance payment */}
-                                        <div className="ml-auto flex items-center gap-2">
-                                            <IconBtn title="Void Insurance Payment" onClick={() => {
-                                                const remit = ip[0];
-                                                if (remit) void voidInsurancePayment(inv.id, remit.id, "Payer reversal / posted in error");
-                                            }}>
-                                                <span role="img" aria-label="void">🚫</span>
-                                            </IconBtn>
-                                            <IconBtn title="Edit Insurance Payment" onClick={() => {
-                                                const remit = ip[0];
-                                                if (remit) setEditInsuranceModal({ invoiceId: inv.id, remit });
-                                            }}>
-                                                <span role="img" aria-label="edit">✏️</span>
-                                            </IconBtn>
-                                            <IconBtn title="Refund Insurance Payment" onClick={() => {
-                                                const remit = ip[0];
-                                                if (remit) void refundInsurancePayment(inv.id, remit.id, 10, "Overpayment per EOB");
-                                            }}>
-                                                <span role="img" aria-label="refund">⋯</span>
-                                            </IconBtn>
-                                            <IconBtn title="Transfer Credit to Patient" onClick={() => {
-                                                const remit = ip[0];
-                                                if (remit) void transferInsuranceCreditToPatient(inv.id, remit.id, 20, "Move insurance overpay to patient account credit");
-                                            }}>
-                                                <span role="img" aria-label="transfer">🔁</span>
-                                            </IconBtn>
-                                        </div>
-                                    </div>
-                                )}
-                                {/* Patient payment summary (inline, only after insurance paid) */}
-                                {showPatientSummary && (
-                                    <div className="flex items-start gap-3 border-b px-3 py-2 text-sm bg-purple-50/40">
-                                        <button
-                                            className="mr-2 p-1 rounded-full hover:bg-purple-100"
-                                            title="View/Add Notes"
-                                            onClick={e => handleOpenNotes(`pt-${inv.id}`, e)}
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-purple-600">
-                                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 20.25c4.556 0 8.25-3.694 8.25-8.25S16.556 3.75 12 3.75 3.75 7.444 3.75 12s3.694 8.25 8.25 8.25z" />
-                                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-3-3v6" />
-                                            </svg>
-                                        </button>
-                                        <div className="min-w-[100px] text-gray-500">Patient</div>
-                                        <div className="flex-1">
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                <Badge tone="green">Payments {currency(sum(pp.map((p: any) => Number(p.amount ?? p.payment ?? p.paid ?? 0))) )}</Badge>
-                                                <Badge tone="gray">{pp.length} entr{pp.length === 1 ? "y" : "ies"}</Badge>
-                                            </div>
-                                        </div>
-                                        {/* Inline action icons for patient payment */}
-                                        <div className="ml-auto flex items-center gap-2">
-                                            <IconBtn title="Void Patient Payment" onClick={() => {
-                                                const pay = pp[0];
-                                                if (pay) void voidPatientPayment(inv.id, pay.id, "Duplicate collection at front desk");
-                                            }}>
-                                                <span role="img" aria-label="void">🚫</span>
-                                            </IconBtn>
-                                            <IconBtn title="Edit Patient Payment" onClick={() => {
-                                                const pay = pp[0];
-                                                if (pay) setEditPatientModal({ invoiceId: inv.id, payment: pay });
-                                            }}>
-                                                <span role="img" aria-label="edit">✏️</span>
-                                            </IconBtn>
-    {/* Edit Insurance Payment Modal */}
-    {editInsuranceModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-            <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-lg">
-                <h3 className="text-lg font-semibold mb-4">Edit Insurance Payment</h3>
-                <form onSubmit={async (e) => {
-                    e.preventDefault();
-                    const form = e.target as typeof e.target & {
-                        submitted: { value: string },
-                        balance: { value: string },
-                        deductible: { value: string },
-                        allowed: { value: string },
-                        insWriteOff: { value: string },
-                        insPay: { value: string },
-                        updateAllowed: { checked: boolean },
-                        updateFlatPortion: { checked: boolean },
-                        applyWriteoff: { checked: boolean },
-                    };
-                    await editInsuranceRemitLine(
-                        editInsuranceModal.invoiceId,
-                        editInsuranceModal.remit.id,
-                        {
-                            invoiceLineId: editInsuranceModal.remit.invoiceLineId,
-                            submitted: Number(form.submitted.value),
-                            balance: Number(form.balance.value),
-                            deductible: Number(form.deductible.value),
-                            allowed: Number(form.allowed.value),
-                            insWriteOff: Number(form.insWriteOff.value),
-                            insPay: Number(form.insPay.value),
-                            updateAllowed: form.updateAllowed.checked,
-                            updateFlatPortion: form.updateFlatPortion.checked,
-                            applyWriteoff: form.applyWriteoff.checked,
-                        }
-                    );
-                    setEditInsuranceModal(null);
-                }}>
-                    <div className="grid grid-cols-2 gap-3">
-                        <label>Submitted<input name="submitted" type="number" className="input w-full" defaultValue={editInsuranceModal.remit.submitted} /></label>
-                        <label>Balance<input name="balance" type="number" className="input w-full" defaultValue={editInsuranceModal.remit.balance} /></label>
-                        <label>Deductible<input name="deductible" type="number" className="input w-full" defaultValue={editInsuranceModal.remit.deductible} /></label>
-                        <label>Allowed<input name="allowed" type="number" className="input w-full" defaultValue={editInsuranceModal.remit.allowed} /></label>
-                        <label>Ins WriteOff<input name="insWriteOff" type="number" className="input w-full" defaultValue={editInsuranceModal.remit.insWriteOff} /></label>
-                        <label>Ins Pay<input name="insPay" type="number" className="input w-full" defaultValue={editInsuranceModal.remit.insPay} /></label>
-                        <label className="col-span-2"><input name="updateAllowed" type="checkbox" defaultChecked={!!editInsuranceModal.remit.updateAllowed} /> Update Allowed</label>
-                        <label className="col-span-2"><input name="updateFlatPortion" type="checkbox" defaultChecked={!!editInsuranceModal.remit.updateFlatPortion} /> Update Flat Portion</label>
-                        <label className="col-span-2"><input name="applyWriteoff" type="checkbox" defaultChecked={!!editInsuranceModal.remit.applyWriteoff} /> Apply Writeoff</label>
-                    </div>
-                    <div className="flex justify-end gap-2 mt-4">
-                        <button type="button" className="btn-light" onClick={() => setEditInsuranceModal(null)}>Cancel</button>
-                        <button type="submit" className="btn-primary">Save</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    )}
-
-    {/* Edit Patient Payment Modal */}
-    {editPatientModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-            <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-lg">
-                <h3 className="text-lg font-semibold mb-4">Edit Patient Payment</h3>
-                <form onSubmit={async (e) => {
-                    e.preventDefault();
-                    const form = e.target as typeof e.target & {
-                        amount: { value: string },
-                        paymentMethod: { value: string },
-                    };
-                    await editPatientPayment(
-                        editPatientModal.invoiceId,
-                        editPatientModal.payment.id,
-                        {
-                            amount: Number(form.amount.value),
-                            paymentMethod: form.paymentMethod.value,
-                        }
-                    );
-                    setEditPatientModal(null);
-                }}>
-                    <div className="grid grid-cols-2 gap-3">
-                        <label>Amount<input name="amount" type="number" className="input w-full" defaultValue={editPatientModal.payment.amount} /></label>
-                        <label>Payment Method
-                            <select name="paymentMethod" className="input w-full" defaultValue={editPatientModal.payment.paymentMethod}>
-                                <option value="CREDIT_CARD">Credit Card</option>
-                                <option value="CHECK">Check</option>
-                                <option value="DEBIT_CARD">Debit Card</option>
-                                <option value="EFT">EFT</option>
-                                <option value="CASH">Cash</option>
-                                <option value="CARE_CREDIT">Care Credit</option>
-                                <option value="MASTERCARD">Master Card</option>
-                                <option value="VISA">Visa</option>
-                                <option value="DISCOVER">Discover</option>
-                                <option value="AMEX">Amex</option>
-                            </select>
-                        </label>
-                    </div>
-                    <div className="flex justify-end gap-2 mt-4">
-                        <button type="button" className="btn-light" onClick={() => setEditPatientModal(null)}>Cancel</button>
-                        <button type="submit" className="btn-primary">Save</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    )}
-                                            <IconBtn title="Refund Patient Payment" onClick={() => {
-                                                const pay = pp[0];
-                                                if (pay) void refundPatientPayment(inv.id, pay.id, 10, "Partial refund");
-                                            }}>
-                                                <span role="img" aria-label="refund">⋯</span>
-                                            </IconBtn>
-                                            <IconBtn title="Transfer Credit to Insurance" onClick={() => {
-                                                // Not implemented: transfer patient credit to insurance
-                                            }}>
-                                                <span role="img" aria-label="transfer">🔁</span>
-                                            </IconBtn>
-                                        </div>
-                                    </div>
-                                )}
-                                {/* Mini invoice line row */}
-                                {first && (
-                                    <div className="flex items-start gap-3 px-3 py-2 text-sm">
-                                        <button
-                                            className="mr-2 p-1 rounded-full hover:bg-gray-100"
-                                            title="View/Add Notes"
-                                            onClick={e => handleOpenNotes(`inv-${inv.id}`, e)}
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-600">
-                                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 20.25c4.556 0 8.25-3.694 8.25-8.25S16.556 3.75 12 3.75 3.75 7.444 3.75 12s3.694 8.25 8.25 8.25z" />
-                                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-3-3v6" />
-                                            </svg>
-                                        </button>
-                                        <div className="min-w-[100px] text-gray-500">{first.dos}</div>
-                                        <div className="flex-1">
-                                            <span className="text-gray-700">
-                                                Invoice #{inv.id}: [ {first.treatment} ] <b>{currency(Number(first.charge ?? 0))}</b>
-                                            </span>
-                                        </div>
-                                        <div className="ml-auto flex items-center gap-2">
-                                            <IconBtn title="Print" onClick={() => window.print()}>🖨️</IconBtn>
-                                            <IconBtn title="Edit" onClick={() => setShowEditLinesFor(inv.id)}>✏️</IconBtn>
-                                            <IconBtn title="Transfer Outstanding" onClick={() => setTransferOpenFor(inv.id)}>🔁</IconBtn>
-                                            <IconBtn title="Adjustment" onClick={() => setShowAdjustmentFor(inv.id)}>➖</IconBtn>
-                                        </div>
-                                    </div>
-                                )}
-            {/* Notes Popover for inline notes */}
-            <NotesPopover
-                open={!!showNotesFor}
-                anchor={showNotesFor?.anchor ?? null}
-                onClose={handleCloseNotes}
-                onSave={handleSaveNotes}
-                value={notesText}
-                onChange={setNotesText}
-            />
-                                {transferOpenFor === inv.id && (
-                                    <div className="relative">
-                                        <div className="absolute z-10 ml-3 mt-2 w-64 rounded-md border bg-white p-1 shadow">
-                                            <button className="w-full rounded px-3 py-2 text-left hover:bg-gray-50">
-                                                Transfer Outstanding To Patient
-                                            </button>
-                                            <button className="w-full rounded px-3 py-2 text-left hover:bg-gray-50">
-                                                Transfer Outstanding To Insurance
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
+                                    )}
+                                </div>
+                            );
+                        })()
+                    )}
                 </div>
             )}
+
+            {/* Notes Modal for invoice notes */}
+            <NotesModal
+                open={!!showNotesFor}
+                anchor={showNotesFor?.anchor ?? null}
+                invoiceId={showNotesFor?.invoiceId ?? 0}
+                onClose={handleCloseNotes}
+                notes={currentNotes}
+                editingNote={editingNote}
+                notesText={notesText}
+                onNotesChange={setNotesText}
+                onSave={handleSaveNote}
+                onEdit={handleEditNote}
+                onDelete={handleDeleteNote}
+            />
 
             {/* ================= CLAIM TAB ================= */}
             {tab === "CLAIM" && selectedInvoice && selectedClaim && (
@@ -1566,7 +1746,7 @@ export default function PatientBilling({ patientId, patientName }: Props) {
                 <div className="space-y-4">
                     {outstanding <= 0 && (
                         <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-amber-800">
-                            There is no outstanding balance on the patient’s account. Please add as a deposit.
+                            {/* There is no outstanding balance on the patient’s account. Please add as a deposit. */}
                         </div>
                     )}
 
@@ -1667,82 +1847,234 @@ export default function PatientBilling({ patientId, patientName }: Props) {
             )}
 
             {/* ======= MODALS ======= */}
-            {showEditLinesFor && (
+            {/* Backdate Transaction Modal */}
+            {showBackdateFor && (
                 <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 p-4">
-                    <div className="w-full max-w-3xl rounded-2xl bg-white shadow-xl">
-                        <div className="flex items-center justify-between border-b px-5 py-3">
-                            <h4 className="text-base font-semibold">{`Edit invoice #${showEditLinesFor}`}</h4>
-                            <button onClick={() => setShowEditLinesFor(null)} className="rounded p-1 hover:bg-gray-100" aria-label="Close">
-                                ✕
-                            </button>
+                    <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
+                        <div className="flex items-center justify-between border-b px-5 py-3 bg-blue-600 text-white rounded-t-2xl">
+                            <h4 className="text-base font-semibold">Backdate Transaction</h4>
+                            <button onClick={() => setShowBackdateFor(null)} className="rounded p-1 hover:bg-blue-700" aria-label="Close">✕</button>
                         </div>
-                        <div className="p-5 space-y-3">
-                            {invoices.find((i) => i.id === showEditLinesFor)?.lines.map((l) => (
-                                <div key={l.id} className="flex items-center gap-3">
-                                    <div className="w-24 font-mono">{l.code}</div>
-                                    <div className="flex-1">{l.treatment}</div>
-                                    <div className="w-32">
-                                        <input
-                                            type="number"
-                                            className="input w-full"
-                                            defaultValue={l.charge}
-                                            onBlur={(e) => {
-                                                void reestimateLine(showEditLinesFor!, l.id, +e.target.value);
-                                            }}
-                                        />
-                                    </div>
-                                </div>
-                            ))}
-                            <div className="mt-4 flex justify-end">
-                                <button className="btn-primary" onClick={() => setShowEditLinesFor(null)}>
-                                    Save
+                        <div className="p-5 space-y-4">
+                            <div className="text-sm text-gray-600">Backdate to:</div>
+                            <div className="flex items-center gap-3">
+                                <input 
+                                    type="date" 
+                                    id="backdate-input"
+                                    className="input flex-1" 
+                                    defaultValue={new Date().toISOString().split('T')[0]}
+                                />
+                            </div>
+                            <div className="flex justify-end gap-2 mt-4">
+                                <button className="btn-light" style={{background: '#f59e0b', color: 'white', borderColor: '#f59e0b'}} onClick={() => {
+                                    const dateInput = document.getElementById('backdate-input') as HTMLInputElement;
+                                    alert(`Backdating invoice #${showBackdateFor} to ${dateInput?.value}`);
+                                    setShowBackdateFor(null);
+                                }}>
+                                    Backdate Transaction
                                 </button>
+                                <button className="btn-light" onClick={() => setShowBackdateFor(null)}>Cancel</button>
                             </div>
                         </div>
                     </div>
                 </div>
             )}
 
-            {showAdjustmentFor && (
+            {/* Account Adjustment Modal */}
+            {showAccountAdjustmentFor && (
                 <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 p-4">
                     <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
-                        <div className="flex items-center justify-between border-b px-5 py-3">
-                            <h4 className="text-base font-semibold">{`Adjust invoice #${showAdjustmentFor}`}</h4>
-                            <button onClick={() => setShowAdjustmentFor(null)} className="rounded p-1 hover:bg-gray-100" aria-label="Close">
-                                ✕
-                            </button>
+                        <div className="flex items-center justify-between border-b px-5 py-3 bg-purple-600 text-white rounded-t-2xl">
+                            <h4 className="text-base font-semibold">Account Adjustment</h4>
+                            <button onClick={() => setShowAccountAdjustmentFor(null)} className="rounded p-1 hover:bg-purple-700" aria-label="Close">✕</button>
                         </div>
-                        <div className="p-5 grid gap-3">
-                            <div>
-                                <label className="text-xs text-gray-600">Type</label>
-                                <select className="input w-full">
-                                    <option>Un-Collected</option>
-                                    <option>Professional Courtesy</option>
-                                    <option>Migrated</option>
-                                    <option>MembershipPlan</option>
+                        <div className="p-5 space-y-4">
+                            <div className="flex items-center gap-3">
+                                <label className="label flex-shrink-0">Adjustment Type</label>
+                                <select id="acct-adj-type" className="input flex-1" defaultValue="Un-Collected">
+                                    <option value="Un-Collected">Un-Collected</option>
+                                    <option value="Professional Courtesy">Professional Courtesy</option>
+                                    <option value="Migrated">Migrated</option>
+                                    <option value="MembershipPlan">MembershipPlan</option>
                                 </select>
                             </div>
-                            <div>
-                                <label className="text-xs text-gray-600">Percentage (%)</label>
-                                <input id="adjp" type="number" className="input w-full" placeholder="e.g., 10" />
+                            <div className="flex items-center gap-3">
+                                <label className="label flex-shrink-0">Flat rate</label>
+                                <input type="radio" name="adj-method" value="flat" defaultChecked />
+                                <label className="label flex-shrink-0 ml-4">Total Outstanding</label>
+                                <input type="number" id="acct-adj-total" className="input w-32" placeholder="$0.00" />
                             </div>
-                            <div className="flex justify-end">
-                                <button
-                                    className="btn-primary"
-                                    onClick={() => {
-                                        const el = document.getElementById("adjp") as HTMLInputElement | null;
-                                        const percent = Number(el?.value || "0");
-                                        void applyPercentAdjustment(showAdjustmentFor!, percent);
-                                        setShowAdjustmentFor(null);
-                                    }}
-                                >
-                                    Adjust
+                            <div className="flex items-center gap-3">
+                                <label className="label flex-shrink-0">Patient Outstanding</label>
+                                <input type="number" id="acct-adj-patient" className="input w-32" placeholder="$0.00" />
+                                <label className="label flex-shrink-0 ml-4">Specific</label>
+                                <input type="radio" name="adj-method" value="specific" />
+                                <input type="number" className="input w-20" placeholder="$0" />
+                            </div>
+                            <div className="mt-2">
+                                <input type="checkbox" id="include-courtesy" />
+                                <label htmlFor="include-courtesy" className="ml-2 text-sm">Include the Courtesy Credit ($0.00)</label>
+                            </div>
+                            <div className="mt-2">
+                                <label className="label">+ Add description</label>
+                                <textarea id="acct-adj-desc" className="input w-full h-20" placeholder="Add description..."></textarea>
+                            </div>
+                            <div className="flex justify-end gap-2 mt-4">
+                                <button className="btn-primary" onClick={() => {
+                                    const type = (document.getElementById('acct-adj-type') as HTMLSelectElement)?.value;
+                                    alert(`Applying account adjustment: ${type}`);
+                                    setShowAccountAdjustmentFor(null);
+                                }}>
+                                    Apply
                                 </button>
+                                <button className="btn-light" onClick={() => setShowAccountAdjustmentFor(null)}>Cancel</button>
                             </div>
                         </div>
                     </div>
                 </div>
             )}
+
+            {/* Adjustment Invoice Modal */}
+            {showAdjustmentInvoiceFor && (
+                <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 p-4">
+                    <div className="w-full max-w-4xl rounded-2xl bg-white shadow-xl">
+                        <div className="flex items-center justify-between border-b px-5 py-3 bg-purple-600 text-white rounded-t-2xl">
+                            <h4 className="text-base font-semibold">Adjust Invoice #{showAdjustmentInvoiceFor}</h4>
+                            <button onClick={() => setShowAdjustmentInvoiceFor(null)} className="rounded p-1 hover:bg-purple-700" aria-label="Close">✕</button>
+                        </div>
+                        <div className="p-5 space-y-4">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="text-sm">{new Date().toLocaleDateString()}</div>
+                                <div className="text-sm">Credit Adjustment <span className="font-semibold">#27943</span> type</div>
+                                <select className="input" defaultValue="Un-Collected">
+                                    <option value="Un-Collected">Un-Collected</option>
+                                    <option value="Professional Courtesy">Professional Courtesy</option>
+                                    <option value="Migrated">Migrated</option>
+                                    <option value="MembershipPlan">MembershipPlan</option>
+                                </select>
+                                <div className="text-sm">for invoice: <span className="font-semibold">#{showAdjustmentInvoiceFor}</span></div>
+                            </div>
+                            <div className="flex items-center gap-3 mb-4">
+                                <label className="text-sm">Percentage ~</label>
+                                <input type="number" className="input w-20" placeholder="% 0" />
+                                <div className="text-sm">= $0</div>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full text-sm border-collapse">
+                                    <thead className="bg-gray-100">
+                                        <tr>
+                                            <th className="p-2 text-left border">Invoice #</th>
+                                            <th className="p-2 text-left border">Code</th>
+                                            <th className="p-2 text-left border">Provider</th>
+                                            <th className="p-2 text-right border">Ins Writeoff</th>
+                                            <th className="p-2 text-right border">Patient: $0.00</th>
+                                            <th className="p-2 text-right border">Insurance: $206.00</th>
+                                            <th className="p-2 text-right border">Previous Total Owing: $206.00</th>
+                                            <th className="p-2 text-right border">Payment: $0.00</th>
+                                            <th className="p-2 text-right border">Adjust: $0.00</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {invoices.find((i) => i.id === showAdjustmentInvoiceFor)?.lines.map((l) => (
+                                            <tr key={l.id} className="border-b">
+                                                <td className="p-2 border">#{showAdjustmentInvoiceFor} : {l.dos} for</td>
+                                                <td className="p-2 border">{l.code}</td>
+                                                <td className="p-2 border">{l.provider}</td>
+                                                <td className="p-2 text-right border">$0.00</td>
+                                                <td className="p-2 text-right border">$0.00</td>
+                                                <td className="p-2 text-right border">${l.charge?.toFixed(2)}</td>
+                                                <td className="p-2 text-right border">${l.charge?.toFixed(2)}</td>
+                                                <td className="p-2 text-right border">$0.00</td>
+                                                <td className="p-2 text-right border">
+                                                    <input type="number" className="input w-20 text-right" placeholder="0%" />
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div className="mt-3">
+                                <label className="label">+ Add description</label>
+                                <textarea className="input w-full h-16" placeholder="Add description..."></textarea>
+                            </div>
+                            <div className="flex justify-end gap-2 mt-4">
+                                <button className="btn-primary" onClick={() => {
+                                    alert(`Adjustment applied to invoice #${showAdjustmentInvoiceFor}`);
+                                    setShowAdjustmentInvoiceFor(null);
+                                }}>
+                                    Adjust
+                                </button>
+                                <button className="btn-light" onClick={() => setShowAdjustmentInvoiceFor(null)}>Cancel</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Insurance Write-Off Modal */}
+            {showInsuranceWriteOffFor && (
+                <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 p-4">
+                    <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
+                        <div className="flex items-center justify-between border-b px-5 py-3 bg-purple-600 text-white rounded-t-2xl">
+                            <h4 className="text-base font-semibold">Insurance Write-Off Invoice #{showInsuranceWriteOffFor}</h4>
+                            <button onClick={() => setShowInsuranceWriteOffFor(null)} className="rounded p-1 hover:bg-purple-700" aria-label="Close">✕</button>
+                        </div>
+                        <div className="p-5 space-y-4">
+                            <div className="text-sm text-gray-600">
+                                {new Date().toLocaleDateString()} claim: <span className="font-semibold">select a claim</span> for invoice: <span className="font-semibold">#{showInsuranceWriteOffFor}</span>
+                            </div>
+                            <div>
+                                <select className="input w-full">
+                                    <option value="">Select a claim</option>
+                                    {Object.values(claims).filter(c => c.invoiceId === showInsuranceWriteOffFor).map(c => (
+                                        <option key={c.id} value={c.id}>Claim #{c.id} - {c.payerName}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="flex justify-end gap-2 mt-4">
+                                <button className="btn-primary" onClick={() => {
+                                    alert(`Insurance write-off applied to invoice #${showInsuranceWriteOffFor}`);
+                                    setShowInsuranceWriteOffFor(null);
+                                }}>
+                                    Apply
+                                </button>
+                                <button className="btn-light" onClick={() => setShowInsuranceWriteOffFor(null)}>Cancel</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Membership Adjustment Modal */}
+            {showMembershipAdjustmentFor && (
+                <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 p-4">
+                    <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
+                        <div className="flex items-center justify-between border-b px-5 py-3 bg-purple-600 text-white rounded-t-2xl">
+                            <h4 className="text-base font-semibold">Membership Adjustment</h4>
+                            <button onClick={() => setShowMembershipAdjustmentFor(null)} className="rounded p-1 hover:bg-purple-700" aria-label="Close">✕</button>
+                        </div>
+                        <div className="p-5 space-y-4">
+                            <div className="text-center text-red-600 font-semibold">Patient Has No Membership Plans</div>
+                            <div>
+                                <label className="label">Description</label>
+                                <textarea className="input w-full h-20" placeholder="Add description..."></textarea>
+                            </div>
+                            <div className="flex justify-end gap-2 mt-4">
+                                <button className="btn-primary" disabled>Apply</button>
+                                <button className="btn-light" onClick={() => setShowMembershipAdjustmentFor(null)}>Cancel</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ...existing code... */}
+            {showEditLinesFor && (
+                <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 p-4">
+                    {/* ...existing code... */}
+                </div>
+            )}
+            {/* ...existing code... */}
 
             {showAddProcedure && (
                 <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 p-4">
@@ -1779,7 +2111,14 @@ export default function PatientBilling({ patientId, patientName }: Props) {
                                 </div>
                                 <div>
                                     <label className="label">Provider</label>
-                                    <input id="p-prov" className="input w-full" defaultValue="PROV-01" />
+                                    <select id="p-prov" className="input w-full" defaultValue={providers[0]?.name || ""}>
+                                        <option value="">Select Provider</option>
+                                        {providers.map((prov) => (
+                                            <option key={prov.id} value={prov.name}>
+                                                {prov.name}
+                                            </option>
+                                        ))}
+                                    </select>
                                 </div>
                             </div>
                             <div className="flex justify-end gap-2">
@@ -1795,7 +2134,7 @@ export default function PatientBilling({ patientId, patientName }: Props) {
                                         const dos =
                                             (document.getElementById("p-dos") as HTMLInputElement).value ||
                                             new Date().toISOString().slice(0, 10);
-                                        const provider = (document.getElementById("p-prov") as HTMLInputElement).value || "PROV-01";
+                                        const provider = (document.getElementById("p-prov") as HTMLSelectElement).value || providers[0]?.name || "PROV-01";
 
                                         void createInvoiceFromProcedure({ dos, code, treatment, provider, rate });
                                         setShowAddProcedure(false);
@@ -1964,8 +2303,26 @@ export default function PatientBilling({ patientId, patientName }: Props) {
                             <div className="flex items-center justify-between">
                                 <button
                                     className="btn-light"
-                                    onClick={() => {
-                                        setShowAttachmentFor(null);
+                                    onClick={async () => {
+                                        const claimId = claims[showAttachmentFor]?.id;
+                                        if (!claimId) return;
+                                        const res = await fetchWithAuth(`${API}/claims/${claimId}/attachment`, { method: "GET" });
+                                        if (res.ok) {
+                                            const contentType = res.headers.get("content-type") || "";
+                                            const blob = await res.blob();
+                                            const url = window.URL.createObjectURL(blob);
+                                            if (contentType.startsWith("image/")) {
+                                                setPreviewUrl(url);
+                                                setPreviewType("image");
+                                                setPreviewOpen(true);
+                                            } else if (contentType === "application/pdf") {
+                                                setPreviewUrl(url);
+                                                setPreviewType("pdf");
+                                                setPreviewOpen(true);
+                                            } else {
+                                                window.open(url, "_blank");
+                                            }
+                                        }
                                     }}
                                 >
                                     View documents
@@ -1978,9 +2335,18 @@ export default function PatientBilling({ patientId, patientName }: Props) {
                                     <button
                                         className="btn-primary"
                                         onClick={async () => {
-                                            // TODO: call upload endpoint here with `attachmentFile`
+                                            if (!attachmentFile || !showAttachmentFor) return;
+                                            const claimId = claims[showAttachmentFor]?.id;
+                                            if (!claimId) return;
+                                            const formData = new FormData();
+                                            formData.append("file", attachmentFile);
+                                            await fetchWithAuth(`${API}/claims/${claimId}/attachment`, {
+                                                method: "POST",
+                                                body: formData,
+                                            });
                                             setAttachmentFile(null);
                                             setShowAttachmentFor(null);
+                                            // Optionally reload claim data here
                                         }}
                                         disabled={!attachmentFile}
                                     >
@@ -2023,12 +2389,49 @@ export default function PatientBilling({ patientId, patientName }: Props) {
                             <div className="flex items-center justify-between">
                                 <button
                                     className="btn-light"
-                                    onClick={() => {
-                                        setShowEobFor(null);
+                                    onClick={async () => {
+                                        const claimId = claims[showEobFor]?.id;
+                                        if (!claimId) return;
+                                        const res = await fetchWithAuth(`${API}/claims/${claimId}/eob`, { method: "GET" });
+                                        if (res.ok) {
+                                            const contentType = res.headers.get("content-type") || "";
+                                            const blob = await res.blob();
+                                            const url = window.URL.createObjectURL(blob);
+                                            if (contentType.startsWith("image/")) {
+                                                setPreviewUrl(url);
+                                                setPreviewType("image");
+                                                setPreviewOpen(true);
+                                            } else if (contentType === "application/pdf") {
+                                                setPreviewUrl(url);
+                                                setPreviewType("pdf");
+                                                setPreviewOpen(true);
+                                            } else {
+                                                window.open(url, "_blank");
+                                            }
+                                        }
                                     }}
                                 >
                                     View documents
                                 </button>
+            {/* ======= FILE PREVIEW MODAL ======= */}
+            {previewOpen && previewUrl && (
+                <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 p-4">
+                    <div className="w-full max-w-2xl rounded-2xl bg-white shadow-xl relative">
+                        <button
+                            onClick={() => { setPreviewOpen(false); setPreviewUrl(null); setPreviewType(null); }}
+                            className="absolute top-2 right-2 rounded p-1 hover:bg-gray-100"
+                            aria-label="Close"
+                        >✕</button>
+                        <div className="p-5 flex justify-center items-center min-h-[400px]">
+                            {previewType === "image" ? (
+                                <img src={previewUrl} alt="Preview" className="max-h-[70vh] max-w-full rounded" />
+                            ) : previewType === "pdf" ? (
+                                <iframe src={previewUrl} title="PDF Preview" className="w-full h-[70vh]" />
+                            ) : null}
+                        </div>
+                    </div>
+                </div>
+            )}
 
                                 <div className="flex gap-2">
                                     <button className="btn-light" onClick={() => { setEobFile(null); setShowEobFor(null); }}>
@@ -2037,9 +2440,18 @@ export default function PatientBilling({ patientId, patientName }: Props) {
                                     <button
                                         className="btn-primary"
                                         onClick={async () => {
-                                            // TODO: call upload endpoint here with `eobFile`
+                                            if (!eobFile || !showEobFor) return;
+                                            const claimId = claims[showEobFor]?.id;
+                                            if (!claimId) return;
+                                            const formData = new FormData();
+                                            formData.append("file", eobFile);
+                                            await fetchWithAuth(`${API}/claims/${claimId}/eob`, {
+                                                method: "POST",
+                                                body: formData,
+                                            });
                                             setEobFile(null);
                                             setShowEobFor(null);
+                                            // Optionally reload claim data here
                                         }}
                                         disabled={!eobFile}
                                     >
@@ -2051,9 +2463,109 @@ export default function PatientBilling({ patientId, patientName }: Props) {
                     </div>
                 </div>
             )}
+
+            {/* Edit Insurance Payment Modal */}
+            {editInsuranceModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+                    <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-lg">
+                        <h3 className="text-lg font-semibold mb-4">Edit Insurance Payment</h3>
+                        <form onSubmit={async (e) => {
+                            e.preventDefault();
+                            const form = e.target as typeof e.target & {
+                                submitted: { value: string },
+                                balance: { value: string },
+                                deductible: { value: string },
+                                allowed: { value: string },
+                                insWriteOff: { value: string },
+                                insPay: { value: string },
+                                updateAllowed: { checked: boolean },
+                                updateFlatPortion: { checked: boolean },
+                                applyWriteoff: { checked: boolean },
+                            };
+                            await editInsuranceRemitLine(
+                                editInsuranceModal.invoiceId,
+                                editInsuranceModal.remit.id,
+                                {
+                                    invoiceLineId: editInsuranceModal.remit.invoiceLineId,
+                                    submitted: Number(form.submitted.value),
+                                    balance: Number(form.balance.value),
+                                    deductible: Number(form.deductible.value),
+                                    allowed: Number(form.allowed.value),
+                                    insWriteOff: Number(form.insWriteOff.value),
+                                    insPay: Number(form.insPay.value),
+                                    updateAllowed: form.updateAllowed.checked,
+                                    updateFlatPortion: form.updateFlatPortion.checked,
+                                    applyWriteoff: form.applyWriteoff.checked,
+                                }
+                            );
+                            setEditInsuranceModal(null);
+                        }}>
+                            <div className="grid grid-cols-2 gap-3">
+                                <label>Submitted<input name="submitted" type="number" className="input w-full" defaultValue={editInsuranceModal.remit.submitted} /></label>
+                                <label>Balance<input name="balance" type="number" className="input w-full" defaultValue={editInsuranceModal.remit.balance} /></label>
+                                <label>Deductible<input name="deductible" type="number" className="input w-full" defaultValue={editInsuranceModal.remit.deductible} /></label>
+                                <label>Allowed<input name="allowed" type="number" className="input w-full" defaultValue={editInsuranceModal.remit.allowed} /></label>
+                                <label>Ins WriteOff<input name="insWriteOff" type="number" className="input w-full" defaultValue={editInsuranceModal.remit.insWriteOff} /></label>
+                                <label>Ins Pay<input name="insPay" type="number" className="input w-full" defaultValue={editInsuranceModal.remit.insPay} /></label>
+                                <label className="col-span-2"><input name="updateAllowed" type="checkbox" defaultChecked={!!editInsuranceModal.remit.updateAllowed} /> Update Allowed</label>
+                                <label className="col-span-2"><input name="updateFlatPortion" type="checkbox" defaultChecked={!!editInsuranceModal.remit.updateFlatPortion} /> Update Flat Portion</label>
+                                <label className="col-span-2"><input name="applyWriteoff" type="checkbox" defaultChecked={!!editInsuranceModal.remit.applyWriteoff} /> Apply Writeoff</label>
+                            </div>
+                            <div className="flex justify-end gap-2 mt-4">
+                                <button type="button" className="btn-light" onClick={() => setEditInsuranceModal(null)}>Cancel</button>
+                                <button type="submit" className="btn-primary">Save</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Edit Patient Payment Modal */}
+            {editPatientModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+                    <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-lg">
+                        <h3 className="text-lg font-semibold mb-4">Edit Patient Payment</h3>
+                        <form onSubmit={async (e) => {
+                            e.preventDefault();
+                            const form = e.target as typeof e.target & {
+                                amount: { value: string },
+                                paymentMethod: { value: string },
+                            };
+                            await editPatientPayment(
+                                editPatientModal.invoiceId,
+                                editPatientModal.payment.id,
+                                {
+                                    amount: Number(form.amount.value),
+                                    paymentMethod: form.paymentMethod.value,
+                                }
+                            );
+                            setEditPatientModal(null);
+                        }}>
+                            <div className="grid grid-cols-2 gap-3">
+                                <label>Amount<input name="amount" type="number" className="input w-full" defaultValue={editPatientModal.payment.amount} /></label>
+                                <label>Payment Method
+                                    <select name="paymentMethod" className="input w-full" defaultValue={editPatientModal.payment.paymentMethod}>
+                                        <option value="CREDIT_CARD">Credit Card</option>
+                                        <option value="CHECK">Check</option>
+                                        <option value="DEBIT_CARD">Debit Card</option>
+                                        <option value="EFT">EFT</option>
+                                        <option value="CASH">Cash</option>
+                                        <option value="CARE_CREDIT">Care Credit</option>
+                                        <option value="MASTERCARD">Master Card</option>
+                                        <option value="VISA">Visa</option>
+                                        <option value="DISCOVER">Discover</option>
+                                        <option value="AMEX">Amex</option>
+                                    </select>
+                                </label>
+                            </div>
+                            <div className="flex justify-end gap-2 mt-4">
+                                <button type="button" className="btn-light" onClick={() => setEditPatientModal(null)}>Cancel</button>
+                                <button type="submit" className="btn-primary">Save</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
-
-
-
