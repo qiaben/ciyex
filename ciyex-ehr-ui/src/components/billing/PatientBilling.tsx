@@ -1,5 +1,6 @@
 
 
+
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -611,8 +612,9 @@ export default function PatientBilling({ patientId, patientName }: Props) {
 
     const isClosed = useMemo(
         () =>
-            selectedInvoice?.status === "PAID" ||
-            ((Number(selectedInvoice?.ptBalance ?? 0) + Number(selectedInvoice?.insBalance ?? 0)) === 0),
+            selectedInvoice?.status === "PAID" &&
+            Number(selectedInvoice?.ptBalance ?? 0) === 0 &&
+            Number(selectedInvoice?.insBalance ?? 0) === 0,
         [selectedInvoice?.status, selectedInvoice?.ptBalance, selectedInvoice?.insBalance]
     );
 
@@ -808,6 +810,43 @@ export default function PatientBilling({ patientId, patientName }: Props) {
     /* =========================================================
        Actions → Backend
     ========================================================== */
+    // Backdate invoice
+    async function backdateInvoice(invoiceId: number, date: string) {
+        const res = await fetchWithAuth(`${API}/invoices/${invoiceId}/backdate`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ date }),
+        });
+        const body = await res.json();
+        if (!body?.success) throw new Error(body?.message || "Failed to backdate invoice");
+        const inv = mapServerInvoice(body.data);
+        setInvoices((prev) => prev.map((i) => (i.id === inv.id ? inv : i)));
+    }
+
+    // Invoice adjustment (flat/percent)
+    async function adjustInvoice(invoiceId: number, payload: { adjustmentType: string; flatRate?: number; specificAmount?: number; description?: string; includeCourtesyCredit?: boolean; }) {
+        const res = await fetchWithAuth(`${API}/invoices/${invoiceId}/adjust`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+        const body = await res.json();
+        if (!body?.success) throw new Error(body?.message || "Failed to adjust invoice");
+        const inv = mapServerInvoice(body.data);
+        setInvoices((prev) => prev.map((i) => (i.id === inv.id ? inv : i)));
+    }
+
+    // Account adjustment
+    async function accountAdjustment(payload: { adjustmentType: string; flatRate?: number; specificAmount?: number; description?: string; includeCourtesyCredit?: boolean; }) {
+        const res = await fetchWithAuth(`${API}/account-adjustment`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+        const body = await res.json();
+        if (!body?.success) throw new Error(body?.message || "Failed to adjust account");
+        setAccountCredit({ balance: body.data?.balance ?? 0 });
+    }
     async function createInvoiceFromProcedure(p: {
         dos: string;
         code: string;
@@ -1207,13 +1246,13 @@ export default function PatientBilling({ patientId, patientName }: Props) {
                             const first = inv.lines[0];
                             const claim = claims[inv.id];
                             const effectiveStatus: InvoiceStatus =
-                                ((Number(inv.ptBalance ?? 0) + Number(inv.insBalance ?? 0)) === 0 ? "PAID" : inv.status);
+                                (inv.status === "PAID" && Number(inv.ptBalance ?? 0) === 0 && Number(inv.insBalance ?? 0) === 0 ? "PAID" : inv.status);
                             const rowTone =
                                 effectiveStatus === "OPEN"
                                     ? "bg-red-50"
                                     : effectiveStatus === "PARTIALLY_PAID"
                                         ? "bg-amber-50"
-                                        : "bg-green-50";
+                                        : (effectiveStatus === "PAID" ? "bg-green-50" : "bg-gray-50");
                             const ip = insPayMap[inv.id] ?? [];
                             const pp = ptPayMap[inv.id] ?? [];
                             const ptPaid = Number(inv.ptPaid) > 0 ? Number(inv.ptPaid) : sum(pp.map((p: any) => Number(p.amount ?? p.payment ?? p.paid ?? 0)));
@@ -1262,13 +1301,13 @@ export default function PatientBilling({ patientId, patientName }: Props) {
                             const first = inv.lines[0];
                             const claim = claims[inv.id];
                             const effectiveStatus: InvoiceStatus =
-                                ((Number(inv.ptBalance ?? 0) + Number(inv.insBalance ?? 0)) === 0 ? "PAID" : inv.status);
+                                (inv.status === "PAID" && Number(inv.ptBalance ?? 0) === 0 && Number(inv.insBalance ?? 0) === 0 ? "PAID" : inv.status);
                             const rowTone =
                                 effectiveStatus === "OPEN"
                                     ? "bg-red-50"
                                     : effectiveStatus === "PARTIALLY_PAID"
                                         ? "bg-amber-50"
-                                        : "bg-green-50";
+                                        : (effectiveStatus === "PAID" ? "bg-green-50" : "bg-gray-50");
                             const ip = insPayMap[inv.id] ?? [];
                             const pp = ptPayMap[inv.id] ?? [];
                             const ptPaid = Number(inv.ptPaid) > 0 ? Number(inv.ptPaid) : sum(pp.map((p: any) => Number(p.amount ?? p.payment ?? p.paid ?? 0)));
@@ -1867,9 +1906,16 @@ export default function PatientBilling({ patientId, patientName }: Props) {
                                 />
                             </div>
                             <div className="flex justify-end gap-2 mt-4">
-                                <button className="btn-light" style={{background: '#f59e0b', color: 'white', borderColor: '#f59e0b'}} onClick={() => {
+                                <button className="btn-light" style={{background: '#f59e0b', color: 'white', borderColor: '#f59e0b'}} onClick={async () => {
                                     const dateInput = document.getElementById('backdate-input') as HTMLInputElement;
-                                    alert(`Backdating invoice #${showBackdateFor} to ${dateInput?.value}`);
+                                    const backdate = dateInput?.value;
+                                    if (!backdate || !showBackdateFor) return;
+                                    try {
+                                        await backdateInvoice(showBackdateFor, backdate);
+                                        alert(`Invoice #${showBackdateFor} backdated to ${backdate}`);
+                                    } catch (err) {
+                                        alert("Error: " + (err as Error).message);
+                                    }
                                     setShowBackdateFor(null);
                                 }}>
                                     Backdate Transaction
@@ -1921,9 +1967,19 @@ export default function PatientBilling({ patientId, patientName }: Props) {
                                 <textarea id="acct-adj-desc" className="input w-full h-20" placeholder="Add description..."></textarea>
                             </div>
                             <div className="flex justify-end gap-2 mt-4">
-                                <button className="btn-primary" onClick={() => {
+                                <button className="btn-primary" onClick={async () => {
                                     const type = (document.getElementById('acct-adj-type') as HTMLSelectElement)?.value;
-                                    alert(`Applying account adjustment: ${type}`);
+                                    const flatRate = Number((document.getElementById('acct-adj-total') as HTMLInputElement)?.value);
+                                    const specificAmount = Number((document.getElementById('acct-adj-patient') as HTMLInputElement)?.value);
+                                    const description = (document.getElementById('acct-adj-desc') as HTMLTextAreaElement)?.value;
+                                    const includeCourtesyCredit = (document.getElementById('include-courtesy') as HTMLInputElement)?.checked;
+                                    if (!type || (!flatRate && !specificAmount) || !showAccountAdjustmentFor) return;
+                                    try {
+                                        await accountAdjustment({ adjustmentType: type, flatRate, specificAmount, description, includeCourtesyCredit });
+                                        alert(`Account adjustment applied: ${type}`);
+                                    } catch (err) {
+                                        alert("Error: " + (err as Error).message);
+                                    }
                                     setShowAccountAdjustmentFor(null);
                                 }}>
                                     Apply
@@ -1947,7 +2003,7 @@ export default function PatientBilling({ patientId, patientName }: Props) {
                             <div className="flex items-center gap-3 mb-4">
                                 <div className="text-sm">{new Date().toLocaleDateString()}</div>
                                 <div className="text-sm">Credit Adjustment <span className="font-semibold">#27943</span> type</div>
-                                <select className="input" defaultValue="Un-Collected">
+                                <select id="adj-invoice-type" className="input" defaultValue="Un-Collected">
                                     <option value="Un-Collected">Un-Collected</option>
                                     <option value="Professional Courtesy">Professional Courtesy</option>
                                     <option value="Migrated">Migrated</option>
@@ -1957,7 +2013,7 @@ export default function PatientBilling({ patientId, patientName }: Props) {
                             </div>
                             <div className="flex items-center gap-3 mb-4">
                                 <label className="text-sm">Percentage ~</label>
-                                <input type="number" className="input w-20" placeholder="% 0" />
+                                <input id="adj-invoice-percent" type="number" className="input w-20" placeholder="% 0" />
                                 <div className="text-sm">= $0</div>
                             </div>
                             <div className="overflow-x-auto">
@@ -1987,7 +2043,7 @@ export default function PatientBilling({ patientId, patientName }: Props) {
                                                 <td className="p-2 text-right border">${l.charge?.toFixed(2)}</td>
                                                 <td className="p-2 text-right border">$0.00</td>
                                                 <td className="p-2 text-right border">
-                                                    <input type="number" className="input w-20 text-right" placeholder="0%" />
+                                                    <input id={`adj-invoice-line-${l.id}`} type="number" className="input w-20 text-right" placeholder="0%" />
                                                 </td>
                                             </tr>
                                         ))}
@@ -1996,11 +2052,22 @@ export default function PatientBilling({ patientId, patientName }: Props) {
                             </div>
                             <div className="mt-3">
                                 <label className="label">+ Add description</label>
-                                <textarea className="input w-full h-16" placeholder="Add description..."></textarea>
+                                <textarea id="adj-invoice-desc" className="input w-full h-16" placeholder="Add description..."></textarea>
                             </div>
                             <div className="flex justify-end gap-2 mt-4">
-                                <button className="btn-primary" onClick={() => {
-                                    alert(`Adjustment applied to invoice #${showAdjustmentInvoiceFor}`);
+                                <button className="btn-primary" onClick={async () => {
+                                    const invoiceId = showAdjustmentInvoiceFor;
+                                    const type = (document.getElementById('adj-invoice-type') as HTMLSelectElement)?.value;
+                                    const percent = Number((document.getElementById('adj-invoice-percent') as HTMLInputElement)?.value);
+                                    const description = (document.getElementById('adj-invoice-desc') as HTMLTextAreaElement)?.value;
+                                    if (!invoiceId || !type) return;
+                                    try {
+                                        await adjustInvoice(invoiceId, { adjustmentType: type, description });
+                                        if (percent > 0) await applyPercentAdjustment(invoiceId, percent);
+                                        alert(`Adjustment applied to invoice #${invoiceId}`);
+                                    } catch (err) {
+                                        alert("Error: " + (err as Error).message);
+                                    }
                                     setShowAdjustmentInvoiceFor(null);
                                 }}>
                                     Adjust
