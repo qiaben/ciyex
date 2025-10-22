@@ -80,6 +80,7 @@ const navItems: NavItem[] = [
       {name:"Messaging",path: "/messaging"},
       { name: "Education", path: "/patient_education" },
         { name: "Codes list", path: "/patients/codes" },
+        { name: "Claim Management", path: "/patients/claim-management" },
 
     ],
   },
