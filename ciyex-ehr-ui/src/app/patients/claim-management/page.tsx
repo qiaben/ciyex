@@ -6,3 +6,4 @@ const ClaimManagementPage: React.FC = () => {
 };
 
 export default ClaimManagementPage;
+

@@ -1,5 +1,6 @@
 import React from 'react';
 
+
 const RejectedClaims: React.FC = () => {
   // Sample data for demonstration
   const claims = [
