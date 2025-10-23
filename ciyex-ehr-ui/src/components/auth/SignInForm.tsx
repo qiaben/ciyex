@@ -1,71 +1,25 @@
 "use client";
-import Checkbox from "@/components/form/input/Checkbox";
-import Input from "@/components/form/input/InputField";
-import Label from "@/components/form/Label";
 import Button from "@/components/ui/button/Button";
-import { EyeCloseIcon, EyeIcon } from "@/icons";
-import Link from "next/link";
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { jwtDecode } from "jwt-decode";
-import {fetchWithAuth} from "@/utils/fetchWithAuth";
-
-interface Org {
-    orgId: number;
-    orgName: string;
-    roles: string[];
-    facilities: {
-        facilityId: number;
-        facilityName: string;
-        roles: string[];
-    }[];
-}
-
-interface LoginResponse {
-    success: boolean;
-    message: string;
-    data?: {
-        firstName: string;
-        lastName: string;
-        phone: string;
-        dateOfBirth: number[];
-        email: string;
-        token: string;
-        orgIds: number[];
-        orgs: Org[];
-        userId: number;
-        city?: string;
-        state?: string;
-        country?: string;
-        street?: string;
-        street2?: string;
-        postalCode?: string;
-        securityQuestion?: string;
-        securityAnswer?: string;
-    };
-}
 
 export default function SignInForm() {
     const router = useRouter();
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [showPassword, setShowPassword] = useState(false);
-    const [isChecked, setIsChecked] = useState(false);
-    const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+
+    const keycloakEnabled = process.env.NEXT_PUBLIC_KEYCLOAK_ENABLED === 'true';
+    const keycloakUrl = process.env.NEXT_PUBLIC_KEYCLOAK_URL;
+    const keycloakRealm = process.env.NEXT_PUBLIC_KEYCLOAK_REALM;
+    const keycloakClientId = process.env.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID;
 
     useEffect(() => {
         const token = localStorage.getItem("token");
-        const orgId = localStorage.getItem("orgId");
-        const facilityId = localStorage.getItem("facilityId");
-        const role = localStorage.getItem("role");
-        if (token && orgId && facilityId && role) {
+        if (token) {
             try {
                 const decoded: { exp: number } = jwtDecode(token);
                 if (decoded.exp * 1000 > Date.now()) {
-                    router.push("/");
+                    router.push("/dashboard");
                 }
             } catch {
                 // Invalid token
@@ -73,73 +27,57 @@ export default function SignInForm() {
         }
     }, [router]);
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setError("");
+    // Generate PKCE code verifier and challenge
+    const generateCodeVerifier = () => {
+        const array = new Uint8Array(32);
+        crypto.getRandomValues(array);
+        return btoa(String.fromCharCode(...array))
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=/g, '');
+    };
+
+    const generateCodeChallenge = async (verifier: string) => {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(verifier);
+        const hash = await crypto.subtle.digest('SHA-256', data);
+        return btoa(String.fromCharCode(...new Uint8Array(hash)))
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=/g, '');
+    };
+
+    const handleKeycloakSignIn = async () => {
+        if (!keycloakEnabled || !keycloakUrl || !keycloakRealm || !keycloakClientId) {
+            console.error("Keycloak is not properly configured");
+            return;
+        }
+
         setLoading(true);
 
         try {
-            const res = await fetchWithAuth(`${apiUrl}/api/auth/login`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Accept": "application/json",   // 👈 Force Spring to return JSON
-                },
-                body: JSON.stringify({ email, password }),
+            // Generate PKCE parameters
+            const codeVerifier = generateCodeVerifier();
+            const codeChallenge = await generateCodeChallenge(codeVerifier);
+
+            // Store code verifier for later use in callback
+            sessionStorage.setItem('pkce_code_verifier', codeVerifier);
+
+            const redirectUri = window.location.origin + "/callback";
+            const authUrl = `${keycloakUrl}/realms/${keycloakRealm}/protocol/openid-connect/auth`;
+            
+            const params = new URLSearchParams({
+                client_id: keycloakClientId,
+                redirect_uri: redirectUri,
+                response_type: "code",
+                scope: "openid profile email",
+                code_challenge: codeChallenge,
+                code_challenge_method: "S256",
             });
 
-            if (!res.ok) {
-                const errorText = await res.text();
-                console.error("❌ Login failed:", res.status, errorText);
-                throw new Error(`Login failed with status ${res.status}`);
-            }
-
-            const data: LoginResponse = await res.json(); // safely JSON now ✅
-
-            if (data.success && data.data) {
-                const {
-                    token,
-                    email,
-                    firstName,
-                    lastName,
-                    orgs,
-                    orgIds,
-                } = data.data;
-                // Normalize here 👇
-                const normalizedUser = {
-                    ...data.data,
-                    lastName: data.data.lastName || (data.data as { LastName?: string }).LastName || "",
-                };
-
-                const fullName = `${firstName} ${lastName}`.trim();
-                const org = orgs[0];
-                const role = org.roles?.[0] || "UNKNOWN";
-
-                localStorage.setItem("orgIds", JSON.stringify(orgIds));
-                localStorage.setItem("token", token);
-                localStorage.setItem("userEmail", email);
-                localStorage.setItem("userFullName", fullName);
-                localStorage.setItem("orgId", org.orgId.toString());
-                localStorage.setItem("role", role);
-
-                if (org.facilities?.length > 0) {
-                    localStorage.setItem("facilityId", org.facilities[0].facilityId.toString());
-                }
-  localStorage.setItem("user", JSON.stringify(normalizedUser));
-
-
-                if (orgIds.length > 1) {
-                    router.push("/practice-switch");
-                } else {
-                    router.push("/dashboard");
-                }
-            } else {
-                setError(data.message || "Invalid credentials");
-            }
-        } catch (err) {
-            console.error("🚨 Login error caught:", err);
-            setError("Something went wrong. Please try again.");
-        } finally {
+            window.location.href = `${authUrl}?${params.toString()}`;
+        } catch (error) {
+            console.error("Error generating PKCE parameters:", error);
             setLoading(false);
         }
     };
@@ -147,87 +85,54 @@ export default function SignInForm() {
 
     return (
         <div className="flex flex-col flex-1 lg:w-1/2 w-full">
-
             <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto">
-                <div className="mb-5 sm:mb-8">
-                    <h1 className="mb-2 font-semibold text-gray-800 text-title-sm dark:text-white/90 sm:text-title-md">
-                        Sign In
+                <div className="mb-8 text-center">
+                    <h1 className="mb-3 font-semibold text-gray-800 text-title-sm dark:text-white/90 sm:text-title-md">
+                        Welcome to Ciyex EHR
                     </h1>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                        Enter your email and password to sign in!
+                        Sign in with your Aran account to continue
                     </p>
                 </div>
 
-                <div className="relative py-3 sm:py-5">
-                    <div className="absolute inset-0 flex items-center">
-                        <div className="w-full border-t border-gray-200 dark:border-gray-800" />
-                    </div>
-                    <div className="relative flex justify-center text-sm">
-            <span className="p-2 text-gray-400 bg-white dark:bg-gray-900 sm:px-5 sm:py-2">
-              Or
-            </span>
-                    </div>
+                <div className="space-y-4">
+                    <Button 
+                        className="w-full flex items-center justify-center gap-3 py-3" 
+                        size="md" 
+                        onClick={handleKeycloakSignIn}
+                        disabled={loading || !keycloakEnabled}
+                    >
+                        {loading ? (
+                            <>
+                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                                <span>Redirecting to Aran...</span>
+                            </>
+                        ) : (
+                            <>
+                                <svg 
+                                    className="w-5 h-5" 
+                                    fill="currentColor" 
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/>
+                                </svg>
+                                <span>Sign in with Aran</span>
+                            </>
+                        )}
+                    </Button>
+
+                    {!keycloakEnabled && (
+                        <div className="text-sm text-center text-amber-600 border border-amber-200 bg-amber-50 py-2 px-4 rounded">
+                            Keycloak authentication is not configured. Please contact your administrator.
+                        </div>
+                    )}
                 </div>
 
-                {error && (
-                    <div className="mb-3 text-sm text-center text-red-600 border border-red-200 bg-red-50 py-2 px-4 rounded">
-                        {error}
-                    </div>
-                )}
-
-                <form onSubmit={handleSubmit}>
-                    <div className="space-y-6">
-                        <div>
-                            <Label>
-                                Email <span className="text-error-500">*</span>
-                            </Label>
-                            <Input
-                                placeholder="info@gmail.com"
-                                type="email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                            />
-                        </div>
-                        <div>
-                            <Label>
-                                Password <span className="text-error-500">*</span>
-                            </Label>
-                            <div className="relative">
-                                <Input
-                                    type={showPassword ? "text" : "password"}
-                                    placeholder="Enter your password"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                />
-                                <span
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute z-30 -translate-y-1/2 cursor-pointer right-4 top-1/2"
-                                >
-                  {showPassword ? <EyeIcon /> : <EyeCloseIcon />}
-                </span>
-                            </div>
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <Checkbox checked={isChecked} onChange={setIsChecked} />
-                                <span className="block font-normal text-gray-700 text-theme-sm dark:text-gray-400">
-                  Keep me logged in
-                </span>
-                            </div>
-                            <Link
-                                href="/reset-password"
-                                className="text-sm text-brand-500 hover:text-brand-600 dark:text-brand-400"
-                            >
-                                Forgot password?
-                            </Link>
-                        </div>
-                        <div>
-                            <Button className="w-full" size="sm" type="submit" disabled={loading}>
-                                {loading ? "Signing in..." : "Sign in"}
-                            </Button>
-                        </div>
-                    </div>
-                </form>
+                <div className="mt-8 text-center">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                        By signing in, you agree to our Terms of Service and Privacy Policy
+                    </p>
+                </div>
             </div>
         </div>
     );

@@ -29,6 +29,14 @@ jwt:
   secret: ***REMOVED_JWT_SECRET***
   expiration: 31557600000
 
+keycloak:
+  enabled: ${KEYCLOAK_ENABLED:false}
+  auth-server-url: ${KEYCLOAK_AUTH_SERVER_URL:https://aran-stg.zpoa.com}
+  realm: ${KEYCLOAK_REALM:master}
+  resource: ${KEYCLOAK_RESOURCE:ciyex-app}
+  credentials:
+    secret: ${KEYCLOAK_CLIENT_SECRET:***REMOVED_KEYCLOAK_CLIENT_SECRET***}
+
 cors:
   allowed-origins: http://localhost:3000
 
