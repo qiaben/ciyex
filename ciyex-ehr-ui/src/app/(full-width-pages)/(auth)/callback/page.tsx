@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { getAccessibleTenants, setSelectedTenant } from "@/utils/tenantService";
 
 export default function AuthCallback() {
     const router = useRouter();
@@ -48,6 +49,8 @@ export default function AuthCallback() {
                 const data = await response.json();
 
                 if (data.success && data.data) {
+                    console.log("✅ Callback received data from backend");
+                    
                     const {
                         token,
                         email,
@@ -57,6 +60,8 @@ export default function AuthCallback() {
                         groups,
                         userId,
                     } = data.data;
+
+                    console.log("📦 Extracted data - groups:", groups);
 
                     const fullName = `${firstName || ""} ${lastName || ""}`.trim() || username || "";
 
@@ -76,8 +81,41 @@ export default function AuthCallback() {
                     // Clean up PKCE code verifier
                     sessionStorage.removeItem('pkce_code_verifier');
 
-                    // Redirect to dashboard
-                    router.push("/dashboard");
+                    console.log("🔍 About to check if user needs to select practice...");
+                    
+                    // Check if user already has a selected practice in localStorage
+                    const existingTenant = localStorage.getItem('selectedTenant');
+                    
+                    // Check if user needs to select practice
+                    try {
+                        console.log("Checking accessible tenants for user...");
+                        const tenantsData = await getAccessibleTenants(token);
+                        console.log("Tenants data:", tenantsData);
+                        
+                        // If user already has a selected practice, skip selection and go to dashboard
+                        if (existingTenant) {
+                            console.log("User already has selected practice:", existingTenant);
+                            console.log("Skipping practice selection, going to dashboard");
+                            router.push("/dashboard");
+                        } else if (tenantsData.requiresSelection) {
+                            // Multi-tenant user without selected practice, redirect to practice selection
+                            console.log("User has multiple tenants, redirecting to practice selection");
+                            router.push("/select-practice");
+                        } else if (tenantsData.tenants.length === 1) {
+                            // Single tenant, auto-select and redirect to dashboard
+                            console.log("User has single tenant, auto-selecting:", tenantsData.tenants[0]);
+                            setSelectedTenant(tenantsData.tenants[0]);
+                            router.push("/dashboard");
+                        } else {
+                            // No tenants or full access, redirect to dashboard
+                            console.log("User has full access or no tenants, redirecting to dashboard");
+                            router.push("/dashboard");
+                        }
+                    } catch (tenantErr) {
+                        console.error("Failed to check tenants:", tenantErr);
+                        // Fallback to dashboard
+                        router.push("/dashboard");
+                    }
                 } else {
                     setError(data.message || "Authentication failed");
                 }

@@ -6,16 +6,20 @@ import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
 import {getInitials} from "@/utils/getInitials";
 import {useRouter} from "next/navigation";
+import SwitchPractice from "@/components/auth/SwitchPractice";
+import { getSelectedTenant } from "@/utils/tenantService";
 
 
 export default function UserDropdown() {
     const [isOpen, setIsOpen] = useState(false);
+    const [showSwitchPractice, setShowSwitchPractice] = useState(false);
     const [user, setUser] = useState<{
         firstName?: string;
         lastName?: string;
         email?: string;
         profileImage?: string;
     } | null>(null);
+    const [currentPractice, setCurrentPractice] = useState<string | null>(null);
 
     const router = useRouter();
 
@@ -36,6 +40,10 @@ export default function UserDropdown() {
                 console.error("Failed to parse user from localStorage", err);
             }
         }
+        
+        // Get current practice
+        const practice = getSelectedTenant();
+        setCurrentPractice(practice);
     }, []);
 
     function toggleDropdown(e: React.MouseEvent<HTMLButtonElement, MouseEvent>) {
@@ -48,10 +56,10 @@ export default function UserDropdown() {
     }
 
     const handleSignOut = () => {
-        // Remove the user-related data from localStorage
-        localStorage.removeItem("orgId");
-        router.push("/");  // Adjust the redirection as needed
-
+        // Clear all authentication data
+        localStorage.clear();
+        // Redirect to signin page
+        router.push("/signin");
     };
 
     return (
@@ -64,11 +72,16 @@ export default function UserDropdown() {
   {getInitials(user?.firstName, user?.lastName)}
 </span>
 
-
-
-                <span className="block mr-1 font-medium text-theme-sm">
-          {user?.firstName || "User"}
-        </span>
+                <div className="flex flex-col mr-1">
+                    <span className="font-medium text-theme-sm text-gray-700 dark:text-gray-400">
+                        {user?.firstName || "User"}
+                    </span>
+                    {currentPractice && (
+                        <span className="text-xs text-gray-400 dark:text-gray-500">
+                            {currentPractice}
+                        </span>
+                    )}
+                </div>
 
                 <svg
                     className={`stroke-gray-500 dark:stroke-gray-400 transition-transform duration-200 ${
@@ -102,6 +115,11 @@ export default function UserDropdown() {
                     <span className="mt-0.5 block text-theme-xs text-gray-500 dark:text-gray-400">
             {user?.email}
           </span>
+                    {currentPractice && (
+                        <span className="mt-1 block text-xs text-gray-400 dark:text-gray-500">
+                            📍 {currentPractice}
+                        </span>
+                    )}
         </div>
 
         <ul className="flex flex-col gap-1 pt-4 pb-3 border-b border-gray-200 dark:border-gray-800">
@@ -158,9 +176,11 @@ export default function UserDropdown() {
 
             <li>
                 <DropdownItem
-                    onItemClick={closeDropdown} // Handle the click event to toggle the context switch dropdown
-                    href="/practice-switch"
-                    tag="a"
+                    onItemClick={() => {
+                        closeDropdown();
+                        setShowSwitchPractice(true);
+                    }}
+                    tag="button"
                     className="flex items-center gap-3 px-3 py-2 font-medium text-gray-700 rounded-lg group text-theme-sm hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
                 >
                     <svg
@@ -183,10 +203,9 @@ export default function UserDropdown() {
                 </DropdownItem>
             </li>
         </ul>
-        <Link
-          href="/"
-          onClick={handleSignOut} // Call handleSignOut function on click
-          className="flex items-center gap-3 px-3 py-2 mt-3 font-medium text-gray-700 rounded-lg group text-theme-sm hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
+        <button
+          onClick={handleSignOut}
+          className="flex items-center gap-3 px-3 py-2 mt-3 font-medium text-gray-700 rounded-lg group text-theme-sm hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300 w-full"
         >
           <svg
             className="fill-gray-500 group-hover:fill-gray-700 dark:group-hover:fill-gray-300"
@@ -204,8 +223,31 @@ export default function UserDropdown() {
             />
           </svg>
           Sign out
-        </Link>
+        </button>
       </Dropdown>
+
+      {/* Switch Practice Modal */}
+      {showSwitchPractice && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="flex justify-between items-start p-4 border-b border-gray-200 dark:border-gray-700">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-800 dark:text-white">Switch Practice</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Select a practice to switch to</p>
+              </div>
+              <button 
+                onClick={() => setShowSwitchPractice(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 ml-4"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <SwitchPractice onClose={() => setShowSwitchPractice(false)} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

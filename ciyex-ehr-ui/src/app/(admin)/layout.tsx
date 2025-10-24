@@ -10,6 +10,7 @@ import { usePathname } from "next/navigation";
 import AppointmentModal from "@/components/calendar/AppointmentModal";
 import { useLowStockNotifications } from "@/hooks/useLowStockNotifications";
 import { fetchWithAuth } from "@/utils/fetchWithAuth";
+import ProtectedRoute from "@/components/auth/ProtectedRoute";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
     const { isExpanded, isHovered, isMobileOpen } = useSidebar();
@@ -88,20 +89,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             : "lg:ml-[90px]";
 
     return (
-        <div className="min-h-screen xl:flex font-sans text-[15px] leading-6 antialiased transition-colors duration-300 bg-slate-50 text-slate-700 dark:bg-slate-950 dark:text-slate-200">
-            <AppSidebar />
-            <Backdrop />
+        <ProtectedRoute>
+            <div className="min-h-screen xl:flex font-sans text-[15px] leading-6 antialiased transition-colors duration-300 bg-slate-50 text-slate-700 dark:bg-slate-950 dark:text-slate-200">
+                <AppSidebar />
+                <Backdrop />
 
-            <div className={`flex-1 transition-all duration-300 ease-in-out ${mainContentMargin}`}>
-                <AppHeader pageTitle={pageTitle} />
-                <div className="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">
-                    <div key={pathname} className="transition-colors duration-300">
-                        {children}
+                <div className={`flex-1 transition-all duration-300 ease-in-out ${mainContentMargin}`}>
+                    <AppHeader pageTitle={pageTitle} />
+                    <div className="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">
+                        <div key={pathname} className="transition-colors duration-300">
+                            {children}
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <AppointmentModal />
-        </div>
+                <AppointmentModal />
+            </div>
+        </ProtectedRoute>
     );
 }

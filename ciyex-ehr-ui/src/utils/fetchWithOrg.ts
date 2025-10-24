@@ -37,7 +37,13 @@ export async function fetchWithOrg(input: RequestInfo, init: RequestInit = {}) {
     // only set Content-Type for requests with a body
     if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
 
-    // orgId header
+    // X-Tenant-Name header (NEW - replaces orgId)
+    const selectedTenant = typeof window !== "undefined" ? localStorage.getItem("selectedTenant") : null;
+    if (selectedTenant) {
+        headers.set("X-Tenant-Name", selectedTenant);
+    }
+
+    // orgId header (DEPRECATED - kept for backward compatibility)
     const orgId = typeof window !== "undefined" ? localStorage.getItem("orgId") : null;
     if (orgId) headers.set("orgId", String(orgId));
 
