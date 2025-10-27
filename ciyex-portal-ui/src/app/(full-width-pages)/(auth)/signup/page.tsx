@@ -2,7 +2,6 @@
 
 import { useState, useEffect, FormEvent, KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
-import { fetchWithAuth } from "@/utils/fetchWithAuth";
 import { signIn } from "next-auth/react";
 import ReCAPTCHA from "react-google-recaptcha";
 
@@ -140,14 +139,12 @@ export default function SignUpPage() {
 
     try {
       const payload = { ...form, captcha: captchaToken, role: "PATIENT" };
-      const res = await fetchWithAuth(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/portal/auth/register`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        }
-      );
+      // ✅ Use plain fetch for registration (no auth required)
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/portal/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
       const text = await res.text();
       const data: PortalApiResponse<PortalUserDto> = JSON.parse(text);
       if (!data.success || !data.data) throw new Error(data.message);

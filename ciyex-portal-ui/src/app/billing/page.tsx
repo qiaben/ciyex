@@ -1,244 +1,275 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import AdminLayout from "@/app/(admin)/layout";
-import Alert from "@/components/ui/alert/Alert";
-import { fetchWithAuth } from "@/utils/fetchWithAuth";
-import Button from "@/components/ui//button/Button";
-
-type Invoice = {
-  id: number;
-  patient: string;
-  amount: number;
-  balance: number;
-  status: "Open" | "Closed" | "Pending";
-  createdDate: string | string[] | number[];
-};
+import { useBilling } from "@/hooks/useBilling";
 
 export default function BillingPage() {
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState<Partial<Invoice>>({
-    patient: "",
-    amount: 0,
-    balance: 0,
-    status: "Open",
-    createdDate: "",
-  });
-  const [alert, setAlert] = useState<{ variant: "success" | "error"; title: string; message: string } | null>(null);
+  const { invoices, loading, error } = useBilling();
 
-  // Auto-dismiss alerts
-  useEffect(() => {
-    if (alert) {
-      const timer = setTimeout(() => setAlert(null), 4000);
-      return () => clearTimeout(timer);
-    }
-  }, [alert]);
+  if (loading) return (
+    <AdminLayout>
+      <div className="p-6 text-gray-600">Loading billing information...</div>
+    </AdminLayout>
+  );
 
-  // Load invoices from backend
-  useEffect(() => {
-    loadInvoices();
-  }, []);
-
-  async function loadInvoices() {
-    try {
-      const res = await fetchWithAuth("/api/portal/billing");
-      const data = await res.json();
-      setInvoices(data.data || []);
-    } catch {
-      setAlert({ variant: "error", title: "Error", message: "Failed to load invoices." });
-    }
-  }
-
-  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
-    const { name, value } = e.target;
-    setForm((prev) => ({
-      ...prev,
-      [name]: name === "amount" || name === "balance" ? Number(value) : value,
-    }));
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    try {
-      const newInvoice: Invoice = {
-        id: Date.now(),
-        patient: form.patient || "",
-        amount: form.amount || 0,
-        balance: form.balance || 0,
-        status: (form.status as "Open" | "Closed" | "Pending") || "Open",
-        createdDate: form.createdDate || new Date().toISOString().split("T")[0],
-      };
-
-      // Save to backend
-      const res = await fetchWithAuth("/api/portal/billing", {
-        method: "POST",
-        body: JSON.stringify(newInvoice),
-      });
-
-      if (!res.ok) throw new Error();
-
-      setInvoices((prev) => [...prev, newInvoice]);
-      setForm({ patient: "", amount: 0, balance: 0, status: "Open", createdDate: "" });
-      setShowModal(false);
-      setAlert({ variant: "success", title: "Invoice Created", message: "The invoice has been added to billing records." });
-    } catch {
-      setAlert({ variant: "error", title: "Error", message: "Could not save invoice." });
-    }
-  }
+  if (error) return (
+    <AdminLayout>
+      <div className="max-w-6xl mx-auto p-6">
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+          <div className="flex items-start">
+            <svg className="h-6 w-6 text-yellow-600 mr-3 mt-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <div>
+              <h3 className="text-lg font-semibold text-yellow-800 mb-2">Unable to Load Billing Information</h3>
+              <p className="text-yellow-700 mb-3">
+                We could not retrieve your billing data at this time. This might be because your patient record has not been linked to the EHR system yet, or you do not have permission to view this data.
+              </p>
+              <p className="text-sm text-yellow-600">
+                Please contact your healthcare provider if you believe you should have access to this information.
+              </p>
+              <div className="mt-4 text-xs text-yellow-500">
+                Technical details: {error}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </AdminLayout>
+  );
 
   return (
     <AdminLayout>
       <div className="max-w-6xl mx-auto p-6 space-y-6">
-        {/* header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <h1 className="text-xl font-bold text-gray-800 dark:text-white">Billing & Invoices</h1>
-          <Button onClick={() => setShowModal(true)}>+ Create Invoice</Button>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800 dark:text-white">My Billing & Invoices</h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              View your medical bills and payment history
+            </p>
+          </div>
         </div>
 
-        {/* alerts */}
-        {alert && <Alert variant={alert.variant} title={alert.title} message={alert.message} />}
+        {invoices.length === 0 ? (
+          <div className="text-center py-12">
+            <svg className="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No invoices found</h3>
+            <p className="text-gray-600">Your medical invoices will appear here once they are generated by your healthcare provider.</p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border-l-4 border-blue-500">
+                <div className="flex items-center">
+                  <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
+                    <svg className="h-6 w-6 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Invoices</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{invoices.length}</p>
+                  </div>
+                </div>
+              </div>
 
-        {/* table */}
-        <div className="overflow-x-auto border rounded-lg bg-white dark:bg-gray-800 shadow-sm">
-          <table className="w-full text-sm text-left border-collapse">
-            <thead className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200">
-              <tr>
-                <th className="px-4 py-2">Invoice #</th>
-                <th className="px-4 py-2">Patient</th>
-                <th className="px-4 py-2">Amount</th>
-                <th className="px-4 py-2">Balance</th>
-                <th className="px-4 py-2">Status</th>
-                <th className="px-4 py-2">Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {invoices.map((inv) => (
-                <tr key={inv.id} className="border-t hover:bg-gray-50 dark:hover:bg-gray-700">
-                  <td className="px-4 py-2">{inv.id}</td>
-                  <td className="px-4 py-2">{inv.patient}</td>
-                  <td className="px-4 py-2">${inv.amount.toFixed(2)}</td>
-                  <td className="px-4 py-2">${inv.balance.toFixed(2)}</td>
-                  <td
-                    className={`px-4 py-2 font-medium ${
-                      inv.status === "Open"
-                        ? "text-green-600"
-                        : inv.status === "Closed"
-                        ? "text-gray-500"
-                        : "text-yellow-600"
-                    }`}
-                  >
-                    {inv.status}
-                  </td>
-                  <td className="px-4 py-2">{
-                    // Normalize a few possible formats we receive from backend: 
-                    // - date-only string (yyyy-MM-dd)
-                    // - full ISO datetime (yyyy-MM-ddTHH:mm:ss...)
-                    // - array from some serializers [yyyy,MM,dd,...]
-                    (() => {
-                      const val = inv.createdDate as string | string[] | number[];
-                      try {
-                        if (Array.isArray(val)) {
-                          // try to interpret [yyyy,MM,dd,...]
-                          const [y, m, d] = val;
-                          if (y && m && d) return `${String(y).padStart(4, "0")}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-                          return String(val);
-                        }
-                        if (typeof val === "string") {
-                          // if ISO datetime, split at 'T'
-                          if (val.includes("T")) return val.split("T")[0];
-                          // if already date-only
-                          return val;
-                        }
-                        return String(val ?? "");
-                      } catch {
-                        return String(inv.createdDate ?? "");
-                      }
-                    })()
-                  }</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border-l-4 border-green-500">
+                <div className="flex items-center">
+                  <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
+                    <svg className="h-6 w-6 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                    </svg>
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Amount</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                      ${invoices.reduce((sum, inv) => sum + (parseFloat(inv.totalGross || '0') || 0), 0).toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+              </div>
 
-        {/* modal */}
-        {showModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md space-y-4 shadow-lg">
-              <h2 className="text-lg font-semibold text-gray-800 dark:text-white">Create Invoice</h2>
-              <form className="space-y-3" onSubmit={handleSubmit}>
-                <div>
-                  <label className="block text-sm mb-1">Patient</label>
-                  <input
-                    type="text"
-                    name="patient"
-                    value={form.patient || ""}
-                    onChange={handleChange}
-                    className="w-full border rounded px-2 py-1 text-sm"
-                    required
-                  />
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border-l-4 border-yellow-500">
+                <div className="flex items-center">
+                  <div className="p-2 bg-yellow-100 dark:bg-yellow-900 rounded-lg">
+                    <svg className="h-6 w-6 text-yellow-600 dark:text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pending</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                      {invoices.filter(inv => inv.status === 'issued' || inv.status === 'draft').length}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm mb-1">Amount</label>
-                  <input
-                    type="number"
-                    name="amount"
-                    value={form.amount || 0}
-                    onChange={handleChange}
-                    className="w-full border rounded px-2 py-1 text-sm"
-                  />
+              </div>
+            </div>
+
+            {/* Invoices Table */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden">
+              <div className="px-6 py-4 bg-gradient-to-r from-green-600 to-blue-600">
+                <h2 className="text-xl font-semibold text-white flex items-center">
+                  <svg className="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Invoice History
+                </h2>
+                <p className="text-green-100 text-sm mt-1">Track your medical billing and payments</p>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                        <div className="flex items-center">
+                          <div className="p-1 bg-blue-100 dark:bg-blue-800 rounded mr-2">
+                            <svg className="h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                            </svg>
+                          </div>
+                          Invoice #
+                        </div>
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                        <div className="flex items-center">
+                          <div className="p-1 bg-green-100 dark:bg-green-800 rounded mr-2">
+                            <svg className="h-4 w-4 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                          </div>
+                          Date
+                        </div>
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                        <div className="flex items-center">
+                          <div className="p-1 bg-purple-100 dark:bg-purple-800 rounded mr-2">
+                            <svg className="h-4 w-4 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                            </svg>
+                          </div>
+                          Amount
+                        </div>
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                        <div className="flex items-center">
+                          <div className="p-1 bg-orange-100 dark:bg-orange-800 rounded mr-2">
+                            <svg className="h-4 w-4 text-orange-600 dark:text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          </div>
+                          Status
+                        </div>
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                        <div className="flex items-center">
+                          <div className="p-1 bg-gray-100 dark:bg-gray-600 rounded mr-2">
+                            <svg className="h-4 w-4 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                            </svg>
+                          </div>
+                          Details
+                        </div>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
+                    {invoices.map((invoice, i) => (
+                      <tr key={invoice.id || i} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200">
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">
+                            {invoice.invoiceNumber || `INV-${invoice.id}`}
+                          </div>
+                          {invoice.externalId && (
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                              Ext: {invoice.externalId}
+                            </div>
+                          )}
+                        </td>
+
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="text-sm text-gray-900 dark:text-white">
+                            {invoice.issueDate ? new Date(invoice.issueDate).toLocaleDateString() : 'N/A'}
+                          </div>
+                          {invoice.dueDate && (
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                              Due: {new Date(invoice.dueDate).toLocaleDateString()}
+                            </div>
+                          )}
+                        </td>
+
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="text-lg font-semibold text-gray-900 dark:text-white">
+                            ${parseFloat(invoice.totalGross || '0').toFixed(2)}
+                          </div>
+                          {invoice.totalNet && parseFloat(invoice.totalNet) !== parseFloat(invoice.totalGross || '0') && (
+                            <div className="text-sm text-green-600 dark:text-green-400">
+                              Paid: ${(parseFloat(invoice.totalGross || '0') - parseFloat(invoice.totalNet)).toFixed(2)}
+                            </div>
+                          )}
+                        </td>
+
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            invoice.status === 'balanced'
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                              : invoice.status === 'issued'
+                              ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                              : invoice.status === 'draft'
+                              ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                              : invoice.status === 'cancelled'
+                              ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                              : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+                          }`}>
+                            {invoice.status?.charAt(0).toUpperCase() + invoice.status?.slice(1) || 'Unknown'}
+                          </span>
+                        </td>
+
+                        <td className="px-4 py-3">
+                          <div className="text-sm text-gray-900 dark:text-white">
+                            {invoice.payer || 'Self'}
+                          </div>
+                          {invoice.lines && invoice.lines.length > 0 && (
+                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                              {invoice.lines.length} item{invoice.lines.length !== 1 ? 's' : ''}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700 border-t border-gray-200 dark:border-gray-600">
+                <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
+                  <div className="flex items-center space-x-4">
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+                      <span>Paid</span>
+                    </div>
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
+                      <span>Issued</span>
+                    </div>
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 bg-yellow-500 rounded-full mr-2"></div>
+                      <span>Draft</span>
+                    </div>
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
+                      <span>Cancelled</span>
+                    </div>
+                  </div>
+                  <div className="text-xs">
+                    Showing {invoices.length} invoice{invoices.length !== 1 ? 's' : ''}
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm mb-1">Balance</label>
-                  <input
-                    type="number"
-                    name="balance"
-                    value={form.balance || 0}
-                    onChange={handleChange}
-                    className="w-full border rounded px-2 py-1 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm mb-1">Status</label>
-                  <select
-                    name="status"
-                    value={form.status}
-                    onChange={handleChange}
-                    className="w-full border rounded px-2 py-1 text-sm dark:bg-gray-700 dark:text-white"
-                  >
-                    <option value="Open">Open</option>
-                    <option value="Pending">Pending</option>
-                    <option value="Closed">Closed</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm mb-1">Date</label>
-                  <input
-                    type="date"
-                    name="createdDate"
-                    value={
-                      Array.isArray(form.createdDate)
-                        ? (() => {
-                            const [y, m, d] = form.createdDate;
-                            if (y && m && d) return `${String(y).padStart(4, "0")}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-                            return "";
-                          })()
-                        : typeof form.createdDate === "string"
-                        ? form.createdDate
-                        : ""
-                    }
-                    onChange={handleChange}
-                    className="w-full border rounded px-2 py-1 text-sm"
-                  />
-                </div>
-                <div className="flex justify-end space-x-2 pt-3">
-                  <Button variant="outline" onClick={() => setShowModal(false)}>
-                    Cancel
-                  </Button>
-                  <Button>Save</Button>
-                </div>
-              </form>
+              </div>
             </div>
           </div>
         )}
