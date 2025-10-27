@@ -2,7 +2,6 @@
 
 import { useState, useEffect, FormEvent, KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
-import { fetchWithAuth } from "@/utils/fetchWithAuth";
 import { signIn } from "next-auth/react";
 import ReCAPTCHA from "react-google-recaptcha";
 
@@ -140,23 +139,39 @@ export default function SignUpPage() {
 
     try {
       const payload = { ...form, captcha: captchaToken, role: "PATIENT" };
-      const res = await fetchWithAuth(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/portal/auth/register`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        }
-      );
+      // ✅ Use plain fetch for registration (no auth required)
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/portal/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
       const text = await res.text();
       const data: PortalApiResponse<PortalUserDto> = JSON.parse(text);
       if (!data.success || !data.data) throw new Error(data.message);
 
-      localStorage.setItem("user", JSON.stringify(data.data));
-      localStorage.setItem("orgId", data.data.orgId.toString());
-      localStorage.setItem("role", data.data.role || "PATIENT");
-
-      router.push("/dashboard");
+      // For portal patient registration, show success message about approval process
+      if (data.data.role === "PATIENT") {
+        // Clear form and show success message
+        setForm({
+          firstName: "", middleName: "", lastName: "", email: "", password: "",
+          dateOfBirth: "", gender: "", phoneNumber: "", street: "", city: "",
+          state: "", country: "", postalCode: "", securityQuestion: "",
+          securityAnswer: "", orgId: ""
+        });
+        setOrgSearch("");
+        setCaptchaToken(null);
+        
+        alert("Registration successful! Your account is pending approval. You will receive an email notification once your account is approved by the healthcare provider.");
+        
+        // Redirect to signin page
+        router.push("/signin");
+      } else {
+        // For non-patient users, proceed normally
+        localStorage.setItem("user", JSON.stringify(data.data));
+        localStorage.setItem("orgId", data.data.orgId.toString());
+        localStorage.setItem("role", data.data.role || "PATIENT");
+        router.push("/dashboard");
+      }
     } catch (err: unknown) {
       setError(getErrorMessage(err) || "Something went wrong.");
     } finally {
@@ -194,11 +209,11 @@ export default function SignUpPage() {
       const data: PortalApiResponse<PortalUserDto> = JSON.parse(text);
       if (!data.success || !data.data) throw new Error(data.message);
 
-      localStorage.setItem("user", JSON.stringify(data.data));
-      localStorage.setItem("orgId", data.data.orgId.toString());
-      localStorage.setItem("role", "PATIENT");
-
-      router.push("/dashboard");
+      // Show success message about approval process for Google signup
+      alert("Registration successful! Your account is pending approval. You will receive an email notification once your account is approved by the healthcare provider.");
+      
+      // Redirect to signin page
+      router.push("/signin");
     } catch (err: unknown) {
       setError(getErrorMessage(err) || "Google signup failed");
     }

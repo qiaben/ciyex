@@ -1,5 +1,6 @@
 "use client";
 
+
 import AllergiesSummary from "@/components/patients/AllergiesSummary";
 import MedicalProblemsSummary from "@/components/patients/MedicalProblemsSummary";
 import InsuranceSummary from "@/components/patients/InsuranceSummary";
@@ -27,6 +28,7 @@ import {
 } from "@/components/PatientComponents";
 import EncounterTableExpandable from "@/components/encounter/EncounterTableExpandable";
 
+import PatientBilling from "@/components/billing/PatientBilling";
 
 interface Patient {
     id: string;
@@ -889,6 +891,7 @@ export default function PatientDashboardPage() {
         { key: "demographics", label: "Demographics" },
         { key: "appointments", label: "Appointments" },
         { key: "encounters", label: "Encounters" },
+        { key: "billing", label: "Billing" },
         { key: "insurance", label: "Insurance" },
         { key: "history", label: "History" },
         { key: "documents", label: "Documents" },
@@ -1111,6 +1114,16 @@ export default function PatientDashboardPage() {
                         <EncounterTableExpandable patientId={Number(patient.id)} />
                     </div>
                 );
+              case "billing":
+  return (
+    <div className="min-w-0">
+      <PatientBilling
+        patientId={Number(patient.id)}
+        patientName={`${patient.firstName ?? ""} ${patient.lastName ?? ""}`.trim()}
+      />
+    </div>
+  );
+
 
 
             case "documents":
@@ -1282,7 +1295,7 @@ export default function PatientDashboardPage() {
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-3 shrink-0">
+                        {/* <div className="flex items-center gap-3 shrink-0">
                             <button
                                 className="h-8 px-3 rounded bg-blue-600 hover:bg-blue-700 text-xs font-medium text-white shadow-sm inline-flex items-center"
                                 onClick={handleOpenEncounter}
@@ -1292,7 +1305,7 @@ export default function PatientDashboardPage() {
                                 </svg>
                                 New Encounter
                             </button>
-                        </div>
+                        </div> */}
                     </div>
 
                     <div className="mt-1.5">
@@ -1379,7 +1392,7 @@ function EncounterForm({ onCancel, onSave }: EncounterFormProps) {
 
     return (
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-            <h3 className="text-lg font-semibold mb-4">New Encounter</h3>
+            {/*<h3 className="text-lg font-semibold mb-4">New Encounter</h3>*/}
 
             {/* --- Encounter Fields --- */}
             <div className="grid md:grid-cols-2 gap-4 mb-6">

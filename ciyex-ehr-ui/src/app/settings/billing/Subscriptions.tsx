@@ -30,6 +30,30 @@ async function safeJson<T>(res: Response): Promise<ApiResponse<T> | null> {
     }
 }
 
+/* Normalize startDate into ISO datetime for API */
+function normalizeStartDateForApi(s: string) {
+    if (!s) return s;
+    const ddmmyyyy = /^(\d{2})-(\d{2})-(\d{4})$/;
+    const ymd = /^\d{4}-\d{2}-\d{2}$/;
+    const iso = /^\d{4}-\d{2}-\d{2}T/;
+    if (iso.test(s)) return s;
+    const m = s.match(ddmmyyyy);
+    if (m) return `${m[3]}-${m[2]}-${m[1]}T00:00:00`;
+    if (ymd.test(s)) return `${s}T00:00:00`;
+    // fallback: attempt Date parse and format
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) { 
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        const hh = String(d.getHours()).padStart(2, "0");
+        const mi = String(d.getMinutes()).padStart(2, "0");
+        const ss = String(d.getSeconds()).padStart(2, "0");
+        return `${yyyy}-${mm}-${dd}T${hh}:${mi}:${ss}`;
+    }
+    return s;
+}
+
 /* ------------ Subscription Form ------------ */
 function SubscriptionForm({
                               mode,
@@ -56,8 +80,17 @@ function SubscriptionForm({
     useEffect(() => {
         (async () => {
             try {
+                const orgId = localStorage.getItem("orgId") || "1";
+                const userId = localStorage.getItem("userId") || "1";
+
                 const res = await fetchWithAuth(
-                    `${process.env.NEXT_PUBLIC_API_URL}/api/services`
+                    `${process.env.NEXT_PUBLIC_API_URL}/api/services`,
+                    {
+                        headers: {
+                            "X-Org-Id": orgId,
+                            "X-User-Id": userId,
+                        },
+                    }
                 );
                 const json = await safeJson<Service[]>(res);
                 if (json?.success) setServices(json.data);
@@ -71,8 +104,17 @@ function SubscriptionForm({
     useEffect(() => {
         (async () => {
             try {
+                const orgId = localStorage.getItem("orgId") || "1";
+                const userId = localStorage.getItem("userId") || "1";
+
                 const res = await fetchWithAuth(
-                    `${process.env.NEXT_PUBLIC_API_URL}/api/providers/count`
+                    `${process.env.NEXT_PUBLIC_API_URL}/api/providers/count`,
+                    {
+                        headers: {
+                            "X-Org-Id": orgId,
+                            "X-User-Id": userId,
+                        },
+                    }
                 );
                 const json = await safeJson<number>(res);
                 if (json?.success) setProviderCount(json.data);
@@ -94,23 +136,32 @@ function SubscriptionForm({
     async function handleSubmit() {
         setLoading(true);
         try {
+            const orgId = localStorage.getItem("orgId") || "1";
+            const userId = localStorage.getItem("userId") || "1";
+
             const url =
                 mode === "add"
                     ? `${process.env.NEXT_PUBLIC_API_URL}/api/subscriptions`
                     : `${process.env.NEXT_PUBLIC_API_URL}/api/subscriptions/${subscription?.id}`;
 
+            const normalizedStartDate = normalizeStartDateForApi(startDate);
             const res = await fetchWithAuth(url, {
                 method: mode === "add" ? "POST" : "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ service, billingCycle, startDate, price }),
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-Org-Id": orgId,
+                    "X-User-Id": userId,
+                },
+                body: JSON.stringify({ service, billingCycle, startDate: normalizedStartDate, price }),
             });
 
             const json = await safeJson<Subscription>(res);
             if (json?.success) {
+                window.dispatchEvent(new CustomEvent("ciyex:toast", { detail: { message: "Subscription saved", type: "success" } }));
                 onSaved();
                 onClose();
             } else {
-                alert(json?.message || "Failed to save subscription");
+                window.dispatchEvent(new CustomEvent("ciyex:toast", { detail: { message: json?.message || "Failed to save subscription", type: "error" } }));
             }
         } catch (err) {
             console.error("Error saving subscription:", err);
@@ -226,11 +277,30 @@ export default function SubscriptionsPage() {
 
     async function loadSubscriptions() {
         try {
+            const orgId = localStorage.getItem("orgId") || "1";
+            const userId = localStorage.getItem("userId") || "1";
+
             const res = await fetchWithAuth(
-                `${process.env.NEXT_PUBLIC_API_URL}/api/subscriptions`
+                `${process.env.NEXT_PUBLIC_API_URL}/api/subscriptions`,
+                {
+                    headers: {
+                        "X-Org-Id": orgId,
+                        "X-User-Id": userId,
+                    },
+                }
             );
-            const json = await safeJson<Subscription[]>(res);
-            if (json?.success) setSubscriptions(json.data);
+
+            const text = await res.text();
+            console.log("Subscriptions API response:", text);
+
+            const parsed = text ? JSON.parse(text) : null;
+            const data =
+                parsed?.data && Array.isArray(parsed.data)
+                    ? parsed.data
+                    : Array.isArray(parsed)
+                        ? parsed
+                        : [];
+            setSubscriptions(data);
         } catch (err) {
             console.error("Error fetching subscriptions:", err);
         }
@@ -239,14 +309,29 @@ export default function SubscriptionsPage() {
     useEffect(() => {
         (async () => {
             try {
+                const orgId = localStorage.getItem("orgId") || "1";
+                const userId = localStorage.getItem("userId") || "1";
+
                 const res1 = await fetchWithAuth(
-                    `${process.env.NEXT_PUBLIC_API_URL}/api/providers/count`
+                    `${process.env.NEXT_PUBLIC_API_URL}/api/providers/count`,
+                    {
+                        headers: {
+                            "X-Org-Id": orgId,
+                            "X-User-Id": userId,
+                        },
+                    }
                 );
                 const json1 = await safeJson<number>(res1);
                 if (json1?.success) setProviderCount(json1.data);
 
                 const res2 = await fetchWithAuth(
-                    `${process.env.NEXT_PUBLIC_API_URL}/api/services`
+                    `${process.env.NEXT_PUBLIC_API_URL}/api/services`,
+                    {
+                        headers: {
+                            "X-Org-Id": orgId,
+                            "X-User-Id": userId,
+                        },
+                    }
                 );
                 const json2 = await safeJson<Service[]>(res2);
                 if (json2?.success) setServices(json2.data);
@@ -264,6 +349,27 @@ export default function SubscriptionsPage() {
             return `$${base} × ${providerCount} providers = $${sub.price}`;
         }
         return `$${sub.price}`;
+    }
+
+    async function handleDelete(id: number) {
+        try {
+            const orgId = localStorage.getItem("orgId") || "1";
+            const userId = localStorage.getItem("userId") || "1";
+
+            await fetchWithAuth(
+                `${process.env.NEXT_PUBLIC_API_URL}/api/subscriptions/${id}`,
+                {
+                    method: "DELETE",
+                    headers: {
+                        "X-Org-Id": orgId,
+                        "X-User-Id": userId,
+                    },
+                }
+            );
+            await loadSubscriptions();
+        } catch (err) {
+            console.error("Error deleting subscription:", err);
+        }
     }
 
     return (
@@ -313,15 +419,9 @@ export default function SubscriptionsPage() {
                                 </button>
                                 <button
                                     className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
-                                    onClick={async () => {
-                                        await fetchWithAuth(
-                                            `${process.env.NEXT_PUBLIC_API_URL}/api/subscriptions/${sub.id}`,
-                                            { method: "DELETE" }
-                                        );
-                                        loadSubscriptions();
-                                    }}
+                                    onClick={() => handleDelete(sub.id)}
                                 >
-                                    Cancel
+                                    Delete
                                 </button>
                             </td>
                         </tr>

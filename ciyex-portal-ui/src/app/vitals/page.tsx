@@ -1,287 +1,251 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
 import AdminLayout from "@/app/(admin)/layout";
-import Alert from "@/components/ui/alert/Alert";
-import { fetchWithAuth } from "@/utils/fetchWithAuth";
-
-type Patient = {
-  id: number;
-  firstName: string;
-  lastName: string;
-  gender: string;
-  dob: string;
-  email: string;
-  phone: string;
-};
-
-type Vital = {
-  id: number;
-  date: string; // YYYY-MM-DD
-  bloodPressure: string;
-  heartRate: number;
-  temperature: number;
-  weight: number;
-};
+import { useVitals } from "@/hooks/useVitals";
 
 export default function VitalsPage() {
-  const params = useParams();
-  const patientId = (params?.id || "") as string;
-  const [patient, setPatient] = useState<Patient | null>(null);
-  const [vitals, setVitals] = useState<Vital[]>([]);
-  const [filter, setFilter] = useState<"7" | "30" | "all">("all");
-  const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({ date: "", bloodPressure: "", heartRate: "", temperature: "", weight: "" });
+  const { vitals, loading, error } = useVitals();
 
-  const [alert, setAlert] = useState<{
-    variant: "success" | "error";
-    title: string;
-    message: string;
-  } | null>(null);
-
-  // fetch patient + vitals
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const patientRes = await fetchWithAuth(`/api/patients/${patientId}`);
-        const patientData = await patientRes.json();
-        setPatient(patientData.data);
-
-        const vitalsRes = await fetchWithAuth(`/api/vitals/${patientId}`);
-        const vitalsData = await vitalsRes.json();
-        setVitals(vitalsData.data || []);
-      } catch (err) {
-        console.error("Failed to load data", err);
-      }
-    }
-    loadData();
-  }, [patientId]);
-
-  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    try {
-      const res = await fetchWithAuth(`/api/vitals/${patientId}`, {
-        method: "POST",
-        body: JSON.stringify({
-          date: form.date,
-          bloodPressure: form.bloodPressure,
-          heartRate: Number(form.heartRate),
-          temperature: Number(form.temperature),
-          weight: Number(form.weight),
-        }),
-      });
-      if (!res.ok) throw new Error("Failed to save");
-      const newVital = await res.json();
-      setVitals((prev) => [...prev, newVital.data]);
-      setForm({ date: "", bloodPressure: "", heartRate: "", temperature: "", weight: "" });
-      setShowModal(false);
-      setAlert({ variant: "success", title: "Success", message: "Vital signs added successfully." });
-    } catch {
-      setAlert({ variant: "error", title: "Error", message: "Could not save vital signs." });
-    }
-  }
-
-  // filter vitals by time range
-  function getFilteredVitals() {
-    if (filter === "all") return vitals;
-    const days = filter === "7" ? 7 : 30;
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - days);
-    return vitals.filter((v) => new Date(v.date) >= cutoff);
-  }
-
-  const filteredVitals = getFilteredVitals();
-  const latestVital = vitals[vitals.length - 1];
-
-  // small reusable line chart
-  function LineChart({ data, label, color }: { data: number[]; label: string; color: string }) {
-    if (!data || data.length < 2) return null;
-    const w = 400;
-    const h = 120;
-    const min = Math.min(...data);
-    const max = Math.max(...data);
-    const stepX = w / (data.length - 1);
-
-    const points = data
-      .map((val, i) => {
-        const x = i * stepX;
-        const y = h - ((val - min) / (max - min)) * h;
-        return `${x},${y}`;
-      })
-      .join(" ");
-
-    return (
-      <div>
-        <p className="text-xs text-gray-600 dark:text-gray-300 mb-1">{label}</p>
-        <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-32 bg-gray-50 dark:bg-gray-900 rounded">
-          <polyline fill="none" stroke={color} strokeWidth="2" points={points} />
-          {data.map((val, i) => {
-            const x = i * stepX;
-            const y = h - ((val - min) / (max - min)) * h;
-            return <circle key={i} cx={x} cy={y} r="3" fill={color} />;
-          })}
-        </svg>
+  if (loading) return (
+    <AdminLayout>
+      <div className="p-6 text-gray-600">Loading vitals...</div>
+    </AdminLayout>
+  );
+  
+  if (error) return (
+    <AdminLayout>
+      <div className="max-w-6xl mx-auto p-6">
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+          <div className="flex items-start">
+            <svg className="h-6 w-6 text-yellow-600 mr-3 mt-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <div>
+              <h3 className="text-lg font-semibold text-yellow-800 mb-2">Unable to Load Vitals</h3>
+              <p className="text-yellow-700 mb-3">
+                We could not retrieve your vitals data at this time. This might be because your patient record has not been linked to the EHR system yet, or you do not have permission to view this data.
+              </p>
+              <p className="text-sm text-yellow-600">
+                Please contact your healthcare provider if you believe you should have access to this information.
+              </p>
+              <div className="mt-4 text-xs text-yellow-500">
+                Technical details: {error}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-    );
-  }
-
-  // prepare data
-  const systolic = filteredVitals.map((v) => Number(v.bloodPressure.split("/")[0]));
-  const diastolic = filteredVitals.map((v) => Number(v.bloodPressure.split("/")[1]));
-  const heartRate = filteredVitals.map((v) => v.heartRate);
-  const temperature = filteredVitals.map((v) => v.temperature);
-  const weight = filteredVitals.map((v) => v.weight);
+    </AdminLayout>
+  );
 
   return (
     <AdminLayout>
       <div className="max-w-6xl mx-auto p-6 space-y-6">
-        {/* patient header */}
-        {patient && (
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-            <div>
-              <h1 className="text-xl font-bold text-gray-800 dark:text-white">Patient Vitals</h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                {patient.firstName} {patient.lastName} • {patient.gender} • DOB: {patient.dob}
-              </p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Email: {patient.email} • Phone: {patient.phone}
-              </p>
-            </div>
-            <div className="flex items-center space-x-3 mt-3 md:mt-0">
-              <select
-                value={filter}
-                onChange={(e) => setFilter(e.target.value as "7" | "30" | "all")}
-                className="border rounded px-2 py-1 text-sm dark:bg-gray-700 dark:text-white"
-              >
-                <option value="7">Last 7 Days</option>
-                <option value="30">Last 30 Days</option>
-                <option value="all">All</option>
-              </select>
-              <button
-                onClick={() => setShowModal(true)}
-                className="px-4 py-1.5 text-sm rounded bg-blue-600 text-white hover:bg-blue-700 shadow"
-              >
-                + Add Vitals
-              </button>
-            </div>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800 dark:text-white">My Health Vitals</h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              View your vital signs and health measurements
+            </p>
           </div>
-        )}
-
-        {/* alert */}
-        {alert && <Alert variant={alert.variant} title={alert.title} message={alert.message} />}
-
-        {/* summary cards */}
-        {latestVital && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow text-center">
-              <p className="text-xs text-gray-500">Blood Pressure</p>
-              <p className="text-lg font-bold">{latestVital.bloodPressure}</p>
-            </div>
-            <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow text-center">
-              <p className="text-xs text-gray-500">Heart Rate</p>
-              <p className="text-lg font-bold">{latestVital.heartRate} bpm</p>
-            </div>
-            <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow text-center">
-              <p className="text-xs text-gray-500">Temperature</p>
-              <p className="text-lg font-bold">{latestVital.temperature} °F</p>
-            </div>
-            <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow text-center">
-              <p className="text-xs text-gray-500">Weight</p>
-              <p className="text-lg font-bold">{latestVital.weight} kg</p>
-            </div>
-          </div>
-        )}
-
-        {/* vitals trends */}
-        <div className="border rounded-lg p-6 bg-white dark:bg-gray-800 shadow space-y-4">
-          <h2 className="text-md font-semibold text-gray-700 dark:text-gray-200">Vitals Trends</h2>
-          {filteredVitals.length > 1 ? (
-            <div className="grid md:grid-cols-2 gap-6">
-              <LineChart data={systolic} label="BP Systolic" color="#2563eb" />
-              <LineChart data={diastolic} label="BP Diastolic" color="#60a5fa" />
-              <LineChart data={heartRate} label="Heart Rate (bpm)" color="#f43f5e" />
-              <LineChart data={temperature} label="Temperature (°F)" color="#10b981" />
-              <LineChart data={weight} label="Weight (kg)" color="#8b5cf6" />
-            </div>
-          ) : (
-            <p className="italic text-gray-500">No vitals data available</p>
-          )}
         </div>
 
-        {/* vitals table */}
-        <div className="overflow-x-auto border rounded-lg bg-white dark:bg-gray-800 shadow">
-          <table className="w-full text-sm text-left border-collapse">
-            <thead className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200">
-              <tr>
-                <th className="px-4 py-2">Date</th>
-                <th className="px-4 py-2">Blood Pressure</th>
-                <th className="px-4 py-2">Heart Rate</th>
-                <th className="px-4 py-2">Temperature</th>
-                <th className="px-4 py-2">Weight (kg)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredVitals.map((v) => (
-                <tr key={v.id} className="border-t hover:bg-gray-50 dark:hover:bg-gray-700">
-                  <td className="px-4 py-2">{v.date}</td>
-                  <td className="px-4 py-2">{v.bloodPressure}</td>
-                  <td className="px-4 py-2">{v.heartRate} bpm</td>
-                  <td className="px-4 py-2">{v.temperature} °F</td>
-                  <td className="px-4 py-2">{v.weight}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {vitals.length === 0 ? (
+          <div className="text-center py-12">
+            <svg className="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No vitals recorded yet</h3>
+            <p className="text-gray-600">Your health vitals will appear here once they are recorded by your healthcare provider.</p>
+          </div>
+        ) : (
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden">
+            <div className="px-6 py-4 bg-gradient-to-r from-blue-600 to-purple-600">
+              <h2 className="text-xl font-semibold text-white flex items-center">
+                <svg className="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                Vital Signs History
+              </h2>
+              <p className="text-blue-100 text-sm mt-1">Track your health measurements over time</p>
+            </div>
 
-        {/* modal */}
-        {showModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[1000]">
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md space-y-4 shadow-xl">
-              <h2 className="text-lg font-semibold text-gray-800 dark:text-white">Add Vital Signs</h2>
-              <form className="space-y-3" onSubmit={handleSubmit}>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm mb-1">Date</label>
-                    <input type="date" name="date" value={form.date} onChange={handleChange} required
-                      className="w-full border rounded px-2 py-1 text-sm" />
+            <div className="">
+              <table className="w-full">
+                <thead className="bg-gray-50 dark:bg-gray-700">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                      <div className="flex items-center">
+                        <div className="p-1 bg-red-100 dark:bg-red-800 rounded mr-2">
+                          <svg className="h-4 w-4 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                          </svg>
+                        </div>
+                        Blood Pressure
+                      </div>
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                      <div className="flex items-center">
+                        <div className="p-1 bg-green-100 dark:bg-green-800 rounded mr-2">
+                          <svg className="h-4 w-4 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                          </svg>
+                        </div>
+                        Heart Rate
+                      </div>
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                      <div className="flex items-center">
+                        <div className="p-1 bg-orange-100 dark:bg-orange-800 rounded mr-2">
+                          <svg className="h-4 w-4 text-orange-600 dark:text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                          </svg>
+                        </div>
+                        Temperature
+                      </div>
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                      <div className="flex items-center">
+                        <div className="p-1 bg-blue-100 dark:bg-blue-800 rounded mr-2">
+                          <svg className="h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                          </svg>
+                        </div>
+                        O₂ Saturation
+                      </div>
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                      <div className="flex items-center">
+                        <div className="p-1 bg-purple-100 dark:bg-purple-800 rounded mr-2">
+                          <svg className="h-4 w-4 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M12 7l3 9m0 0l6-2m-6 2l-3-1" />
+                          </svg>
+                        </div>
+                        Weight & BMI
+                      </div>
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                      Notes
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
+                  {vitals.map((vital, i) => (
+                    <tr key={vital.id || i} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200">
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {vital.bpSystolic && vital.bpDiastolic ? (
+                          <div className="flex items-center">
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${
+                              vital.bpSystolic >= 140 || vital.bpDiastolic >= 90
+                                ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                                : vital.bpSystolic >= 120 || vital.bpDiastolic >= 80
+                                ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                                : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                            }`}>
+                              {vital.bpSystolic}/{vital.bpDiastolic}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 dark:text-gray-500">-</span>
+                        )}
+                      </td>
+
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {vital.pulse ? (
+                          <div className="flex items-center">
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${
+                              vital.pulse >= 100
+                                ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                                : vital.pulse >= 60
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                            }`}>
+                              {vital.pulse}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 dark:text-gray-500">-</span>
+                        )}
+                      </td>
+
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {(vital.temperatureF || vital.temperatureC) ? (
+                          <div className="flex items-center">
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
+                              {vital.temperatureF || vital.temperatureC}°{vital.temperatureF ? 'F' : 'C'}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 dark:text-gray-500">-</span>
+                        )}
+                      </td>
+
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {vital.oxygenSaturation ? (
+                          <div className="flex items-center">
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${
+                              vital.oxygenSaturation >= 95
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                : vital.oxygenSaturation >= 90
+                                ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                                : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                            }`}>
+                              {vital.oxygenSaturation}%
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 dark:text-gray-500">-</span>
+                        )}
+                      </td>
+
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {(vital.weightKg || vital.weightLbs) ? (
+                          <div className="text-xs">
+                            <div className="font-semibold text-gray-900 dark:text-white">
+                              {vital.weightKg ? `${vital.weightKg}kg` : `${vital.weightLbs}lbs`}
+                            </div>
+                            {vital.bmi && (
+                              <div className="text-gray-500 dark:text-gray-400">
+                                BMI: {vital.bmi}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 dark:text-gray-500">-</span>
+                        )}
+                      </td>
+
+                      <td className="px-4 py-3">
+                        <div className="text-xs text-gray-900 dark:text-white max-w-xs truncate" title="Routine vitals check">
+                          Routine vitals check
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700 border-t border-gray-200 dark:border-gray-600">
+              <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+                    <span>Normal</span>
                   </div>
-                  <div>
-                    <label className="block text-sm mb-1">Blood Pressure</label>
-                    <input type="text" name="bloodPressure" value={form.bloodPressure} onChange={handleChange}
-                      placeholder="120/80" className="w-full border rounded px-2 py-1 text-sm" />
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 bg-yellow-500 rounded-full mr-2"></div>
+                    <span>Elevated</span>
+                  </div>
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
+                    <span>High</span>
                   </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-sm mb-1">Heart Rate</label>
-                    <input type="number" name="heartRate" value={form.heartRate} onChange={handleChange}
-                      className="w-full border rounded px-2 py-1 text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-sm mb-1">Temperature (°F)</label>
-                    <input type="number" step="0.1" name="temperature" value={form.temperature} onChange={handleChange}
-                      className="w-full border rounded px-2 py-1 text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-sm mb-1">Weight (kg)</label>
-                    <input type="number" step="0.1" name="weight" value={form.weight} onChange={handleChange}
-                      className="w-full border rounded px-2 py-1 text-sm" />
-                  </div>
+                <div className="text-xs">
+                  Showing {vitals.length} vital{vitals.length !== 1 ? 's' : ''} record{vitals.length !== 1 ? 's' : ''}
                 </div>
-                <div className="flex justify-end space-x-2 pt-3">
-                  <button type="button" onClick={() => setShowModal(false)}
-                    className="px-3 py-1 text-sm rounded bg-gray-300 dark:bg-gray-600 dark:text-white">Cancel</button>
-                  <button type="submit"
-                    className="px-3 py-1 text-sm rounded bg-blue-600 text-white hover:bg-blue-700">Save</button>
-                </div>
-              </form>
+              </div>
             </div>
           </div>
         )}
