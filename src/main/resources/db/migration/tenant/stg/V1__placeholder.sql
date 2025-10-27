@@ -1,1 +1,0 @@
--- Placeholder for tenant-specific migrations in the staging environment.

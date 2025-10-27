@@ -1,1 +1,0 @@
--- Placeholder for staging master schema migrations.

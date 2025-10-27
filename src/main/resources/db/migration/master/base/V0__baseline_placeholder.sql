@@ -1,2 +1,0 @@
--- Baseline placeholder for master schema migrations.
--- Actual schema creation is handled by JPA/Hibernate startup routines.

@@ -1,2 +1,0 @@
--- Baseline placeholder for tenant schema migrations.
--- Tenant tables are generated programmatically before Flyway runs.
