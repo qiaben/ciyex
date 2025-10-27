@@ -1434,10 +1434,11 @@ export default function TemplateStudio() {
       await apiDeleteTemplate(Number(t.id));
       setMyTemplates(prev => prev.filter(x => x.id !== t.id));
       if (t.id === currentId) { setCurrentId(null); setTitle(""); setTemplateText(""); }
-  showToast("Deleted Sucessfully.", "success");
+      showToast("Template deleted successfully!", "success");
     } catch (e: unknown) {
       console.error(e);
-  showToast("Delete failed", "error");
+      const errMsg = e instanceof Error ? e.message : "Unknown error";
+      showToast(`Failed to delete: ${errMsg}`, "error");
     }
   };
 
@@ -1974,3 +1975,4 @@ export default function TemplateStudio() {
     </AdminLayout>
   );
 }
+
