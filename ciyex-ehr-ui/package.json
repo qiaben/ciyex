@@ -1,6 +1,8 @@
 
 
 
+
+
 {
   "name": "ciyex-connect-patient-portal",
   "version": "2.0.2",
@@ -18,6 +20,7 @@
     "@fullcalendar/list": "^6.1.15",
     "@fullcalendar/react": "^6.1.15",
     "@fullcalendar/timegrid": "^6.1.15",
+    "@jitsi/react-sdk": "^1.4.4",
     "@react-jvectormap/core": "^1.0.4",
     "@react-jvectormap/world": "^1.1.2",
     "@stripe/react-stripe-js": "^2.7.1",
@@ -31,6 +34,7 @@
     "html2pdf.js": "^0.12.1",
     "jspdf": "^3.0.2",
     "lucide-react": "^0.544.0",
+    "framer-motion": "^12.23.22",
     "next": "15.4.5",
 
 
@@ -78,4 +82,3 @@
     }
   }
 }
-
