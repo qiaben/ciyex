@@ -90,6 +90,7 @@ type Claim = {
     attachments: number;
     eobAttached: boolean;
     createdOn?: string | null;
+    locked?: boolean; // Add locked flag to Claim type
 };
 
 type InsuranceRemitLine = {
@@ -242,6 +243,245 @@ const StyleInjector: React.FC = () => (
    Component
 ========================================================= */
 export default function PatientBilling({ patientId, patientName }: Props) {
+    // More Actions state
+    const [moreActionsOpenId, setMoreActionsOpenId] = React.useState<number | null>(null);
+    const [showStatusModal, setShowStatusModal] = React.useState(false);
+    const [statusModalClaim, setStatusModalClaim] = React.useState<Claim | null>(null);
+    const [showAttachmentModal, setShowAttachmentModal] = React.useState(false);
+    const [attachmentClaim, setAttachmentClaim] = React.useState<Claim | null>(null);
+    const [showAttachmentConfirm, setShowAttachmentConfirm] = React.useState(false);
+    const [lockLoading, setLockLoading] = React.useState(false);
+
+    async function handleLockClaim(claim: Claim) {
+        setLockLoading(true);
+        try {
+            const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/patient-billing/${patientId}/claims/${claim.id}/lock`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+            });
+            const body = await res.json();
+            if (!body?.success) {
+                alert(body?.message || "Failed to lock claim");
+                return;
+            }
+            await loadAll(); // Refresh claim data
+        } catch (err) {
+            alert("Error: " + (err as Error).message);
+        } finally {
+            setLockLoading(false);
+        }
+    }
+
+    function handleChangeClaimStatus(claim: Claim) {
+        setStatusModalClaim(claim);
+        setShowStatusModal(true);
+        // Actual API call is in StatusModal's handleSave
+    }
+
+    function handleSubmitAttachments(claim: Claim) {
+        setAttachmentClaim(claim);
+        setShowAttachmentConfirm(true);
+        // Actual API call is in AttachmentModal's handleUpload
+    }
+
+    function renderMoreActions(claim: Claim) {
+        return (
+            <div style={{ position: "relative", display: "inline-block" }}>
+                <IconBtn title="More Actions" onClick={() => setMoreActionsOpenId(moreActionsOpenId === claim.id ? null : claim.id)}>
+                    <span role="img" aria-label="more">⋮</span>
+                </IconBtn>
+                {moreActionsOpenId === claim.id && (
+                    <div style={{ position: "absolute", right: 0, zIndex: 10, background: "#fff", border: "1px solid #eee", borderRadius: 4, boxShadow: "0 2px 8px #0002", minWidth: 180 }}>
+                        <button className="btn-light" style={{ width: "100%", textAlign: "left" }} disabled={claim.locked} onClick={() => { handleLockClaim(claim); setMoreActionsOpenId(null); }}>Lock Claim</button>
+                        <button className="btn-light" style={{ width: "100%", textAlign: "left" }} onClick={() => { handleSubmitAttachments(claim); setMoreActionsOpenId(null); }}>Submit Attachments</button>
+                        <button className="btn-light" style={{ width: "100%", textAlign: "left" }} disabled={claim.locked} onClick={() => { handleChangeClaimStatus(claim); setMoreActionsOpenId(null); }}>Change Claim Status</button>
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    // Modal for Change Claim Status
+    function StatusModal({ claim, onClose }: { claim: Claim, onClose: () => void }) {
+        const [selectedStatus, setSelectedStatus] = React.useState<string>("");
+        const [remitDate, setRemitDate] = React.useState("");
+        const [paymentAmount, setPaymentAmount] = React.useState("");
+        async function handleSave() {
+            try {
+                const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/patient-billing/${patientId}/claims/${claim.id}/status`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ status: selectedStatus, remitDate, paymentAmount }),
+                });
+                const body = await res.json();
+                if (!body?.success) {
+                    alert(body?.message || "Failed to change claim status");
+                    return;
+                }
+                await loadAll();
+                onClose();
+            } catch (err) {
+                alert("Error: " + (err as Error).message);
+            }
+        }
+        return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+                <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md">
+                    <h3 className="text-lg font-semibold mb-4">Modify Claim Status</h3>
+                    <div className="mb-3">
+                        <label><input type="radio" value="ACCEPTED" checked={selectedStatus === "ACCEPTED"} onChange={() => setSelectedStatus("ACCEPTED")} /> Accepted & Paid</label><br />
+                        <label><input type="radio" value="DENIED" checked={selectedStatus === "DENIED"} onChange={() => setSelectedStatus("DENIED")} /> Accepted but Final Payment Denied</label><br />
+                        <label><input type="radio" value="REJECTED" checked={selectedStatus === "REJECTED"} onChange={() => setSelectedStatus("REJECTED")} /> Rejected</label>
+                    </div>
+                    {/* Show Remittance Date for Accepted & Paid and Denied */}
+                    {(selectedStatus === "ACCEPTED" || selectedStatus === "DENIED") && (
+                        <div className="mb-3">
+                            <label>Remittance Date: <input type="date" value={remitDate} onChange={e => setRemitDate(e.target.value)} /></label>
+                        </div>
+                    )}
+                    {/* Show Insurance Payment Amount only for Accepted & Paid */}
+                    {selectedStatus === "ACCEPTED" && (
+                        <div className="mb-3">
+                            <label>Insurance Payment Amount: <input type="number" value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} /></label>
+                        </div>
+                    )}
+                    <div className="flex gap-2 mt-4">
+                        <button className="btn-primary" onClick={handleSave}>Save</button>
+                        <button className="btn-light" onClick={onClose}>Cancel</button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Modal for Submit Attachments
+    function AttachmentModal({ claim, onClose }: { claim: Claim, onClose: () => void }) {
+        const [file, setFile] = React.useState<File | null>(null);
+        async function handleUpload() {
+            if (!file) return;
+            const formData = new FormData();
+            formData.append("file", file);
+            try {
+                const res = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL}/api/patient-billing/${patientId}/claims/${claim.id}/attachment`, {
+                    method: "POST",
+                    body: formData,
+                });
+                const body = await res.json();
+                if (!body?.success) {
+                    alert(body?.message || "Failed to submit attachment");
+                    return;
+                }
+                await loadAll();
+                onClose();
+            } catch (err) {
+                alert("Error: " + (err as Error).message);
+            }
+        }
+        return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+                <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md">
+                    <h3 className="text-lg font-semibold mb-4">Submit Attachments</h3>
+                    <input type="file" onChange={e => setFile(e.target.files?.[0] ?? null)} />
+                    <div className="flex gap-2 mt-4">
+                        <button className="btn-primary" onClick={handleUpload} disabled={!file}>Upload</button>
+                        <button className="btn-light" onClick={onClose}>Cancel</button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Confirmation modal for Submit Attachments
+    function AttachmentConfirmModal({ claim, onClose, onOk }: { claim: Claim, onClose: () => void, onOk: () => void }) {
+        return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+                <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md">
+                    <h3 className="text-lg font-semibold mb-4 text-center">Are you sure you want to manually submit the claim attachments?</h3>
+                    <div className="flex gap-2 mt-4 justify-center">
+                        <button className="btn-light" onClick={onClose}>Cancel</button>
+                        <button className="btn-primary" onClick={onOk}>OK</button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+    
+
+    
+    // Patient Deposit logic
+    async function addPatientDeposit() {
+        if (!depositAmount || !depositMethod || !depositFromPatientId) return;
+        try {
+            const res = await fetchWithAuth(`${API}/deposit`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    amount: Number(depositAmount),
+                    method: depositMethod,
+                    description: depositDesc,
+                    fromPatientId: depositFromPatientId
+                }),
+            });
+            const body = await res.json();
+            if (!body?.success) {
+                alert(body?.message || "Failed to add deposit");
+                return;
+            }
+            // Update account credit after deposit
+            setAccountCredit({ balance: body.data?.balance ?? 0 });
+            // Optionally reset deposit modal state
+            setDepositAmount("");
+            setDepositDesc("");
+            setShowDepositType(null);
+        } catch (err) {
+            alert("Error: " + (err as Error).message);
+        }
+    }
+    // Transfer INS balance to PT balance
+    async function transferOutstandingToPatient(invoiceId: number, amount: number) {
+        try {
+            const res = await fetchWithAuth(`${API}/invoices/${invoiceId}/transfer-outstanding-to-patient`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ amount }),
+            });
+            const data = await res.json();
+            if (!data?.success) {
+                alert(data?.message || "Transfer to patient failed");
+                return;
+            }
+            // Success: reload invoice and balances
+            await loadAll();
+            // Optionally show success message
+            // alert("Transfer to patient successful");
+            return data;
+        } catch (err) {
+            alert("Error: " + (err as Error).message);
+        }
+    }
+
+    // Transfer PT balance to INS balance
+    async function transferOutstandingToInsurance(invoiceId: number, amount: number) {
+        try {
+            const res = await fetchWithAuth(`${API}/invoices/${invoiceId}/transfer-outstanding-to-insurance`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ amount }),
+            });
+            const data = await res.json();
+            if (!data?.success) {
+                alert(data?.message || "Transfer to insurance failed");
+                return;
+            }
+            // Success: reload invoice and balances
+            await loadAll();
+            // Optionally show success message
+            // alert("Transfer to insurance successful");
+            return data;
+        } catch (err) {
+            alert("Error: " + (err as Error).message);
+        }
+    }
     // Edit modals for insurance and patient payments
     const [editInsuranceModal, setEditInsuranceModal] = useState<{invoiceId: number, remit: InsuranceRemitLine} | null>(null);
     const [editPatientModal, setEditPatientModal] = useState<{invoiceId: number, payment: PatientPayment} | null>(null);
@@ -895,7 +1135,6 @@ export default function PatientBilling({ patientId, patientName }: Props) {
     async function sendToBatch(invoiceId: number) {
         const res = await fetchWithAuth(`${API}/invoices/${invoiceId}/claim/send-to-batch`, {
             method: "POST",
-            headers: { "x-org-id": "1" },
         });
         const body = await res.json();
         if (!body?.success) throw new Error(body?.message || "Failed to move claim to batch");
@@ -1146,7 +1385,7 @@ export default function PatientBilling({ patientId, patientName }: Props) {
                                     <input className="input w-full" value={depositDesc} onChange={e => setDepositDesc(e.target.value)} />
                                 </div>
                                 <div className="flex gap-2 mt-4">
-                                    <button className="btn-primary" onClick={() => { /* handle add deposit */ }}>Add Deposit</button>
+                                    <button className="btn-primary" onClick={addPatientDeposit}>Add Deposit</button>
                                     <button className="btn-light" onClick={() => setShowDepositType(null)}>Cancel</button>
                                 </div>
                             </div>
@@ -1363,12 +1602,28 @@ export default function PatientBilling({ patientId, patientName }: Props) {
                                             </div>
                                             <div className="ml-auto flex items-center gap-2">
                                                 <IconBtn title="Print" onClick={() => window.print()}>🖨️</IconBtn>
-                                                <IconBtn title="Edit" onClick={() => setShowClaimEditFor(inv.id)}>✏️</IconBtn>
-                                                <IconBtn title="Close Claim" onClick={() => { void closeClaim(inv.id); }}>✅</IconBtn>
+                                                <IconBtn title="Edit" onClick={() => setShowClaimEditFor(inv.id)} disabled={claim.locked}>✏️</IconBtn>
+                                                <IconBtn title="Close Claim" onClick={() => { void closeClaim(inv.id); }} disabled={claim.locked}>✅</IconBtn>
                                                 <IconBtn title="Attachments" onClick={() => setShowAttachmentFor(inv.id)}>📎</IconBtn>
-                                                <IconBtn title="Void & Re-Create" onClick={() => setShowVoidFor(inv.id)}>🗑️</IconBtn>
+                                                <IconBtn title="Void & Re-Create" onClick={() => setShowVoidFor(inv.id)} disabled={claim.locked}>🗑️</IconBtn>
                                                 <IconBtn title="EOB" onClick={() => setShowEobFor(inv.id)}>📄</IconBtn>
-                                                <IconBtn title="Submit Claim" onClick={() => { void submitClaim(inv.id); }}>📤</IconBtn>
+                                                <IconBtn title="Submit Claim" onClick={() => { void submitClaim(inv.id); }} disabled={claim.locked}>📤</IconBtn>
+                                                {/* More Actions icon next to Submit Claim */}
+                                                {renderMoreActions(claim)}
+    {/* Add modal for Change Claim Status */}
+    {showStatusModal && statusModalClaim && <StatusModal claim={statusModalClaim} onClose={() => setShowStatusModal(false)} />}
+    {/* Add modal for Submit Attachments */}
+    {showAttachmentConfirm && attachmentClaim && (
+        <AttachmentConfirmModal
+            claim={attachmentClaim}
+            onClose={() => setShowAttachmentConfirm(false)}
+            onOk={() => {
+                setShowAttachmentConfirm(false);
+                setShowAttachmentModal(true);
+            }}
+        />
+    )}
+    {showAttachmentModal && attachmentClaim && <AttachmentModal claim={attachmentClaim} onClose={() => setShowAttachmentModal(false)} />}
                                             </div>
                                         </div>
                                     ) : (
@@ -1511,10 +1766,10 @@ export default function PatientBilling({ patientId, patientName }: Props) {
                                     {transferOpenFor === inv.id && (
                                         <div className="relative">
                                             <div className="absolute z-10 ml-3 mt-2 w-64 rounded-md border bg-white p-1 shadow">
-                                                <button className="w-full rounded px-3 py-2 text-left hover:bg-gray-50">
+                                                <button className="w-full rounded px-3 py-2 text-left hover:bg-gray-50" onClick={() => { transferOutstandingToPatient(inv.id, Number(inv.ptBalance ?? 0)); setTransferOpenFor(null); }}>
                                                     Transfer Outstanding To Patient
                                                 </button>
-                                                <button className="w-full rounded px-3 py-2 text-left hover:bg-gray-50">
+                                                <button className="w-full rounded px-3 py-2 text-left hover:bg-gray-50" onClick={() => { transferOutstandingToInsurance(inv.id, Number(inv.insBalance ?? 0)); setTransferOpenFor(null); }}>
                                                     Transfer Outstanding To Insurance
                                                 </button>
                                             </div>
@@ -1530,7 +1785,6 @@ export default function PatientBilling({ patientId, patientName }: Props) {
             {/* Notes Modal for invoice notes */}
             <NotesModal
                 open={!!showNotesFor}
-                anchor={showNotesFor?.anchor ?? null}
                 invoiceId={showNotesFor?.invoiceId ?? 0}
                 onClose={handleCloseNotes}
                 notes={currentNotes}
