@@ -37,6 +37,8 @@
     "swiper": "^11.2.0",
     "swr": "^2.3.6",
     "tailwind-merge": "^2.6.0"
+  ,
+  "nodemailer": "^7.0.7"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

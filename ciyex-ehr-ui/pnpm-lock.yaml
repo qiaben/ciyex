@@ -1,10 +1,15 @@
+
+
 lockfileVersion: '9.0'
+
+
 
 settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
 importers:
+
 
   .:
     dependencies:
@@ -75,6 +80,9 @@ importers:
       next:
         specifier: 15.4.5
         version: 15.4.5(@babel/core@7.28.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      nodemailer:
+        specifier: ^7.0.7
+        version: 7.0.10
       puppeteer:
         specifier: ^24.22.0
         version: 24.22.0(typescript@5.9.2)
@@ -2935,6 +2943,10 @@ packages:
 
   node-releases@2.0.19:
     resolution: {integrity: sha512-xxOWJsBKtzAq7DY0J+DTzuz58K8e7sJbdgwkbMWQe8UYB6ekmsQ45q0M/tJDsGaZmbC+l7n57UV8Hl5tHxO9uw==}
+
+  nodemailer@7.0.10:
+    resolution: {integrity: sha512-Us/Se1WtT0ylXgNFfyFSx4LElllVLJXQjWi2Xz17xWw7amDKO2MLtFnVp1WACy7GkVGs+oBlRopVNUzlrGSw1w==}
+    engines: {node: '>=6.0.0'}
 
   normalize-range@0.1.2:
     resolution: {integrity: sha512-bdok/XvKII3nUpklnV6P2hxtMNrCboOjAcyBuQnWEhO665FwrSNRxU+AqpsyvO6LgGYPspN+lu5CLtw4jPRKNA==}
@@ -6780,6 +6792,8 @@ snapshots:
   node-fetch@2.6.0: {}
 
   node-releases@2.0.19: {}
+
+  nodemailer@7.0.10: {}
 
   normalize-range@0.1.2: {}
 
