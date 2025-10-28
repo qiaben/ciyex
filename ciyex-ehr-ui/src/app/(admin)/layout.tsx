@@ -60,6 +60,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         "/settings/forms/admin": "Encounter Sections",
         "/settings/config": "Integration",
         "/settings/Documents": "Documents Settings",
+        "/settings/templateDocument": "Template Documents",
         "/settings/insurance": "Insurance Companies",
         "/settings/codes": "Codes",
         "/settings": "Settings",
