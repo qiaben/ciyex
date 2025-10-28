@@ -29,12 +29,12 @@ find $CONTROLLER_DIR -name "*.java" -type f -exec sed -i 's/@PathVariable Long o
 echo "✅ @PathVariable parameters removed"
 echo ""
 
-# 3. Remove @RequestHeader("orgId") Long orgId
+# 3. Remove
 echo "🔄 Step 3: Removing @RequestHeader orgId parameters..."
-find $CONTROLLER_DIR -name "*.java" -type f -exec sed -i 's/@RequestHeader("orgId") Long orgId,[ \t]*//g' {} \;
-find $CONTROLLER_DIR -name "*.java" -type f -exec sed -i 's/@RequestHeader("orgId") Long orgId)/)/' {} \;
-find $CONTROLLER_DIR -name "*.java" -type f -exec sed -i 's/@RequestHeader(value = "orgId") Long orgId,[ \t]*//g' {} \;
-find $CONTROLLER_DIR -name "*.java" -type f -exec sed -i 's/@RequestHeader(value = "orgId") Long orgId)/)/' {} \;
+find $CONTROLLER_DIR -name "*.java" -type f -exec sed -i 's/,[ \t]*//g' {} \;
+find $CONTROLLER_DIR -name "*.java" -type f -exec sed -i 's/)/)/' {} \;
+find $CONTROLLER_DIR -name "*.java" -type f -exec sed -i 's/,[ \t]*//g' {} \;
+find $CONTROLLER_DIR -name "*.java" -type f -exec sed -i 's/)/)/' {} \;
 echo "✅ @RequestHeader parameters removed"
 echo ""
 

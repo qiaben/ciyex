@@ -2,7 +2,7 @@
 """
 Script to remove all orgId references from Spring Boot controllers.
 This script:
-1. Removes @RequestHeader("orgId") Long orgId and @RequestHeader("x-org-id") Long orgId
+1. Removes  and @RequestHeader("x-org-id") Long orgId
 2. Removes @PathVariable Long orgId
 3. Updates service method calls to remove orgId arguments
 4. Updates URL paths to remove {orgId}
@@ -23,7 +23,7 @@ def process_controller(file_path):
     original_content = content
     changes = []
     
-    # Pattern 1: Remove @RequestHeader("orgId") Long orgId with comma after
+    # Pattern 1: Remove  with comma after
     pattern1 = r'@RequestHeader\("orgId"\)\s+Long\s+orgId,\s*'
     if re.search(pattern1, content):
         content = re.sub(pattern1, '', content)
@@ -35,7 +35,7 @@ def process_controller(file_path):
         content = re.sub(pattern2, '', content)
         changes.append("Removed @RequestHeader(\"x-org-id\") with comma")
     
-    # Pattern 3: Remove @RequestHeader("orgId") Long orgId without comma (last param)
+    # Pattern 3: Remove  without comma (last param)
     pattern3 = r',\s*@RequestHeader\("orgId"\)\s+Long\s+orgId\)'
     if re.search(pattern3, content):
         content = re.sub(pattern3, ')', content)
