@@ -1,4 +1,5 @@
-INSERT INTO public.codess (
+INSERT INTO public.codess
+(
     active, category, code, code_type, created_at, description,
     diagnosis_reporting, external_id, fee_standard, modifier,
     relate_to, service_reporting, short_description, updated_at
