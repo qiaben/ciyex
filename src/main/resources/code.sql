@@ -4,6 +4,7 @@ INSERT INTO public.codess
     diagnosis_reporting, external_id, fee_standard, modifier,
     relate_to, service_reporting, short_description, updated_at
 )
+
 VALUES (
     TRUE,
     NULL,
