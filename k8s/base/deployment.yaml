@@ -1,25 +1,25 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ciyex-app-stage
+  name: ciyex-app
   labels:
-    app: ciyex-app-stage
+    app: ciyex-app
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: ciyex-app-stage
+      app: ciyex-app
   template:
     metadata:
       labels:
-        app: ciyex-app-stage
+        app: ciyex-app
     spec:
       containers:
-        - name: ciyex-app-stage
+        - name: ciyex-app
           image: IMAGE_URL:IMAGE_TAG
           imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 8080  # Spring Boot Backend API
+            - containerPort: 8080
           livenessProbe:
             httpGet:
               path: /actuator/health
@@ -35,8 +35,6 @@ spec:
             periodSeconds: 10
             failureThreshold: 3
           env:
-            - name: SPRING_PROFILES_ACTIVE
-              value: "stage"
             - name: SPRING_DATASOURCE_URL
               value: "jdbc:postgresql://postgres:5432/ciyexdb"
             - name: SPRING_DATASOURCE_USERNAME
@@ -48,4 +46,3 @@ spec:
                   key: POSTGRES_PASSWORD
             - name: CIYEX_TENANT_AUTO_INIT
               value: "false"
-
