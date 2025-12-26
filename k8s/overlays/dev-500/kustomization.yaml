@@ -3,7 +3,7 @@ kind: Kustomization
 
 namespace: ciyex-dev
 
-namePrefix: dev-
+namePrefix: dev-500-
 
 resources:
   - ../../base
@@ -11,6 +11,7 @@ resources:
 labels:
   - pairs:
       environment: dev
+      practice: "500"
 
 replicas:
   - name: ciyex-app

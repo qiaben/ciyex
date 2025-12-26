@@ -13,8 +13,10 @@ spec:
           env:
             - name: SPRING_PROFILES_ACTIVE
               value: "dev"
+            - name: PRACTICE_ID
+              value: "500"
             - name: SPRING_DATASOURCE_URL
-              value: "jdbc:postgresql://postgres-dev.default.svc.cluster.local:5432/ciyexdb"
+              value: "jdbc:postgresql://postgres-dev.default.svc.cluster.local:5432/ciyexdb_500"
             - name: SPRING_DATASOURCE_USERNAME
               value: "ciyex_user"
             - name: SPRING_DATASOURCE_PASSWORD

@@ -10,16 +10,16 @@ spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - ciyex-api.apps-dev.in.hinisoft.com
-      secretName: ciyex-ingress-dev-tls
+        - ciyex-api-500.apps-dev.in.hinisoft.com
+      secretName: ciyex-ingress-dev-500-tls
   rules:
-    - host: ciyex-api.apps-dev.in.hinisoft.com
+    - host: ciyex-api-500.apps-dev.in.hinisoft.com
       http:
         paths:
           - pathType: Prefix
             path: /
             backend:
               service:
-                name: dev-ciyex-app
+                name: dev-500-ciyex-app
                 port:
                   number: 8080
