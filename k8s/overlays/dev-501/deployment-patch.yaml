@@ -5,6 +5,11 @@ metadata:
 spec:
   template:
     spec:
+      hostAliases:
+        - ip: "10.43.60.158"
+          hostnames:
+            - "aran.apps-dev.in.hinisoft.com"
+            - "dev-aran.default.svc.cluster.local"
       imagePullSecrets:
         - name: regcred
       containers:
