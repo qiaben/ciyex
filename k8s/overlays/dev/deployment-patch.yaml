@@ -14,7 +14,7 @@ spec:
             - name: SPRING_PROFILES_ACTIVE
               value: "dev"
             - name: SPRING_DATASOURCE_URL
-              value: "jdbc:postgresql://postgres-dev:5432/ciyexdb"
+              value: "jdbc:postgresql://postgres-dev.default.svc.cluster.local:5432/ciyexdb"
             - name: SPRING_DATASOURCE_USERNAME
               value: "ciyex_user"
             - name: SPRING_DATASOURCE_PASSWORD
