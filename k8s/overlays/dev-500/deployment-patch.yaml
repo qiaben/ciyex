@@ -9,7 +9,7 @@ spec:
         - name: regcred
       containers:
         - name: ciyex-app
-          image: registry.apps-dev.in.hinisoft.com/ciyex-app:v1.0.13
+          image: registry.apps-dev.in.hinisoft.com/ciyex-app:IMAGE_TAG
           env:
             - name: SPRING_PROFILES_ACTIVE
               value: "dev"
