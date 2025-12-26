@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ciyex-ingress
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: 1024m
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - ciyex-api-502.apps-dev.in.hinisoft.com
+      secretName: ciyex-ingress-dev-502-tls
+  rules:
+    - host: ciyex-api-502.apps-dev.in.hinisoft.com
+      http:
+        paths:
+          - pathType: Prefix
+            path: /
+            backend:
+              service:
+                name: dev-502-ciyex-app
+                port:
+                  number: 8080

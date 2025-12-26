@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ciyex-app
+spec:
+  template:
+    spec:
+      imagePullSecrets:
+        - name: regcred
+      containers:
+        - name: ciyex-app
+          image: registry.apps-dev.in.hinisoft.com/ciyex-app:IMAGE_TAG
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "dev"
+            - name: PRACTICE_ID
+              value: "501"
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://postgres-dev.default.svc.cluster.local:5432/ciyexdb_501"
+            - name: SPRING_DATASOURCE_USERNAME
+              value: "ciyex_user"
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ciyex-db-secret
+                  key: CIYEX_DB_PASSWORD
+            - name: KEYCLOAK_ENABLED
+              value: "true"
+            - name: KEYCLOAK_AUTH_SERVER_URL
+              value: "https://aran.apps-dev.in.hinisoft.com"
+            - name: KEYCLOAK_REALM
+              value: "master"
+            - name: KEYCLOAK_RESOURCE
+              value: "ciyex-app"
+            - name: KEYCLOAK_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ciyex-keycloak-secret
+                  key: KEYCLOAK_CLIENT_SECRET
+            - name: KEYCLOAK_ADMIN_USERNAME
+              value: "aran-admin"
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ciyex-keycloak-secret
+                  key: KEYCLOAK_ADMIN_PASSWORD
+            - name: SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI
+              value: "https://aran.apps-dev.in.hinisoft.com/realms/master"
+            - name: SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI
+              value: "https://aran.apps-dev.in.hinisoft.com/realms/master/protocol/openid-connect/certs"
