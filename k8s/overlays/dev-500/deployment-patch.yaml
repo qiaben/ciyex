@@ -48,3 +48,5 @@ spec:
               value: "https://aran.apps-dev.in.hinisoft.com/realms/master"
             - name: SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI
               value: "https://aran.apps-dev.in.hinisoft.com/realms/master/protocol/openid-connect/certs"
+            - name: CORS_ALLOWED_ORIGINS
+              value: "http://localhost:3000,https://ciyex.apps-dev.in.hinisoft.com,https://ciyex-portal.apps-dev.in.hinisoft.com,https://*.apps-dev.in.hinisoft.com"
