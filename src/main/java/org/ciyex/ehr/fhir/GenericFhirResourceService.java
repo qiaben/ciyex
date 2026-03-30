@@ -928,6 +928,12 @@ public class GenericFhirResourceService {
         ResourceMeta primary = resources.get(0);
         Class<? extends Resource> clazz = pathMapper.resolveResourceClass(primary.type);
 
+        // If query looks like a date (MM/DD/YYYY or contains /), use in-memory search
+        // which can match DOB and other date fields
+        if (query.matches(".*\\d{1,2}/\\d{1,2}/\\d{2,4}.*") || query.matches("\\d{4}-\\d{2}-\\d{2}")) {
+            return searchByNameInMemory(tabKey, query, page, size);
+        }
+
         Bundle bundle = null;
         try {
             var search = fhirClient.getClient(orgAlias).search()

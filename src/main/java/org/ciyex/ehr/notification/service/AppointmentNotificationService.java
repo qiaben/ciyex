@@ -7,6 +7,8 @@ import org.ciyex.ehr.notification.repository.NotificationTemplateRepository;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.Map;
 
 /**
@@ -129,11 +131,12 @@ public class AppointmentNotificationService {
     }
 
     private String buildDefaultSubject(String eventType, String patientName) {
+        String dateStr = LocalDate.now().format(DateTimeFormatter.ofPattern("MMMM d, yyyy"));
         return switch (eventType) {
             case "appointment_confirmation" -> "Appointment Confirmation" +
-                    (patientName != null ? " for " + patientName : "");
+                    (patientName != null ? " for " + patientName : "") + " | " + dateStr;
             case "appointment_reminder" -> "Appointment Reminder" +
-                    (patientName != null ? " for " + patientName : "");
+                    (patientName != null ? " for " + patientName : "") + " | " + dateStr;
             case "lab_result_ready" -> "Lab Results Available";
             case "prescription_ready" -> "Prescription Ready for Pickup";
             default -> "Notification from Your Healthcare Provider";
@@ -149,13 +152,23 @@ public class AppointmentNotificationService {
 
         return switch (eventType) {
             case "appointment_confirmation" -> String.format(
-                    "<p>Dear %s,</p><p>Your appointment with %s has been confirmed for %s at %s.</p>" +
-                    "<p>Practice: %s</p><p>Thank you!</p>",
-                    name, provider, date, time, practice);
+                    "<p>Dear %s,</p>" +
+                    "<p>Your appointment has been confirmed.</p>" +
+                    "<p><strong>Date:</strong> %s<br/>" +
+                    "<strong>Time:</strong> %s<br/>" +
+                    "<strong>Provider:</strong> %s</p>" +
+                    "<p>We look forward to seeing you!</p>" +
+                    "<p>Thank you,<br/>%s</p>",
+                    name, date, time, provider, practice);
             case "appointment_reminder" -> String.format(
-                    "<p>Dear %s,</p><p>This is a reminder about your upcoming appointment with %s on %s at %s.</p>" +
-                    "<p>Practice: %s</p><p>Thank you!</p>",
-                    name, provider, date, time, practice);
+                    "<p>Dear %s,</p>" +
+                    "<p>This is a reminder about your upcoming appointment.</p>" +
+                    "<p><strong>Date:</strong> %s<br/>" +
+                    "<strong>Time:</strong> %s<br/>" +
+                    "<strong>Provider:</strong> %s</p>" +
+                    "<p>We look forward to seeing you!</p>" +
+                    "<p>Thank you,<br/>%s</p>",
+                    name, date, time, provider, practice);
             default -> String.format("<p>Dear %s,</p><p>You have a new notification from %s.</p>", name, practice);
         };
     }
