@@ -1021,11 +1021,26 @@ public class GenericFhirResourceService {
             return empty;
         }
         String lq = query.toLowerCase();
+        // Convert MM/DD/YYYY to YYYY-MM-DD so DOB search matches ISO dates stored in FHIR
+        String isoDate = null;
+        java.util.regex.Matcher dateMatcher = java.util.regex.Pattern.compile("(\\d{1,2})/(\\d{1,2})/(\\d{4})").matcher(query);
+        if (dateMatcher.find()) {
+            isoDate = String.format("%s-%02d-%02d",
+                    dateMatcher.group(3),
+                    Integer.parseInt(dateMatcher.group(1)),
+                    Integer.parseInt(dateMatcher.group(2)));
+        }
+        final String isoDateQuery = isoDate;
         List<Map<String, Object>> filtered = allContent.stream()
                 .filter(r -> r.entrySet().stream()
-                        .anyMatch(e -> !e.getKey().startsWith("_")
-                                && e.getValue() != null
-                                && e.getValue().toString().toLowerCase().contains(lq)))
+                        .anyMatch(e -> {
+                            if (e.getKey().startsWith("_") || e.getValue() == null) return false;
+                            String val = e.getValue().toString().toLowerCase();
+                            if (val.contains(lq)) return true;
+                            // Also match ISO date conversion for DOB fields
+                            if (isoDateQuery != null && val.contains(isoDateQuery)) return true;
+                            return false;
+                        }))
                 .collect(java.util.stream.Collectors.toList());
         int total = filtered.size();
         int start = page * size;

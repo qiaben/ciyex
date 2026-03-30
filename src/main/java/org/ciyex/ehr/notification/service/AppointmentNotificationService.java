@@ -78,12 +78,33 @@ public class AppointmentNotificationService {
             return;
         }
 
-        // Build template variables
+        // Build template variables — try multiple key patterns for date/time
+        String rawDate = extractString(data, "appointmentStartDate",
+                extractString(data, "startDate",
+                extractString(data, "appointmentDate", "")));
+        String rawTime = extractString(data, "appointmentStartTime",
+                extractString(data, "startTime",
+                extractString(data, "appointmentTime", "")));
+        // Format date for display (YYYY-MM-DD → "March 30, 2026")
+        String displayDate = rawDate;
+        try {
+            if (rawDate != null && rawDate.matches("\\d{4}-\\d{2}-\\d{2}")) {
+                displayDate = LocalDate.parse(rawDate).format(DateTimeFormatter.ofPattern("MMMM d, yyyy"));
+            }
+        } catch (Exception ignored) { /* keep raw */ }
+        // Format time for display (HH:mm → "2:00 PM")
+        String displayTime = rawTime;
+        try {
+            if (rawTime != null && rawTime.matches("\\d{2}:\\d{2}")) {
+                var t = java.time.LocalTime.parse(rawTime);
+                displayTime = t.format(DateTimeFormatter.ofPattern("h:mm a"));
+            }
+        } catch (Exception ignored) { /* keep raw */ }
         Map<String, String> variables = Map.of(
                 "patientName", patientName != null ? patientName : "",
                 "providerName", extractString(data, "providerName", ""),
-                "appointmentDate", extractString(data, "startDate", ""),
-                "appointmentTime", extractString(data, "startTime", ""),
+                "appointmentDate", displayDate != null ? displayDate : "",
+                "appointmentTime", displayTime != null ? displayTime : "",
                 "practiceName", extractString(data, "practiceName", orgAlias),
                 "practicePhone", extractString(data, "practicePhone", ""),
                 "portalLink", ""
@@ -100,7 +121,7 @@ public class AppointmentNotificationService {
                 String templateBody = resolveVars(templateOpt.get().getBody(), variables);
                 // Use default subject if template subject is empty
                 if (templateSubject == null || templateSubject.isBlank()) {
-                    templateSubject = buildDefaultSubject(eventType, patientName);
+                    templateSubject = buildDefaultSubject(eventType, patientName, displayDate);
                 }
                 notificationService.send(
                         orgAlias, "email", patientEmail,
@@ -115,7 +136,7 @@ public class AppointmentNotificationService {
         }
 
         // Fallback: send with default subject/body
-        String subject = buildDefaultSubject(eventType, patientName);
+        String subject = buildDefaultSubject(eventType, patientName, displayDate);
         String body = buildDefaultBody(eventType, variables);
         notificationService.send(orgAlias, "email", patientEmail, subject, body, patientId, "auto_" + eventType);
         log.info("Sent {} email (default template) to {} for org {}", eventType, patientEmail, orgAlias);
@@ -130,8 +151,10 @@ public class AppointmentNotificationService {
         return result;
     }
 
-    private String buildDefaultSubject(String eventType, String patientName) {
-        String dateStr = LocalDate.now().format(DateTimeFormatter.ofPattern("MMMM d, yyyy"));
+    private String buildDefaultSubject(String eventType, String patientName, String appointmentDate) {
+        String dateStr = (appointmentDate != null && !appointmentDate.isBlank())
+                ? appointmentDate
+                : LocalDate.now().format(DateTimeFormatter.ofPattern("MMMM d, yyyy"));
         return switch (eventType) {
             case "appointment_confirmation" -> "Appointment Confirmation" +
                     (patientName != null ? " for " + patientName : "") + " | " + dateStr;
