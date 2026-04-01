@@ -2,6 +2,8 @@ package org.ciyex.ehr.notification.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -14,6 +16,7 @@ public class NotificationConfig {
     private String channelType;
     private String provider;
     private Boolean enabled;
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private String config;
     private String senderName;

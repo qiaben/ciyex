@@ -2,6 +2,8 @@ package org.ciyex.ehr.kiosk.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.time.LocalDateTime;
 
 @Data @Entity @Table(name = "kiosk_config")
@@ -10,6 +12,7 @@ public class KioskConfig {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private Boolean enabled;
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private String config;          // {verify_dob, verify_phone, update_demographics, update_insurance, sign_consent, collect_copay, show_wait_time}
     @Column(columnDefinition = "TEXT")

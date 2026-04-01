@@ -2,6 +2,8 @@ package org.ciyex.ehr.education.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.time.LocalDateTime;
 
 @Data @Entity @Table(name = "education_material")
@@ -17,6 +19,7 @@ public class EducationMaterial {
     private String externalUrl;
     private String language;
     private String audience;
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private String tags;
     private String author;

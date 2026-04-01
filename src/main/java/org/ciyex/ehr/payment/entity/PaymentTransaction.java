@@ -2,6 +2,8 @@ package org.ciyex.ehr.payment.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -26,6 +28,7 @@ public class PaymentTransaction {
     private String invoiceNumber;
     private String stripePaymentIntentId;
     private String stripeChargeId;
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "JSONB")
     private String processorResponse;
     private BigDecimal convenienceFee;

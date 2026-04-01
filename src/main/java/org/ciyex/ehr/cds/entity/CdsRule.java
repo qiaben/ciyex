@@ -2,6 +2,8 @@ package org.ciyex.ehr.cds.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.time.LocalDateTime;
 
 @Data @Entity @Table(name = "cds_rule")
@@ -15,6 +17,7 @@ public class CdsRule {
     private String ruleType;       // preventive_screening, drug_allergy, drug_drug, duplicate_order, age_based, condition_based, lab_value, custom
     private String category;       // preventive, medication_safety, order_entry, chronic_disease
     private String triggerEvent;   // encounter_open, order_entry, medication_prescribe, lab_result, manual
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private String conditions;     // {age_min, age_max, gender, diagnosis_codes[], medication_codes[], lab_codes[]}
     private String actionType;     // alert, reminder, suggestion, hard_stop

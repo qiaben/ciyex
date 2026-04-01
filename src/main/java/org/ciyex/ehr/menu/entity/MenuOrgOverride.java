@@ -2,6 +2,8 @@ package org.ciyex.ehr.menu.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -25,6 +27,7 @@ public class MenuOrgOverride {
     @Column(nullable = false)
     private String action; // hide, modify, reorder, add
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private String data;
 

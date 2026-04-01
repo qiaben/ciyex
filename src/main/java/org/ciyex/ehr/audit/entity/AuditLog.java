@@ -2,6 +2,8 @@ package org.ciyex.ehr.audit.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.time.LocalDateTime;
 
 @Data @Entity @Table(name = "audit_log")
@@ -17,6 +19,7 @@ public class AuditLog {
     private String userName;
     private String userRole;
     private String ipAddress;
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private String details;
     private Long patientId;

@@ -2,6 +2,8 @@ package org.ciyex.ehr.payment.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -12,8 +14,10 @@ public class PaymentConfig {
     private Long id;
     private String processor;           // stripe, square, authorize_net
     private Boolean enabled;
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "JSONB")
     private String config;              // {stripe_publishable_key, stripe_secret_key, webhook_secret}
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "JSONB")
     private String acceptedMethods;     // ["credit_card","debit_card","bank_account","fsa","hsa"]
     private Boolean convenienceFeeEnabled;
