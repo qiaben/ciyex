@@ -126,8 +126,10 @@ public class GenericFhirResourceController {
                     .body(ApiResponse.error(e.getMessage()));
         } catch (Exception e) {
             log.error("Error updating resource for tab '{}' patient {} id {}", tabKey, patientId, resourceId, e);
+            String msg = e.getMessage();
+            if (msg != null && msg.length() > 200) msg = msg.substring(0, 200);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("Failed to update record. Please try again."));
+                    .body(ApiResponse.error("Failed to update record: " + (msg != null ? msg : "Unknown error")));
         }
     }
 

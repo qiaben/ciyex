@@ -133,7 +133,7 @@ public class PaymentController {
     @PreAuthorize("hasAuthority('SCOPE_user/Claim.write')")
     public ResponseEntity<ApiResponse<Void>> deleteTransaction(@PathVariable Long id) {
         try {
-            service.voidTransaction(id);
+            service.deleteTransaction(id);
             return ResponseEntity.ok(ApiResponse.ok("Transaction deleted", null));
         } catch (NoSuchElementException e) {
             return ResponseEntity.status(404).body(ApiResponse.error(e.getMessage()));

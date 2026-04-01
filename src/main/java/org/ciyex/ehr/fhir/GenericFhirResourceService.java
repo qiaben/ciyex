@@ -790,19 +790,23 @@ public class GenericFhirResourceService {
                         clinCode = ai.getClinicalStatus().getCodingFirstRep().getCode();
                         if (clinCode == null || clinCode.isBlank()) clinCode = "active";
                     }
+                    clinCode = clinCode.toLowerCase();
                     ai.setClinicalStatus(new org.hl7.fhir.r4.model.CodeableConcept()
                             .addCoding(new Coding()
                                     .setSystem("http://terminology.hl7.org/CodeSystem/allergyintolerance-clinical")
-                                    .setCode(clinCode)));
+                                    .setCode(clinCode)
+                                    .setDisplay(clinCode.substring(0, 1).toUpperCase() + clinCode.substring(1))));
                     String verCode = "confirmed";
                     if (ai.hasVerificationStatus() && ai.getVerificationStatus().hasCoding()) {
                         verCode = ai.getVerificationStatus().getCodingFirstRep().getCode();
                         if (verCode == null || verCode.isBlank()) verCode = "confirmed";
                     }
+                    verCode = verCode.toLowerCase();
                     ai.setVerificationStatus(new org.hl7.fhir.r4.model.CodeableConcept()
                             .addCoding(new Coding()
                                     .setSystem("http://terminology.hl7.org/CodeSystem/allergyintolerance-verification")
-                                    .setCode(verCode)));
+                                    .setCode(verCode)
+                                    .setDisplay(verCode.substring(0, 1).toUpperCase() + verCode.substring(1))));
                 }
 
                 fhirClient.update(updated, typeAlias);

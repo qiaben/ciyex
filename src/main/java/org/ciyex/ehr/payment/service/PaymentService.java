@@ -252,6 +252,13 @@ public class PaymentService {
         return toTransactionDto(txn);
     }
 
+    @Transactional
+    public void deleteTransaction(Long transactionId) {
+        var txn = transactionRepo.findByIdAndOrgAlias(transactionId, orgAlias())
+                .orElseThrow(() -> new NoSuchElementException("Transaction not found: " + transactionId));
+        transactionRepo.delete(txn);
+    }
+
     @Transactional(readOnly = true)
     public Map<String, Object> transactionStats() {
         String org = orgAlias();
