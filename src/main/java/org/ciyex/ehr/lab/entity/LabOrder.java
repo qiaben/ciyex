@@ -11,6 +11,8 @@ public class LabOrder {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private Long patientId;
+    private String patientFirstName;
+    private String patientLastName;
     private String orderNumber;
     private String orderName;
     private String testCode;

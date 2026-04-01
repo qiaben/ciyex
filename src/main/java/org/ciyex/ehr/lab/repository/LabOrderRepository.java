@@ -17,6 +17,9 @@ public interface LabOrderRepository extends JpaRepository<LabOrder, Long> {
            "LOWER(o.testCode) LIKE LOWER(CONCAT('%',:q,'%')) OR " +
            "LOWER(o.physicianName) LIKE LOWER(CONCAT('%',:q,'%')) OR " +
            "LOWER(o.orderingProvider) LIKE LOWER(CONCAT('%',:q,'%')) OR " +
+           "LOWER(o.patientFirstName) LIKE LOWER(CONCAT('%',:q,'%')) OR " +
+           "LOWER(o.patientLastName) LIKE LOWER(CONCAT('%',:q,'%')) OR " +
+           "LOWER(CONCAT(COALESCE(o.patientFirstName,''), ' ', COALESCE(o.patientLastName,''))) LIKE LOWER(CONCAT('%',:q,'%')) OR " +
            "CAST(o.patientId AS text) = :q" +
            ") ORDER BY o.createdAt DESC")
     List<LabOrder> search(@Param("org") String orgAlias, @Param("q") String query);

@@ -29,6 +29,8 @@ public class LabOrderService {
     public LabOrderDto create(Long patientId, LabOrderDto dto) {
         var order = LabOrder.builder()
                 .patientId(patientId)
+                .patientFirstName(dto.getPatientFirstName())
+                .patientLastName(dto.getPatientLastName())
                 .orderNumber(dto.getOrderNumber())
                 .orderName(dto.getOrderName())
                 .testCode(dto.getTestCode())
@@ -136,6 +138,8 @@ public class LabOrderService {
         return LabOrderDto.builder()
                 .id(e.getId())
                 .patientId(e.getPatientId())
+                .patientFirstName(e.getPatientFirstName())
+                .patientLastName(e.getPatientLastName())
                 .orderNumber(e.getOrderNumber())
                 .orderName(e.getOrderName())
                 .testCode(e.getTestCode())

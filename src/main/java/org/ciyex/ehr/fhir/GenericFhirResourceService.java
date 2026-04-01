@@ -1334,7 +1334,10 @@ public class GenericFhirResourceService {
 
             if (pathLower.contains("insurer") || pathLower.contains("organization")) {
                 resourceType = "Organization";
-            } else if (pathLower.contains("provider") || pathLower.contains("practitioner")) {
+            } else if (pathLower.contains("provider") || pathLower.contains("practitioner")
+                    || pathLower.contains("requester") || pathLower.contains("prescriber")
+                    || pathLower.contains("performer") || pathLower.contains("recorder")
+                    || pathLower.contains("author") || pathLower.contains("asserter")) {
                 resourceType = "Practitioner";
             }
 
