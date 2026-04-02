@@ -1959,6 +1959,30 @@ public class FhirFacadeController {
                         log.debug("Could not look up patient {} for notification: {}", patientId, e.getMessage());
                     }
                 }
+                // Resolve provider name if not already present
+                if (!notifData.containsKey("providerName") || String.valueOf(notifData.get("providerName")).isBlank()) {
+                    Long providerId = toLong(body.get("providerId"));
+                    if (providerId != null) {
+                        try {
+                            Map<String, Object> providerData = fhirService.get("providers", null, String.valueOf(providerId));
+                            if (providerData != null) {
+                                Object idBlock = providerData.get("identification");
+                                if (idBlock instanceof Map<?, ?> idMap) {
+                                    String pfn = idMap.get("firstName") != null ? String.valueOf(idMap.get("firstName")) : "";
+                                    String pln = idMap.get("lastName") != null ? String.valueOf(idMap.get("lastName")) : "";
+                                    String provName = (pfn + " " + pln).trim();
+                                    if (!provName.isBlank()) notifData.put("providerName", provName);
+                                } else if (providerData.get("name") != null) {
+                                    notifData.put("providerName", String.valueOf(providerData.get("name")));
+                                }
+                            }
+                        } catch (Exception e) {
+                            log.debug("Could not look up provider {} for notification: {}", providerId, e.getMessage());
+                        }
+                    }
+                }
+                // Ensure practice name is set
+                notifData.putIfAbsent("practiceName", orgAlias);
                 appointmentNotificationService.onAppointmentCreated(orgAlias, notifData);
             } catch (Exception notifEx) {
                 log.warn("Failed to trigger appointment notification: {}", notifEx.getMessage());
