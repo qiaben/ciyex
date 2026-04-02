@@ -532,12 +532,12 @@ public class FhirPathMapper {
                         }
                     } else if (!refVal.startsWith("http")) {
                         // Relative reference like "Organization/ABC insurance" — validate the ID part
-                        // If the ID portion contains spaces or looks like a name, log a warning.
-                        // The FHIR server will reject "Organization/ABC insurance" as an invalid reference.
+                        // If the ID portion contains spaces or looks like a name, skip it to prevent HAPI-1094
                         String[] parts = refVal.split("/", 2);
                         if (parts.length == 2 && parts[1].contains(" ")) {
-                            log.warn("Reference value '{}' contains spaces in ID portion — this may be a display name " +
-                                    "instead of a FHIR resource ID. The FHIR server may reject this reference.", refVal);
+                            log.warn("Skipping reference '{}' — ID portion contains spaces (likely a display name " +
+                                    "instead of a FHIR resource ID). Use the resource's FHIR ID instead.", refVal);
+                            yield null;
                         }
                     }
 
