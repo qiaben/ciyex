@@ -3,6 +3,10 @@ package org.ciyex.ehr.controller;
 import lombok.extern.slf4j.Slf4j;
 import org.ciyex.ehr.client.TelehealthServiceClient;
 import org.ciyex.ehr.dto.ApiResponse;
+import org.ciyex.ehr.dto.integration.RequestContext;
+import org.ciyex.ehr.telehealth.TelehealthVendorResolver;
+import org.ciyex.sdk.telehealth.TelehealthProvider;
+import org.ciyex.sdk.telehealth.TelehealthProvider.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -33,6 +37,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class TelehealthController {
 
     private final TelehealthServiceClient telehealthClient;
+    private final TelehealthVendorResolver vendorResolver;
     /** Idempotency cache: appointmentId → sessionId, so both provider and patient get the same session. */
     private final Map<String, String> appointmentSessionCache = new ConcurrentHashMap<>();
 
@@ -40,8 +45,15 @@ public class TelehealthController {
     @Value("${services.telehealth-public-url:${services.telehealth-url:http://localhost:8088}}")
     private String telehealthPublicUrl;
 
-    public TelehealthController(TelehealthServiceClient telehealthClient) {
+    public TelehealthController(TelehealthServiceClient telehealthClient, TelehealthVendorResolver vendorResolver) {
         this.telehealthClient = telehealthClient;
+        this.vendorResolver = vendorResolver;
+    }
+
+    /** Resolve the telehealth provider for the current request's org. */
+    private TelehealthProvider resolveProvider() {
+        String orgAlias = RequestContext.get().getOrgName();
+        return vendorResolver.resolve(orgAlias);
     }
 
     /**
@@ -53,8 +65,9 @@ public class TelehealthController {
         if (!(result instanceof Map)) return result;
         Map<String, Object> session = new HashMap<>((Map<String, Object>) result);
 
-        // Add vendor type — currently mediasoup; future: resolved from marketplace
-        session.putIfAbsent("providerType", "mediasoup");
+        // Add vendor type — resolved from marketplace app_installations config
+        TelehealthProvider provider = resolveProvider();
+        session.putIfAbsent("providerType", provider.vendorId());
 
         // Build joinInfo with WebSocket signaling URL (use public URL for browser access)
         String wsUrl = telehealthPublicUrl.replaceFirst("^http", "ws") + "/ws/telehealth";
@@ -76,12 +89,60 @@ public class TelehealthController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> createSession(@RequestBody Map<String, Object> request) {
         try {
-            Object result = enrichSessionResponse(telehealthClient.createSession(request));
-            return ResponseEntity.ok(ApiResponse.ok("Session created", result));
+            TelehealthProvider provider = resolveProvider();
+            // Use SDK provider for session creation
+            SessionRequest sdkRequest = mapToSessionRequest(request);
+            SessionResult sdkResult = provider.createSession(sdkRequest);
+
+            // Build enriched response combining SDK result with join info
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("id", sdkResult.sessionId());
+            response.put("roomName", sdkResult.roomName());
+            response.put("hostUrl", sdkResult.hostUrl());
+            response.put("participantUrl", sdkResult.participantUrl());
+            response.put("createdAt", sdkResult.createdAt());
+            response.put("expiresAt", sdkResult.expiresAt());
+            response.put("providerType", provider.vendorId());
+
+            // Build joinInfo with WebSocket signaling URL
+            String wsUrl = telehealthPublicUrl.replaceFirst("^http", "ws") + "/ws/telehealth";
+            Map<String, Object> joinInfo = new HashMap<>();
+            joinInfo.put("wsUrl", wsUrl);
+            if (sdkResult.roomName() != null) {
+                joinInfo.put("roomName", sdkResult.roomName());
+            }
+            response.put("joinInfo", joinInfo);
+
+            return ResponseEntity.ok(ApiResponse.ok("Session created", response));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(
                     ApiResponse.error("Failed to create session: " + e.getMessage()));
         }
+    }
+
+    /** Map raw request map to SDK SessionRequest DTO. */
+    private SessionRequest mapToSessionRequest(Map<String, Object> request) {
+        String orgAlias = RequestContext.get().getOrgName();
+        return new SessionRequest(
+                orgAlias,
+                getStr(request, "encounterId"),
+                request.get("patientId") != null
+                        ? new org.ciyex.sdk.common.PatientRef(getStr(request, "patientId"), orgAlias, null, getStr(request, "patientName"), null, null)
+                        : null,
+                request.get("providerId") != null
+                        ? new org.ciyex.sdk.common.ProviderRef(getStr(request, "providerId"), null, getStr(request, "providerName"), null)
+                        : null,
+                Boolean.TRUE.equals(request.get("recordingEnabled")),
+                request.get("waitingRoomEnabled") == null || Boolean.TRUE.equals(request.get("waitingRoomEnabled")),
+                request.get("screenShareEnabled") == null || Boolean.TRUE.equals(request.get("screenShareEnabled")),
+                request.get("maxDurationMinutes") instanceof Number n ? n.intValue() : 60,
+                null
+        );
+    }
+
+    private String getStr(Map<String, Object> map, String key) {
+        Object val = map.get(key);
+        return val != null ? val.toString() : null;
     }
 
     @PostMapping("/sessions/from-appointment")
@@ -211,8 +272,9 @@ public class TelehealthController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> endSession(@PathVariable String id) {
         try {
-            Object result = telehealthClient.endSession(id);
-            return ResponseEntity.ok(ApiResponse.ok("Session ended", result));
+            TelehealthProvider provider = resolveProvider();
+            provider.endSession(id);
+            return ResponseEntity.ok(ApiResponse.ok("Session ended", Map.of("sessionId", id, "status", "ENDED")));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(
                     ApiResponse.error("Failed to end session: " + e.getMessage()));

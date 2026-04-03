@@ -95,6 +95,8 @@ dependencies {
 	// External integrations
 	implementation 'com.azure:azure-ai-openai:1.0.0-beta.16'
 	implementation 'software.amazon.awssdk:s3:2.32.26'
+	// Ciyex Platform SDK (telehealth provider interface, common DTOs)
+	implementation 'org.ciyex:ciyex-platform-sdk:0.1.2'
 	// Twilio + Telnyx removed — telehealth now delegated to ciyex-telehealth service
 	// Email (SMTP for feature requests, password reset notifications)
 	implementation 'org.springframework.boot:spring-boot-starter-mail'
