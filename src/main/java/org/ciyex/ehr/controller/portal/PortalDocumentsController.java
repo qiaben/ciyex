@@ -3,10 +3,13 @@ package org.ciyex.ehr.controller.portal;
 import org.ciyex.ehr.dto.DocumentDto;
 import org.ciyex.ehr.dto.portal.ApiResponse;
 import org.ciyex.ehr.fhir.FhirClientService;
+import org.ciyex.ehr.portal.entity.DocumentReview;
+import org.ciyex.ehr.portal.repository.DocumentReviewRepository;
 import org.ciyex.ehr.service.DocumentService;
 import org.ciyex.ehr.service.DocumentService.DownloadResult;
 import org.ciyex.ehr.service.PracticeContextService;
 import org.ciyex.ehr.service.portal.PortalGenericResourceService;
+import org.ciyex.ehr.service.portal.PortalNotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hl7.fhir.r4.model.Bundle;
@@ -43,6 +46,8 @@ public class PortalDocumentsController {
     private final FhirClientService fhirClientService;
     private final PracticeContextService practiceContextService;
     private final PortalGenericResourceService portalResourceService;
+    private final DocumentReviewRepository documentReviewRepo;
+    private final PortalNotificationService portalNotificationService;
 
     @GetMapping("/my")
     @PreAuthorize("hasAuthority('PATIENT') or hasRole('PATIENT') or hasAuthority('SCOPE_patient/Patient.read')")
@@ -128,6 +133,34 @@ public class PortalDocumentsController {
             dto.setType("patient-upload");
 
             DocumentDto created = sharedDocumentService.create(tenantName, patientId, dto, file);
+
+            // Create a review record for EHR staff
+            try {
+                // Resolve patient name from FHIR
+                String patientName = resolvePatientName(ehrPatientId);
+
+                DocumentReview review = DocumentReview.builder()
+                        .fhirId(created.getFhirId())
+                        .patientId(patientId)
+                        .patientName(patientName)
+                        .patientEmail(userEmail)
+                        .fileName(file.getOriginalFilename())
+                        .category(category)
+                        .description(description)
+                        .contentType(file.getContentType())
+                        .fileSize(file.getSize())
+                        .status("PENDING")
+                        .orgAlias(tenantName)
+                        .build();
+                documentReviewRepo.save(review);
+
+                // Notify EHR staff channel
+                portalNotificationService.notifyDocumentUpload(
+                        patientName != null ? patientName : userEmail,
+                        file.getOriginalFilename(), category);
+            } catch (Exception e) {
+                log.warn("Failed to create document review record: {}", e.getMessage());
+            }
 
             log.info("Portal patient {} uploaded document: {}", userEmail, file.getOriginalFilename());
             return ResponseEntity.ok(ApiResponse.<DocumentDto>builder()
@@ -254,6 +287,26 @@ public class PortalDocumentsController {
             log.error("Unexpected error deleting document {}", documentId, e);
             return ResponseEntity.internalServerError().build();
         }
+    }
+
+    /**
+     * Resolve patient display name from FHIR Patient resource.
+     */
+    private String resolvePatientName(String patientFhirId) {
+        try {
+            String orgAlias = practiceContextService.getPracticeId();
+            Patient patient = fhirClientService.read(Patient.class, patientFhirId, orgAlias);
+            if (patient != null && patient.hasName()) {
+                var name = patient.getNameFirstRep();
+                String given = name.hasGiven() ? name.getGivenAsSingleString() : "";
+                String family = name.hasFamily() ? name.getFamily() : "";
+                String full = (given + " " + family).trim();
+                if (!full.isEmpty()) return full;
+            }
+        } catch (Exception e) {
+            log.debug("Could not resolve patient name for {}: {}", patientFhirId, e.getMessage());
+        }
+        return null;
     }
 
     /**
