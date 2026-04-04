@@ -19,6 +19,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -83,6 +84,62 @@ public class PortalDocumentsController {
             log.error("Error retrieving documents for portal user: {}", e.getMessage(), e);
             return ApiResponse.<List<DocumentDto>>builder()
                     .success(false).message("Failed to retrieve documents: " + e.getMessage()).build();
+        }
+    }
+
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAuthority('PATIENT') or hasRole('PATIENT') or hasAuthority('SCOPE_patient/Patient.read')")
+    public ResponseEntity<ApiResponse<DocumentDto>> uploadDocument(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "category", required = false, defaultValue = "Other") String category,
+            @RequestParam(value = "description", required = false) String description,
+            Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(401).body(ApiResponse.<DocumentDto>builder()
+                    .success(false).message("Unauthorized").build());
+        }
+
+        try {
+            if (file == null || file.isEmpty()) {
+                return ResponseEntity.badRequest().body(ApiResponse.<DocumentDto>builder()
+                        .success(false).message("No file provided").build());
+            }
+
+            String userEmail = extractEmailFromAuthentication(authentication);
+            String ehrPatientId;
+            try {
+                ehrPatientId = portalResourceService.resolvePatientId(userEmail, extractJwt(authentication));
+            } catch (Exception e) {
+                log.debug("Could not resolve patient for portal user {}: {}", userEmail, e.getMessage());
+                ehrPatientId = getEhrPatientIdFromEmail(userEmail);
+            }
+
+            if (ehrPatientId == null) {
+                return ResponseEntity.status(403).body(ApiResponse.<DocumentDto>builder()
+                        .success(false).message("Patient record not linked to EHR").build());
+            }
+
+            Long patientId = Long.parseLong(ehrPatientId);
+            String tenantName = practiceContextService.getPracticeId();
+
+            DocumentDto dto = new DocumentDto();
+            dto.setCategory(category);
+            dto.setDescription(description);
+            dto.setType("patient-upload");
+
+            DocumentDto created = sharedDocumentService.create(tenantName, patientId, dto, file);
+
+            log.info("Portal patient {} uploaded document: {}", userEmail, file.getOriginalFilename());
+            return ResponseEntity.ok(ApiResponse.<DocumentDto>builder()
+                    .success(true).message("Document uploaded successfully").data(created).build());
+        } catch (RuntimeException e) {
+            log.error("Portal document upload failed: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(ApiResponse.<DocumentDto>builder()
+                    .success(false).message(e.getMessage()).build());
+        } catch (Exception e) {
+            log.error("Unexpected error during portal document upload", e);
+            return ResponseEntity.internalServerError().body(ApiResponse.<DocumentDto>builder()
+                    .success(false).message("Upload failed: " + e.getMessage()).build());
         }
     }
 
