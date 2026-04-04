@@ -135,6 +135,14 @@ public class DocumentService {
         return dto;
     }
 
+    // UPDATE STATUS (used when staff accepts a patient-uploaded document)
+    public void updateStatus(String fhirId, Enumerations.DocumentReferenceStatus status) {
+        DocumentReference docRef = fhirClientService.read(DocumentReference.class, fhirId, getPracticeId());
+        docRef.setStatus(status);
+        fhirClientService.update(docRef, getPracticeId());
+        log.info("Updated DocumentReference {} status to {}", fhirId, status);
+    }
+
     // DELETE
     public void delete(String fhirId) {
         DocumentReference docRef = fhirClientService.read(DocumentReference.class, fhirId, getPracticeId());
@@ -216,6 +224,7 @@ public class DocumentService {
             Bundle bundle = fhirClientService.getClient(getPracticeId()).search()
                     .forResource(DocumentReference.class)
                     .where(new ReferenceClientParam("subject").hasId("Patient/" + patientId))
+                    .where(DocumentReference.STATUS.exactly().code("current"))
                     .returnBundle(Bundle.class)
                     .execute();
 
@@ -256,7 +265,12 @@ public class DocumentService {
 
     private DocumentReference toFhirDocumentReference(DocumentDto dto, String encryptionKey, String encryptionIv) {
         DocumentReference dr = new DocumentReference();
-        dr.setStatus(Enumerations.DocumentReferenceStatus.CURRENT);
+        // Portal patient uploads start as ENTERED_IN_ERROR (hidden) until staff accepts
+        if ("patient-upload".equals(dto.getType())) {
+            dr.setStatus(Enumerations.DocumentReferenceStatus.ENTEREDINERROR);
+        } else {
+            dr.setStatus(Enumerations.DocumentReferenceStatus.CURRENT);
+        }
 
         // Subject (Patient)
         if (dto.getPatientId() != null) {

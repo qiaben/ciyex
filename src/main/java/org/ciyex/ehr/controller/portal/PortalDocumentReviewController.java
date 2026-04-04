@@ -11,6 +11,7 @@ import org.ciyex.ehr.service.PracticeContextService;
 import org.ciyex.ehr.service.portal.PortalNotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.hl7.fhir.r4.model.Enumerations;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -85,6 +86,13 @@ public class PortalDocumentReviewController {
         review.setReviewerEmail(extractEmail(authentication));
         reviewRepo.save(review);
 
+        // Make the FHIR DocumentReference visible (CURRENT) in the patient chart
+        try {
+            documentService.updateStatus(review.getFhirId(), Enumerations.DocumentReferenceStatus.CURRENT);
+        } catch (Exception e) {
+            log.warn("Could not update FHIR status for {}: {}", review.getFhirId(), e.getMessage());
+        }
+
         // Notify patient
         createPatientNotification(review, "document_accepted",
                 "Document Accepted",
@@ -124,6 +132,13 @@ public class PortalDocumentReviewController {
         review.setReviewedAt(LocalDateTime.now());
         review.setReviewerEmail(extractEmail(authentication));
         reviewRepo.save(review);
+
+        // Delete the FHIR DocumentReference + storage file (rejected = not needed)
+        try {
+            documentService.delete(review.getFhirId());
+        } catch (Exception e) {
+            log.warn("Could not delete FHIR doc for rejected review {}: {}", id, e.getMessage());
+        }
 
         // Notify patient
         createPatientNotification(review, "document_rejected",
