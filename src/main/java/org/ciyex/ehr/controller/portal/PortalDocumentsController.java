@@ -7,6 +7,7 @@ import org.ciyex.ehr.portal.entity.DocumentReview;
 import org.ciyex.ehr.portal.repository.DocumentReviewRepository;
 import org.ciyex.ehr.service.DocumentService;
 import org.ciyex.ehr.service.DocumentService.DownloadResult;
+import org.ciyex.ehr.service.DocumentSettingsService;
 import org.ciyex.ehr.service.PracticeContextService;
 import org.ciyex.ehr.service.portal.PortalGenericResourceService;
 import org.ciyex.ehr.service.portal.PortalNotificationService;
@@ -48,6 +49,7 @@ public class PortalDocumentsController {
     private final PortalGenericResourceService portalResourceService;
     private final DocumentReviewRepository documentReviewRepo;
     private final PortalNotificationService portalNotificationService;
+    private final DocumentSettingsService documentSettingsService;
 
     @GetMapping("/my")
     @PreAuthorize("hasAuthority('PATIENT') or hasRole('PATIENT') or hasAuthority('SCOPE_patient/Patient.read')")
@@ -89,6 +91,23 @@ public class PortalDocumentsController {
             log.error("Error retrieving documents for portal user: {}", e.getMessage(), e);
             return ApiResponse.<List<DocumentDto>>builder()
                     .success(false).message("Failed to retrieve documents: " + e.getMessage()).build();
+        }
+    }
+
+    @GetMapping("/categories")
+    @PreAuthorize("hasAuthority('PATIENT') or hasRole('PATIENT') or hasAuthority('SCOPE_patient/Patient.read')")
+    public ApiResponse<List<String>> getDocumentCategories() {
+        try {
+            var cats = documentSettingsService.getCategories();
+            List<String> active = cats.stream()
+                    .filter(c -> c.isActive())
+                    .map(c -> c.getName())
+                    .toList();
+            return ApiResponse.<List<String>>builder().success(true).data(active).build();
+        } catch (Exception e) {
+            log.debug("Could not load categories, using defaults: {}", e.getMessage());
+            return ApiResponse.<List<String>>builder().success(true)
+                    .data(List.of("Clinical", "Lab", "Imaging", "Insurance", "Other")).build();
         }
     }
 
