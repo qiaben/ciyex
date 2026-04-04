@@ -330,6 +330,12 @@ public class GenericFhirResourceService {
                     .where(new ReferenceClientParam(meta.patientSearchParam)
                             .hasId(String.valueOf(patientId)));
 
+            // DocumentReference: only show "current" status (hides pending patient uploads)
+            if ("DocumentReference".equals(meta.type)) {
+                search = search.and(new ca.uhn.fhir.rest.gclient.TokenClientParam("status")
+                        .exactly().code("current"));
+            }
+
             // If encounterRef provided, also filter by encounter reference
             if (encounterRef != null && !encounterRef.isBlank()) {
                 search = search.and(new ReferenceClientParam("encounter")
