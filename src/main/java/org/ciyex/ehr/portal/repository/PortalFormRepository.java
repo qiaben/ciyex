@@ -26,4 +26,6 @@ public interface PortalFormRepository extends JpaRepository<PortalForm, Long> {
     @Query("SELECT pf FROM PortalForm pf WHERE (pf.orgAlias = :orgAlias OR pf.orgAlias = '__DEFAULT__') " +
            "AND pf.active = true ORDER BY pf.position")
     List<PortalForm> findAllActiveWithDefaults(String orgAlias);
+
+    void deleteByOrgAliasAndFormKey(String orgAlias, String formKey);
 }

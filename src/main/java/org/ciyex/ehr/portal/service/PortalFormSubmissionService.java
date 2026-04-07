@@ -50,14 +50,10 @@ public class PortalFormSubmissionService {
     }
 
     @Transactional
-    public PortalFormSubmission reject(String orgAlias, Long submissionId, String reviewedBy, String reason) {
+    public void reject(String orgAlias, Long submissionId, String reviewedBy, String reason) {
         var sub = repo.findById(submissionId)
                 .orElseThrow(() -> new RuntimeException("Submission not found"));
         if (!sub.getOrgAlias().equals(orgAlias)) throw new RuntimeException("Access denied");
-        sub.setStatus("rejected");
-        sub.setReviewedDate(Instant.now());
-        sub.setReviewedBy(reviewedBy);
-        sub.setReviewNote(reason);
-        return repo.save(sub);
+        repo.delete(sub);
     }
 }

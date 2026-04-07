@@ -148,17 +148,17 @@ public class PortalFormSubmissionController {
     }
 
     /**
-     * Staff: reject a submission.
+     * Staff: reject (delete) a submission.
      */
     @PutMapping("/{id}/reject")
-    public ResponseEntity<ApiResponse<PortalFormSubmission>> reject(
+    public ResponseEntity<ApiResponse<String>> reject(
             @PathVariable Long id,
             @RequestParam(required = false) String reason,
             Authentication auth) {
         try {
             String reviewer = extractName(auth);
-            var sub = submissionService.reject(orgAlias(), id, reviewer, reason);
-            return ResponseEntity.ok(ApiResponse.ok("Submission rejected", sub));
+            submissionService.reject(orgAlias(), id, reviewer, reason);
+            return ResponseEntity.ok(ApiResponse.ok("Submission deleted", "ok"));
         } catch (Exception e) {
             log.error("Failed to reject submission id={}", id, e);
             return ResponseEntity.badRequest().body(ApiResponse.error("Failed: " + e.getMessage()));

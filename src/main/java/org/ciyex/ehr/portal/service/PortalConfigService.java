@@ -77,6 +77,11 @@ public class PortalConfigService {
     }
 
     @Transactional
+    public void deleteFormByKey(String orgAlias, String formKey) {
+        formRepo.deleteByOrgAliasAndFormKey(orgAlias, formKey);
+    }
+
+    @Transactional
     public PortalForm toggleForm(String orgAlias, Long formId, boolean active) {
         var form = formRepo.findById(formId)
                 .orElseThrow(() -> new RuntimeException("Form not found"));
