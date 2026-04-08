@@ -90,11 +90,16 @@ public class TemplateDocumentController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    @GetMapping(value = "/{id}/render", produces = MediaType.TEXT_HTML_VALUE)
-    public ResponseEntity<String> render(@PathVariable Long id) {
+    @GetMapping("/{id}/render")
+    public ResponseEntity<Map<String, Object>> render(@PathVariable Long id) {
         return repo.findById(id)
                 .filter(d -> d.getOrgAlias().equals(orgAlias()))
-                .map(d -> ResponseEntity.ok().contentType(MediaType.TEXT_HTML).body(d.getContent()))
+                .map(d -> {
+                    Map<String, Object> result = new HashMap<>();
+                    result.put("html", d.getContent());
+                    result.put("name", d.getName());
+                    return ResponseEntity.ok(result);
+                })
                 .orElse(ResponseEntity.notFound().build());
     }
 
