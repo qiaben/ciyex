@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -100,15 +101,29 @@ public class AppointmentNotificationService {
                 displayTime = t.format(DateTimeFormatter.ofPattern("h:mm a"));
             }
         } catch (Exception ignored) { /* keep raw */ }
-        Map<String, String> variables = Map.of(
-                "patientName", patientName != null ? patientName : "",
-                "providerName", extractString(data, "providerName", ""),
-                "appointmentDate", displayDate != null ? displayDate : "",
-                "appointmentTime", displayTime != null ? displayTime : "",
-                "practiceName", extractString(data, "practiceName", orgAlias),
-                "practicePhone", extractString(data, "practicePhone", ""),
-                "portalLink", ""
-        );
+        // Include both camelCase and snake_case keys so templates work regardless of naming convention
+        String pName = patientName != null ? patientName : "";
+        String provName = extractString(data, "providerName", "");
+        String dDate = displayDate != null ? displayDate : "";
+        String dTime = displayTime != null ? displayTime : "";
+        String prcName = extractString(data, "practiceName", orgAlias);
+        String prcPhone = extractString(data, "practicePhone", "");
+        Map<String, String> variables = new HashMap<>(Map.of(
+                "patientName", pName,
+                "patient_name", pName,
+                "providerName", provName,
+                "provider_name", provName,
+                "appointmentDate", dDate,
+                "appointment_date", dDate,
+                "appointmentTime", dTime,
+                "appointment_time", dTime,
+                "practiceName", prcName
+        ));
+        variables.put("practice_name", prcName);
+        variables.put("practicePhone", prcPhone);
+        variables.put("practice_phone", prcPhone);
+        variables.put("portalLink", "");
+        variables.put("location_name", extractString(data, "locationName", ""));
 
         // Try to send using template first
         String templateKey = eventType;
@@ -121,7 +136,7 @@ public class AppointmentNotificationService {
                 String templateBody = resolveVars(templateOpt.get().getBody(), variables);
                 // Use default subject if template subject is empty
                 if (templateSubject == null || templateSubject.isBlank()) {
-                    templateSubject = buildDefaultSubject(eventType, patientName, displayDate);
+                    templateSubject = buildDefaultSubject(eventType, patientName, displayDate, displayTime);
                 }
                 notificationService.send(
                         orgAlias, "email", patientEmail,
@@ -136,7 +151,7 @@ public class AppointmentNotificationService {
         }
 
         // Fallback: send with default subject/body
-        String subject = buildDefaultSubject(eventType, patientName, displayDate);
+        String subject = buildDefaultSubject(eventType, patientName, displayDate, displayTime);
         String body = buildDefaultBody(eventType, variables);
         notificationService.send(orgAlias, "email", patientEmail, subject, body, patientId, "auto_" + eventType);
         log.info("Sent {} email (default template) to {} for org {}", eventType, patientEmail, orgAlias);
@@ -152,14 +167,22 @@ public class AppointmentNotificationService {
     }
 
     private String buildDefaultSubject(String eventType, String patientName, String appointmentDate) {
+        return buildDefaultSubject(eventType, patientName, appointmentDate, null);
+    }
+
+    private String buildDefaultSubject(String eventType, String patientName, String appointmentDate, String appointmentTime) {
         String dateStr = (appointmentDate != null && !appointmentDate.isBlank())
                 ? appointmentDate
                 : LocalDate.now().format(DateTimeFormatter.ofPattern("MMMM d, yyyy"));
+        // Include time in subject to make each appointment email unique (prevents email threading)
+        String timeStr = (appointmentTime != null && !appointmentTime.isBlank())
+                ? " at " + appointmentTime
+                : "";
         return switch (eventType) {
             case "appointment_confirmation" -> "Appointment Confirmation" +
-                    (patientName != null ? " for " + patientName : "") + " | " + dateStr;
+                    (patientName != null ? " for " + patientName : "") + " | " + dateStr + timeStr;
             case "appointment_reminder" -> "Appointment Reminder" +
-                    (patientName != null ? " for " + patientName : "") + " | " + dateStr;
+                    (patientName != null ? " for " + patientName : "") + " | " + dateStr + timeStr;
             case "lab_result_ready" -> "Lab Results Available";
             case "prescription_ready" -> "Prescription Ready for Pickup";
             default -> "Notification from Your Healthcare Provider";
