@@ -1,9 +1,12 @@
 package org.ciyex.ehr.controller;
 
 import org.ciyex.ehr.config.KeycloakConfig;
+import org.ciyex.ehr.fhir.FhirClientService;
 import org.ciyex.ehr.fhir.FhirPartitionService;
 import org.ciyex.ehr.service.KeycloakAdminService;
 import org.ciyex.ehr.service.KeycloakUserService;
+import org.hl7.fhir.r4.model.Bundle;
+import org.hl7.fhir.r4.model.Patient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpEntity;
@@ -37,6 +40,7 @@ public class AuthController {
     private final KeycloakAdminService keycloakAdminService;
     private final KeycloakUserService keycloakUserService;
     private final FhirPartitionService fhirPartitionService;
+    private final FhirClientService fhirClientService;
     private final org.ciyex.ehr.marketplace.repository.AppInstallationRepository appInstallationRepository;
     private final RestTemplate restTemplate = new RestTemplate();
 
@@ -232,6 +236,19 @@ public class AuthController {
                         "requiresPasswordChange", true,
                         "error", "Your password has been reset. Please set a new password."
                 ));
+            }
+
+            // Self-healing fallback: if the Keycloak user does not exist yet but a FHIR
+            // Patient with this email exists in one of the tenants, auto-provision the
+            // Keycloak account on first login attempt. This covers patients whose KC
+            // account creation silently failed during EHR patient creation.
+            try {
+                var provisioned = autoProvisionPatientAccount(username, password);
+                if (provisioned != null) {
+                    return ResponseEntity.ok(Map.of("success", true, "data", provisioned));
+                }
+            } catch (Exception ex) {
+                log.warn("Auto-provision fallback failed for {}: {}", username, ex.getMessage());
             }
 
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
@@ -458,6 +475,132 @@ public class AuthController {
                 .build();
         appInstallationRepository.save(installation);
         log.info("Auto-installed ciyex-codes for new org: {}", orgAlias);
+    }
+
+    /**
+     * Self-healing fallback for patient portal login.
+     *
+     * When an EHR admin creates a Patient, the backend attempts to create a matching
+     * Keycloak user so the patient can access the portal. That auto-create can silently
+     * fail (network blip, org lookup race, etc.), leaving the patient with a FHIR
+     * record but no Keycloak account — so every portal login returns 401.
+     *
+     * This method looks for a FHIR Patient with the given email across all tenants,
+     * and if one is found with no existing Keycloak user, provisions the KC account
+     * using the password the patient just typed (treating first login as activation),
+     * then performs the password grant and returns the token response.
+     *
+     * Returns null when no fallback applies — the caller should then return the
+     * original 401 to the user.
+     */
+    private Map<String, Object> autoProvisionPatientAccount(String email, String password) {
+        if (email == null || email.isBlank() || password == null || password.isBlank()) {
+            return null;
+        }
+
+        // Abort if a Keycloak user with this email already exists — this is a real
+        // "wrong password" case, not a missing-account case.
+        var existing = keycloakAdminService.searchUserByEmail(email);
+        if (existing != null && !existing.isEmpty()) {
+            return null;
+        }
+
+        // Locate a FHIR Patient with this email across tenants.
+        Patient patient = null;
+        String orgAlias = null;
+
+        var orgs = keycloakAdminService.getAllOrganizations();
+        if (orgs != null) {
+            for (Map<String, Object> org : orgs) {
+                String alias = (String) org.get("alias");
+                if (alias == null || alias.isBlank()) continue;
+                try {
+                    Bundle bundle = fhirClientService.searchWithParams(
+                            Patient.class, alias, Map.of("email", email));
+                    if (bundle != null && bundle.hasEntry()) {
+                        for (var entry : bundle.getEntry()) {
+                            if (entry.getResource() instanceof Patient p) {
+                                patient = p;
+                                orgAlias = alias;
+                                break;
+                            }
+                        }
+                    }
+                } catch (Exception ex) {
+                    log.debug("FHIR Patient lookup in partition {} failed: {}", alias, ex.getMessage());
+                }
+                if (patient != null) break;
+            }
+        }
+
+        if (patient == null || orgAlias == null) {
+            return null;
+        }
+
+        String fhirId = patient.getIdElement().getIdPart();
+        String firstName = patient.hasName() && patient.getNameFirstRep() != null
+                ? patient.getNameFirstRep().getGivenAsSingleString() : "";
+        String lastName = patient.hasName() && patient.getNameFirstRep() != null
+                ? patient.getNameFirstRep().getFamily() : "";
+
+        log.info("Auto-provisioning Keycloak patient account for {} (fhirId={}, org={})",
+                email, fhirId, orgAlias);
+
+        String userId;
+        try {
+            userId = keycloakUserService.createUser(
+                    email, firstName, lastName, password,
+                    Map.of("patient_fhir_id", fhirId));
+        } catch (RuntimeException ex) {
+            log.warn("Failed to auto-create Keycloak user for patient {}: {}", email, ex.getMessage());
+            return null;
+        }
+        if (userId == null) {
+            return null;
+        }
+
+        try {
+            keycloakUserService.addUserToOrganization(userId, orgAlias);
+        } catch (Exception ex) {
+            log.warn("Failed to add auto-provisioned user {} to org {}: {}",
+                    email, orgAlias, ex.getMessage());
+        }
+        try {
+            keycloakUserService.assignRolesToUser(userId, List.of("PATIENT"));
+        } catch (Exception ex) {
+            log.warn("Failed to assign PATIENT role to {}: {}", email, ex.getMessage());
+        }
+
+        // Retry the password grant now that the user exists.
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+            MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+            body.add("grant_type", "password");
+            body.add("client_id", keycloakConfig.getResource());
+            body.add("client_secret", keycloakConfig.getClientSecret());
+            body.add("username", email);
+            body.add("password", password);
+            body.add("scope", "openid profile email organization");
+
+            HttpEntity<MultiValueMap<String, String>> requestEntity = new HttpEntity<>(body, headers);
+            ResponseEntity<Map> response = restTemplate.postForEntity(
+                    keycloakConfig.getTokenEndpoint(), requestEntity, Map.class);
+
+            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+                return null;
+            }
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> tokenData = response.getBody();
+            String accessToken = (String) tokenData.get("access_token");
+            Map<String, Object> userData = parseJwtPayload(accessToken);
+            return buildAuthResponse(accessToken, tokenData, userData);
+        } catch (Exception ex) {
+            log.warn("Retry login after auto-provision failed for {}: {}", email, ex.getMessage());
+            return null;
+        }
     }
 
     private Map<String, Object> parseJwtPayload(String jwt) {
