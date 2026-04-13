@@ -325,6 +325,33 @@ public class GenericFhirResourceController {
                     log.debug("Could not look up patient {} for notification: {}", patientId, e.getMessage());
                 }
             }
+            // Resolve provider name if not present
+            if (!notifData.containsKey("providerName") || String.valueOf(notifData.getOrDefault("providerName", "")).isBlank()) {
+                try {
+                    Object providerRef = formData.get("provider");
+                    String providerId = null;
+                    if (providerRef instanceof String ref && ref.contains("/")) {
+                        providerId = ref.substring(ref.lastIndexOf("/") + 1);
+                    }
+                    if (providerId == null) providerId = String.valueOf(notifData.getOrDefault("providerId", ""));
+                    if (providerId != null && !providerId.isBlank()) {
+                        Map<String, Object> provData = resourceService.get("providers", null, providerId);
+                        if (provData != null) {
+                            Object idBlock = provData.get("identification");
+                            if (idBlock instanceof Map<?, ?> idMap) {
+                                String pfn = idMap.get("firstName") != null ? String.valueOf(idMap.get("firstName")) : "";
+                                String pln = idMap.get("lastName") != null ? String.valueOf(idMap.get("lastName")) : "";
+                                String provName = (pfn + " " + pln).trim();
+                                if (!provName.isBlank()) notifData.put("providerName", provName);
+                            } else if (provData.get("name") != null) {
+                                notifData.put("providerName", String.valueOf(provData.get("name")));
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    log.debug("Could not look up provider for notification: {}", e.getMessage());
+                }
+            }
             appointmentNotificationService.onAppointmentCreated(orgAlias, notifData);
         } catch (Exception e) {
             log.warn("Failed to trigger appointment notification: {}", e.getMessage());

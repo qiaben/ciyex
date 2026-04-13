@@ -86,6 +86,16 @@ public class AppointmentNotificationService {
         String rawTime = extractString(data, "appointmentStartTime",
                 extractString(data, "startTime",
                 extractString(data, "appointmentTime", "")));
+        // Fallback: parse from FHIR "start" ISO datetime (e.g. "2026-04-13T10:15:00-05:00")
+        if ((rawDate == null || rawDate.isBlank()) && data.containsKey("start")) {
+            String startIso = String.valueOf(data.get("start"));
+            if (startIso.length() >= 10) {
+                rawDate = startIso.substring(0, 10); // yyyy-MM-dd
+                if (startIso.length() >= 16 && (rawTime == null || rawTime.isBlank())) {
+                    rawTime = startIso.substring(11, 16); // HH:mm
+                }
+            }
+        }
         // Format date for display (YYYY-MM-DD → "March 30, 2026")
         String displayDate = rawDate;
         try {
