@@ -328,13 +328,37 @@ public class GenericFhirResourceController {
             // Resolve provider name if not present
             if (!notifData.containsKey("providerName") || String.valueOf(notifData.getOrDefault("providerName", "")).isBlank()) {
                 try {
-                    Object providerRef = formData.get("provider");
+                    // Try multiple sources for provider ID
                     String providerId = null;
+                    Object providerRef = formData.get("provider");
                     if (providerRef instanceof String ref && ref.contains("/")) {
                         providerId = ref.substring(ref.lastIndexOf("/") + 1);
+                    } else if (providerRef instanceof String ref && !ref.isBlank()) {
+                        providerId = ref; // direct ID string
+                    } else if (providerRef instanceof Number num) {
+                        providerId = String.valueOf(num.longValue());
                     }
-                    if (providerId == null) providerId = String.valueOf(notifData.getOrDefault("providerId", ""));
-                    if (providerId != null && !providerId.isBlank()) {
+                    // Fallback to providerId in form data or created data
+                    if (providerId == null || providerId.isBlank()) {
+                        Object pid = notifData.get("providerId");
+                        if (pid == null) pid = formData.get("providerId");
+                        if (pid == null) pid = formData.get("practitionerId");
+                        if (pid == null) pid = created.get("providerId");
+                        if (pid != null) providerId = String.valueOf(pid);
+                    }
+                    // Also check participant references for Practitioner
+                    if ((providerId == null || providerId.isBlank()) && created.get("participant") instanceof List<?> participants) {
+                        for (Object p : participants) {
+                            if (p instanceof Map<?, ?> pm) {
+                                String actorRef = pm.get("actor") != null ? String.valueOf(pm.get("actor")) : "";
+                                if (actorRef.contains("Practitioner/")) {
+                                    providerId = actorRef.substring(actorRef.lastIndexOf("/") + 1);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if (providerId != null && !providerId.isBlank() && !"null".equals(providerId)) {
                         Map<String, Object> provData = resourceService.get("providers", null, providerId);
                         if (provData != null) {
                             Object idBlock = provData.get("identification");
@@ -345,6 +369,11 @@ public class GenericFhirResourceController {
                                 if (!provName.isBlank()) notifData.put("providerName", provName);
                             } else if (provData.get("name") != null) {
                                 notifData.put("providerName", String.valueOf(provData.get("name")));
+                            } else if (provData.get("firstName") != null || provData.get("lastName") != null) {
+                                String fn = provData.get("firstName") != null ? String.valueOf(provData.get("firstName")) : "";
+                                String ln = provData.get("lastName") != null ? String.valueOf(provData.get("lastName")) : "";
+                                String provName = (fn + " " + ln).trim();
+                                if (!provName.isBlank()) notifData.put("providerName", provName);
                             }
                         }
                     }

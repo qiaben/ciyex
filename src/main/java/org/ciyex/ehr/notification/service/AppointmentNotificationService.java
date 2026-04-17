@@ -205,28 +205,42 @@ public class AppointmentNotificationService {
         String date = vars.getOrDefault("appointmentDate", "");
         String time = vars.getOrDefault("appointmentTime", "");
         String practice = vars.getOrDefault("practiceName", "");
+        String location = vars.getOrDefault("location_name", "");
 
-        return switch (eventType) {
+        String innerHtml = switch (eventType) {
             case "appointment_confirmation" -> String.format(
-                    "<p>Dear %s,</p>" +
-                    "<p>Your appointment has been confirmed.</p>" +
-                    "<p><strong>Date:</strong> %s<br/>" +
-                    "<strong>Time:</strong> %s<br/>" +
-                    "<strong>Provider:</strong> %s</p>" +
-                    "<p>We look forward to seeing you!</p>" +
-                    "<p>Thank you,<br/>%s</p>",
+                    "<p style=\"margin:0 0 16px\">Dear %s,</p>" +
+                    "<p style=\"margin:0 0 16px\">Your appointment has been confirmed.</p>" +
+                    "<table style=\"border-collapse:collapse;margin:0 0 16px\">" +
+                    "<tr><td style=\"padding:4px 12px 4px 0;font-weight:bold\">Date:</td><td style=\"padding:4px 0\">%s</td></tr>" +
+                    "<tr><td style=\"padding:4px 12px 4px 0;font-weight:bold\">Time:</td><td style=\"padding:4px 0\">%s</td></tr>" +
+                    "<tr><td style=\"padding:4px 12px 4px 0;font-weight:bold\">Provider:</td><td style=\"padding:4px 0\">%s</td></tr>" +
+                    (location.isBlank() ? "" : "<tr><td style=\"padding:4px 12px 4px 0;font-weight:bold\">Location:</td><td style=\"padding:4px 0\">" + location + "</td></tr>") +
+                    "</table>" +
+                    "<p style=\"margin:0 0 16px\">We look forward to seeing you!</p>" +
+                    "<p style=\"margin:0\">Thank you,<br/>%s</p>",
                     name, date, time, provider, practice);
             case "appointment_reminder" -> String.format(
-                    "<p>Dear %s,</p>" +
-                    "<p>This is a reminder about your upcoming appointment.</p>" +
-                    "<p><strong>Date:</strong> %s<br/>" +
-                    "<strong>Time:</strong> %s<br/>" +
-                    "<strong>Provider:</strong> %s</p>" +
-                    "<p>We look forward to seeing you!</p>" +
-                    "<p>Thank you,<br/>%s</p>",
+                    "<p style=\"margin:0 0 16px\">Dear %s,</p>" +
+                    "<p style=\"margin:0 0 16px\">This is a reminder about your upcoming appointment.</p>" +
+                    "<table style=\"border-collapse:collapse;margin:0 0 16px\">" +
+                    "<tr><td style=\"padding:4px 12px 4px 0;font-weight:bold\">Date:</td><td style=\"padding:4px 0\">%s</td></tr>" +
+                    "<tr><td style=\"padding:4px 12px 4px 0;font-weight:bold\">Time:</td><td style=\"padding:4px 0\">%s</td></tr>" +
+                    "<tr><td style=\"padding:4px 12px 4px 0;font-weight:bold\">Provider:</td><td style=\"padding:4px 0\">%s</td></tr>" +
+                    (location.isBlank() ? "" : "<tr><td style=\"padding:4px 12px 4px 0;font-weight:bold\">Location:</td><td style=\"padding:4px 0\">" + location + "</td></tr>") +
+                    "</table>" +
+                    "<p style=\"margin:0 0 16px\">We look forward to seeing you!</p>" +
+                    "<p style=\"margin:0\">Thank you,<br/>%s</p>",
                     name, date, time, provider, practice);
-            default -> String.format("<p>Dear %s,</p><p>You have a new notification from %s.</p>", name, practice);
+            default -> String.format(
+                    "<p style=\"margin:0 0 16px\">Dear %s,</p>" +
+                    "<p style=\"margin:0\">You have a new notification from %s.</p>",
+                    name, practice);
         };
+
+        // Wrap in a responsive HTML email wrapper for proper alignment
+        return "<div style=\"font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#333\">" +
+                innerHtml + "</div>";
     }
 
     private String extractString(Map<String, Object> data, String key) {
