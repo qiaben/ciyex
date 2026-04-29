@@ -8,6 +8,8 @@ import java.util.List;
 
 public interface PatientEducationAssignmentRepository extends JpaRepository<PatientEducationAssignment, Long> {
 
+    List<PatientEducationAssignment> findByOrgAliasOrderByCreatedAtDesc(String orgAlias);
+
     List<PatientEducationAssignment> findByOrgAliasAndPatientIdOrderByAssignedDateDesc(String orgAlias, Long patientId);
 
     List<PatientEducationAssignment> findByOrgAliasAndStatusOrderByCreatedAtDesc(String orgAlias, String status);

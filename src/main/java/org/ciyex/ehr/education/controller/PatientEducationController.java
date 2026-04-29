@@ -22,6 +22,17 @@ public class PatientEducationController {
 
     private final PatientEducationService service;
 
+    @GetMapping
+    public ResponseEntity<ApiResponse<List<PatientEducationAssignmentDto>>> listAll() {
+        try {
+            var assignments = service.listAll();
+            return ResponseEntity.ok(ApiResponse.ok("Assignments retrieved", assignments));
+        } catch (Exception e) {
+            log.error("Failed to list education assignments", e);
+            return ResponseEntity.ok(ApiResponse.error("Failed: " + e.getMessage()));
+        }
+    }
+
     @GetMapping("/patient/{patientId}")
     public ResponseEntity<ApiResponse<List<PatientEducationAssignmentDto>>> getByPatient(
             @PathVariable Long patientId) {
@@ -69,6 +80,21 @@ public class PatientEducationController {
             return ResponseEntity.status(404).body(ApiResponse.error(e.getMessage()));
         } catch (Exception e) {
             log.error("Failed to assign education material", e);
+            return ResponseEntity.badRequest().body(ApiResponse.error("Failed: " + e.getMessage()));
+        }
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('SCOPE_user/Communication.write')")
+    public ResponseEntity<ApiResponse<PatientEducationAssignmentDto>> update(
+            @PathVariable Long id, @RequestBody PatientEducationAssignmentDto dto) {
+        try {
+            var updated = service.update(id, dto);
+            return ResponseEntity.ok(ApiResponse.ok("Assignment updated", updated));
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.status(404).body(ApiResponse.error(e.getMessage()));
+        } catch (Exception e) {
+            log.error("Failed to update assignment {}", id, e);
             return ResponseEntity.badRequest().body(ApiResponse.error("Failed: " + e.getMessage()));
         }
     }

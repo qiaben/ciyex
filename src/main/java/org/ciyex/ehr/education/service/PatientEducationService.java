@@ -50,6 +50,12 @@ public class PatientEducationService {
     }
 
     @Transactional(readOnly = true)
+    public List<PatientEducationAssignmentDto> listAll() {
+        return repo.findByOrgAliasOrderByCreatedAtDesc(orgAlias())
+                .stream().map(this::toDto).toList();
+    }
+
+    @Transactional(readOnly = true)
     public List<PatientEducationAssignmentDto> getByPatient(Long patientId) {
         return repo.findByOrgAliasAndPatientIdOrderByAssignedDateDesc(orgAlias(), patientId)
                 .stream().map(this::toDto).toList();
@@ -61,6 +67,26 @@ public class PatientEducationService {
                 .filter(a -> a.getOrgAlias().equals(orgAlias()))
                 .map(this::toDto)
                 .orElseThrow(() -> new NoSuchElementException("Assignment not found: " + id));
+    }
+
+    @Transactional
+    public PatientEducationAssignmentDto update(Long id, PatientEducationAssignmentDto dto) {
+        var assignment = repo.findById(id)
+                .filter(a -> a.getOrgAlias().equals(orgAlias()))
+                .orElseThrow(() -> new NoSuchElementException("Assignment not found: " + id));
+
+        if (dto.getPatientId() != null) assignment.setPatientId(dto.getPatientId());
+        if (dto.getPatientName() != null) assignment.setPatientName(dto.getPatientName());
+        if (dto.getMaterialId() != null) assignment.setMaterialId(dto.getMaterialId());
+        if (dto.getAssignedBy() != null) assignment.setAssignedBy(dto.getAssignedBy());
+        if (dto.getAssignedDate() != null) assignment.setAssignedDate(parseDate(dto.getAssignedDate()));
+        if (dto.getDueDate() != null) assignment.setDueDate(parseDate(dto.getDueDate()));
+        if (dto.getStatus() != null) assignment.setStatus(dto.getStatus());
+        if (dto.getEncounterId() != null) assignment.setEncounterId(dto.getEncounterId());
+        if (dto.getNotes() != null) assignment.setNotes(dto.getNotes());
+        if (dto.getPatientFeedback() != null) assignment.setPatientFeedback(dto.getPatientFeedback());
+
+        return toDto(repo.save(assignment));
     }
 
     @Transactional
