@@ -774,7 +774,10 @@ public class FhirPathMapper {
                 || pathLower.contains("recorder") || pathLower.contains("asserter")
                 || pathLower.contains("sender") || pathLower.contains("author")
                 || pathLower.contains("authenticator") || pathLower.contains("billingprovider")
-                || propLower.equals("practitioner")) {
+                || pathLower.contains("participant.individual")
+                || pathLower.contains("participant.actor")
+                || propLower.equals("practitioner")
+                || propLower.equals("individual")) {
             return "Practitioner";
         }
         if (pathLower.contains("subject") || pathLower.contains("patient")
