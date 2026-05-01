@@ -62,6 +62,35 @@ public class CdsAlertController {
         }
     }
 
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('SCOPE_user/Flag.write')")
+    public ResponseEntity<ApiResponse<CdsAlertLogDto>> update(
+            @PathVariable Long id, @RequestBody CdsAlertLogDto dto) {
+        try {
+            var updated = service.updateAlert(id, dto);
+            return ResponseEntity.ok(ApiResponse.ok("CDS alert updated", updated));
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.status(404).body(ApiResponse.error(e.getMessage()));
+        } catch (Exception e) {
+            log.error("Failed to update CDS alert {}", id, e);
+            return ResponseEntity.badRequest().body(ApiResponse.error("Failed: " + e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('SCOPE_user/Flag.write')")
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
+        try {
+            service.deleteAlert(id);
+            return ResponseEntity.ok(ApiResponse.ok("CDS alert deleted", null));
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.status(404).body(ApiResponse.error(e.getMessage()));
+        } catch (Exception e) {
+            log.error("Failed to delete CDS alert {}", id, e);
+            return ResponseEntity.badRequest().body(ApiResponse.error("Failed: " + e.getMessage()));
+        }
+    }
+
     @PostMapping("/{id}/acknowledge")
     @PreAuthorize("hasAuthority('SCOPE_user/Flag.write')")
     public ResponseEntity<ApiResponse<CdsAlertLogDto>> acknowledge(

@@ -178,6 +178,34 @@ public class CdsService {
         return toAlertDto(alertRepo.save(alert));
     }
 
+    @Transactional
+    public CdsAlertLogDto updateAlert(Long alertId, CdsAlertLogDto dto) {
+        if (alertId == null) {
+            throw new IllegalArgumentException("alertId is required to update a CDS alert");
+        }
+        var alert = alertRepo.findById(alertId)
+                .filter(a -> a.getOrgAlias().equals(orgAlias()))
+                .orElseThrow(() -> new NoSuchElementException("CDS alert not found: " + alertId));
+        if (dto.getRuleName() != null) alert.setRuleName(dto.getRuleName());
+        if (dto.getAlertType() != null) alert.setAlertType(dto.getAlertType());
+        if (dto.getSeverity() != null) alert.setSeverity(dto.getSeverity());
+        if (dto.getMessage() != null) alert.setMessage(dto.getMessage());
+        if (dto.getEncounterId() != null) alert.setEncounterId(dto.getEncounterId());
+        if (dto.getPatientName() != null) alert.setPatientName(dto.getPatientName());
+        return toAlertDto(alertRepo.save(alert));
+    }
+
+    @Transactional
+    public void deleteAlert(Long alertId) {
+        if (alertId == null) {
+            throw new IllegalArgumentException("alertId is required to delete a CDS alert");
+        }
+        var alert = alertRepo.findById(alertId)
+                .filter(a -> a.getOrgAlias().equals(orgAlias()))
+                .orElseThrow(() -> new NoSuchElementException("CDS alert not found: " + alertId));
+        alertRepo.delete(alert);
+    }
+
     @Transactional(readOnly = true)
     public Page<CdsAlertLogDto> getAllAlerts(Pageable pageable) {
         return alertRepo.findByOrgAlias(orgAlias(), pageable).map(this::toAlertDto);
