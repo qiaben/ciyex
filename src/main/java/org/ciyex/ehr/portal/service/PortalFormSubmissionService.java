@@ -16,6 +16,10 @@ public class PortalFormSubmissionService {
     private final PortalFormSubmissionRepository repo;
 
     public PortalFormSubmission submit(String orgAlias, PortalFormSubmission submission) {
+        if (submission.getFormId() == null) {
+            throw new IllegalArgumentException(
+                    "formId is required to submit a portal form. Pick a form template before submitting.");
+        }
         submission.setOrgAlias(orgAlias);
         submission.setStatus("pending");
         submission.setSubmittedDate(Instant.now());

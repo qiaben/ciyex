@@ -28,6 +28,12 @@ public class PatientEducationService {
 
     @Transactional
     public PatientEducationAssignmentDto assign(PatientEducationAssignmentDto dto) {
+        if (dto.getMaterialId() == null) {
+            throw new IllegalArgumentException("materialId is required to assign education");
+        }
+        if (dto.getPatientId() == null) {
+            throw new IllegalArgumentException("patientId is required to assign education");
+        }
         // Validate material exists
         var material = materialRepo.findById(dto.getMaterialId())
                 .filter(m -> m.getOrgAlias().equals(orgAlias()))
