@@ -69,12 +69,25 @@ public class GlobalExceptionHandler {
  
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResponse<Object>> handleIllegalArgumentException(IllegalArgumentException ex) {
-        log.error("Invalid argument: {}", ex.getMessage());
+        // Spring Data JPA throws IllegalArgumentException("The given id must not be null") when
+        // findById/getReferenceById is called with null. The raw message is meaningless to the
+        // user — surface a clearer hint while preserving the stack trace in logs so the actual
+        // throw site is identifiable for future fixes.
+        String raw = ex.getMessage();
+        boolean isJpaNullId = raw != null && raw.contains("The given id must not be null");
+        if (isJpaNullId) {
+            log.error("JPA null-id error — a required ID field is missing on the request payload", ex);
+        } else {
+            log.error("Invalid argument: {}", raw, ex);
+        }
+        String userMsg = isJpaNullId
+                ? "A required ID field is missing on the request. Pick a value for any reference / lookup field before saving."
+                : raw;
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.builder()
                         .success(false)
-                        .message(ex.getMessage())
+                        .message(userMsg)
                         .data(null)
                         .build());
     }
