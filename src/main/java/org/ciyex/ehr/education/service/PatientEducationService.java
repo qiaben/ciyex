@@ -28,14 +28,17 @@ public class PatientEducationService {
 
     @Transactional
     public PatientEducationAssignmentDto assign(PatientEducationAssignmentDto dto) {
-        if (dto.getMaterialId() == null) {
-            throw new IllegalArgumentException("materialId is required to assign education");
-        }
+        // Up-front validation — without these, JPA throws the cryptic
+        // "The given id must not be null" when the UI omits patientId or
+        // materialId. Reject with a user-readable message instead.
         if (dto.getPatientId() == null) {
-            throw new IllegalArgumentException("patientId is required to assign education");
+            throw new IllegalArgumentException("Patient is required");
+        }
+        if (dto.getMaterialId() == null) {
+            throw new IllegalArgumentException("Education material is required");
         }
         // Validate material exists
-        var material = materialRepo.findById(dto.getMaterialId())
+        materialRepo.findById(dto.getMaterialId())
                 .filter(m -> m.getOrgAlias().equals(orgAlias()))
                 .orElseThrow(() -> new NoSuchElementException("Material not found: " + dto.getMaterialId()));
 
