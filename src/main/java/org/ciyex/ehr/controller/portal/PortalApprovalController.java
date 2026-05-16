@@ -26,6 +26,17 @@ public class PortalApprovalController {
     private final PortalApprovalService portalApprovalService;
 
     /**
+     * Get all portal users waiting for approval (alias of /pending for clients
+     * — like the Ciyex Workspace Patient Approvals editor — that fetch the
+     * collection root).
+     * GET /api/portal/approvals
+     */
+    @GetMapping
+    public ResponseEntity<ApiResponse<List<PortalUserDto>>> listApprovals() {
+        return ResponseEntity.ok(portalApprovalService.getPendingUsers());
+    }
+
+    /**
      * Get all pending portal users waiting for approval
      * GET /api/portal/approvals/pending
      */

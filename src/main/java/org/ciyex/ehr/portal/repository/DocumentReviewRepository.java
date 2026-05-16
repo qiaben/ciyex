@@ -9,6 +9,8 @@ public interface DocumentReviewRepository extends JpaRepository<DocumentReview, 
 
     List<DocumentReview> findByOrgAliasAndStatusOrderByCreatedAtDesc(String orgAlias, String status);
 
+    List<DocumentReview> findByOrgAliasOrderByCreatedAtDesc(String orgAlias);
+
     Optional<DocumentReview> findByIdAndOrgAlias(Long id, String orgAlias);
 
     Optional<DocumentReview> findByFhirIdAndOrgAlias(String fhirId, String orgAlias);

@@ -45,6 +45,25 @@ public class PortalDocumentReviewController {
     private final PortalNotificationService portalNotificationService;
 
     /**
+     * GET /api/portal/document-reviews
+     * List all patient-uploaded documents for the current org. Optional ?status=PENDING|ACCEPTED|REJECTED.
+     * Used by the Ciyex Workspace Document Reviews editor, which fetches at the collection root.
+     */
+    @GetMapping
+    public ResponseEntity<ApiResponse<List<DocumentReview>>> listDocuments(
+            @RequestParam(value = "status", required = false) String status) {
+        String orgAlias = practiceContextService.getPracticeId();
+        if (orgAlias == null) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("No organization context"));
+        }
+
+        List<DocumentReview> docs = (status != null && !status.isBlank())
+                ? reviewRepo.findByOrgAliasAndStatusOrderByCreatedAtDesc(orgAlias, status.toUpperCase())
+                : reviewRepo.findByOrgAliasOrderByCreatedAtDesc(orgAlias);
+        return ResponseEntity.ok(ApiResponse.success("Document reviews retrieved", docs));
+    }
+
+    /**
      * GET /api/portal/document-reviews/pending
      * List all pending patient-uploaded documents for the current org.
      */
