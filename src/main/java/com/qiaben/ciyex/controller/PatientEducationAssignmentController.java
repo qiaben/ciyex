@@ -20,11 +20,18 @@ public class PatientEducationAssignmentController {
     public ResponseEntity<ApiResponse<PatientEducationAssignmentDto>> assign(
             @PathVariable Long educationId,
             @RequestBody PatientEducationAssignmentDto dto) {
-        return ResponseEntity.ok(ApiResponse.<PatientEducationAssignmentDto>builder()
-                .success(true)
-                .message("Assigned successfully")
-                .data(service.assign(educationId, dto))
-                .build());
+        try {
+            return ResponseEntity.ok(ApiResponse.<PatientEducationAssignmentDto>builder()
+                    .success(true)
+                    .message("Assigned successfully")
+                    .data(service.assign(educationId, dto))
+                    .build());
+        } catch (Exception e) {
+            return ResponseEntity.ok(ApiResponse.<PatientEducationAssignmentDto>builder()
+                    .success(false)
+                    .message("Failed to assign education: " + e.getMessage())
+                    .build());
+        }
     }
 
     @GetMapping("/patient/{patientId}")

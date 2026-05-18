@@ -110,40 +110,42 @@ public class DocumentService {
             }
         }
 
-        // 6. Upload to S3
+        // 6. Upload to S3 or fall back to local DB storage
         StorageConfig.S3 s3Config = configProvider.getS3DocumentStorage();
-        if (s3Config == null) {
-            throw new RuntimeException("S3 document storage is not configured");
-        }
-        S3Client s3 = buildS3Client(s3Config);
-
-        String key = tenantName + "/documents/" + patientId + "/" + UUID.randomUUID() + "_" + file.getOriginalFilename();
-        try {
-            s3.putObject(
-                    PutObjectRequest.builder()
-                            .bucket(s3Config.getBucket())
-                            .key(key)
-                            .contentType(file.getContentType())
-                            .build(),
-                    RequestBody.fromBytes(fileBytes)
-            );
-            log.info("Uploaded to S3 bucket={} key={}", s3Config.getBucket(), key);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to upload file to S3", e);
-        }
-
-        // 7. Save metadata in DB
         dto.setPatientId(patientId);
         dto.setFileName(file.getOriginalFilename());
         dto.setContentType(file.getContentType());
-        dto.setS3Bucket(s3Config.getBucket());
-        dto.setS3Key(key);
 
         Document entity = mapToEntity(dto);
-        entity.setTenantName(tenantName); // Save tenant name from header
+        entity.setTenantName(tenantName);
         entity.setEncryptionKey(base64Key);
         entity.setInitializationVector(base64Iv);
 
+        if (s3Config != null) {
+            S3Client s3 = buildS3Client(s3Config);
+            String key = tenantName + "/documents/" + patientId + "/" + UUID.randomUUID() + "_" + file.getOriginalFilename();
+            try {
+                s3.putObject(
+                        PutObjectRequest.builder()
+                                .bucket(s3Config.getBucket())
+                                .key(key)
+                                .contentType(file.getContentType())
+                                .build(),
+                        RequestBody.fromBytes(fileBytes)
+                );
+                log.info("Uploaded to S3 bucket={} key={}", s3Config.getBucket(), key);
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to upload file to S3", e);
+            }
+            entity.setS3Bucket(s3Config.getBucket());
+            entity.setS3Key(key);
+        } else {
+            // Local DB fallback when S3 is not configured
+            entity.setContentBase64(Base64.getEncoder().encodeToString(fileBytes));
+            log.info("S3 not configured — stored file content locally for patientId={}", patientId);
+        }
+
+        // 7. Save metadata (and optionally content) in DB
         repository.save(entity);
         dto.setId(entity.getId());
         dto.setContent(null);
@@ -156,20 +158,20 @@ public class DocumentService {
         Document document = repository.findById(documentId)
                 .orElseThrow(() -> new RuntimeException("Document not found"));
 
-        StorageConfig.S3 s3Config = configProvider.getS3DocumentStorage();
-        if (s3Config == null) {
-            throw new RuntimeException("S3 document storage is not configured");
-        }
-        S3Client s3 = buildS3Client(s3Config);
-
-        try {
-            s3.deleteObject(DeleteObjectRequest.builder()
-                    .bucket(document.getS3Bucket())
-                    .key(document.getS3Key())
-                    .build());
-            log.info("Deleted from S3: bucket={}, key={}", document.getS3Bucket(), document.getS3Key());
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to delete file from S3", e);
+        if (document.getS3Key() != null && !document.getS3Key().isBlank()) {
+            StorageConfig.S3 s3Config = configProvider.getS3DocumentStorage();
+            if (s3Config != null) {
+                try {
+                    S3Client s3 = buildS3Client(s3Config);
+                    s3.deleteObject(DeleteObjectRequest.builder()
+                            .bucket(document.getS3Bucket())
+                            .key(document.getS3Key())
+                            .build());
+                    log.info("Deleted from S3: bucket={}, key={}", document.getS3Bucket(), document.getS3Key());
+                } catch (Exception e) {
+                    throw new RuntimeException("Failed to delete file from S3", e);
+                }
+            }
         }
 
         repository.delete(document);
@@ -180,42 +182,48 @@ public class DocumentService {
         Document document = repository.findById(documentId)
                 .orElseThrow(() -> new RuntimeException("Document not found"));
 
-        StorageConfig.S3 s3Config = configProvider.getS3DocumentStorage();
-        if (s3Config == null) {
-            throw new RuntimeException("S3 document storage is not configured");
-        }
-        S3Client s3 = buildS3Client(s3Config);
+        byte[] fileBytes;
 
-        try (InputStream is = s3.getObject(GetObjectRequest.builder()
-                .bucket(document.getS3Bucket())
-                .key(document.getS3Key())
-                .build())) {
-
-            byte[] fileBytes = is.readAllBytes();
-
-            // 🔑 decrypt if metadata exists
-            if (document.getEncryptionKey() != null && document.getInitializationVector() != null) {
-                try {
-                    byte[] decodedKey = Base64.getDecoder().decode(document.getEncryptionKey());
-                    SecretKey key = EncryptionUtil.fromBytes(decodedKey);
-                    byte[] iv = Base64.getDecoder().decode(document.getInitializationVector());
-
-                    fileBytes = EncryptionUtil.decrypt(fileBytes, key, iv);
-                    log.info("Decrypted file before sending: {}", document.getFileName());
-                } catch (Exception e) {
-                    throw new RuntimeException("Failed to decrypt file", e);
-                }
+        if (document.getS3Key() != null && !document.getS3Key().isBlank()) {
+            // Retrieve from S3
+            StorageConfig.S3 s3Config = configProvider.getS3DocumentStorage();
+            if (s3Config == null) {
+                throw new RuntimeException("S3 document storage is not configured");
             }
-
-            return new DownloadResult(
-                    new java.io.ByteArrayInputStream(fileBytes),
-                    document.getContentType(),
-                    document.getFileName()
-            );
-
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to download file from S3", e);
+            S3Client s3 = buildS3Client(s3Config);
+            try (InputStream is = s3.getObject(GetObjectRequest.builder()
+                    .bucket(document.getS3Bucket())
+                    .key(document.getS3Key())
+                    .build())) {
+                fileBytes = is.readAllBytes();
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to download file from S3", e);
+            }
+        } else if (document.getContentBase64() != null && !document.getContentBase64().isBlank()) {
+            // Retrieve from local DB storage
+            fileBytes = Base64.getDecoder().decode(document.getContentBase64());
+        } else {
+            throw new RuntimeException("No file content available for document " + documentId);
         }
+
+        // Decrypt if metadata exists
+        if (document.getEncryptionKey() != null && document.getInitializationVector() != null) {
+            try {
+                byte[] decodedKey = Base64.getDecoder().decode(document.getEncryptionKey());
+                SecretKey key = EncryptionUtil.fromBytes(decodedKey);
+                byte[] iv = Base64.getDecoder().decode(document.getInitializationVector());
+                fileBytes = EncryptionUtil.decrypt(fileBytes, key, iv);
+                log.info("Decrypted file before sending: {}", document.getFileName());
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to decrypt file", e);
+            }
+        }
+
+        return new DownloadResult(
+                new java.io.ByteArrayInputStream(fileBytes),
+                document.getContentType(),
+                document.getFileName()
+        );
     }
 
     @Transactional(readOnly = true)

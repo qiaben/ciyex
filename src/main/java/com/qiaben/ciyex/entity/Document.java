@@ -22,9 +22,14 @@ public class Document extends AuditableEntity {
     private String tenantName; // Tenant name from X-Tenant-Name header, nullable
     // audit fields are provided by AuditableEntity
 
-    // S3 details
+    // S3 details (null when stored locally)
     private String s3Bucket;
     private String s3Key;
+
+    // Local storage fallback — used when S3 is not configured
+    @Lob
+    @Column(name = "content", columnDefinition = "TEXT")
+    private String contentBase64;
 
     // Encryption metadata (Base64 encoded)
     @Column(length = 512)

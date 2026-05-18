@@ -47,11 +47,18 @@ public class PatientEducationController {
 
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<PatientEducationDto>> update(@PathVariable Long id, @RequestBody PatientEducationDto dto) {
-        return ResponseEntity.ok(ApiResponse.<PatientEducationDto>builder()
-                .success(true)
-                .message("Patient education updated successfully")
-                .data(service.update(id, dto))
-                .build());
+        try {
+            return ResponseEntity.ok(ApiResponse.<PatientEducationDto>builder()
+                    .success(true)
+                    .message("Patient education updated successfully")
+                    .data(service.update(id, dto))
+                    .build());
+        } catch (Exception e) {
+            return ResponseEntity.ok(ApiResponse.<PatientEducationDto>builder()
+                    .success(false)
+                    .message("Failed to update patient education: " + e.getMessage())
+                    .build());
+        }
     }
 
     @DeleteMapping("/{id}")

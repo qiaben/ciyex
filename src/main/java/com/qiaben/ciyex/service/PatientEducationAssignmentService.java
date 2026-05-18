@@ -66,6 +66,10 @@ public class PatientEducationAssignmentService {
     }
 
     public PatientEducationAssignmentDto assign(Long educationId, PatientEducationAssignmentDto dto) {
+        if (dto.getPatientId() == null) {
+            throw new IllegalArgumentException("Patient ID must not be null. Please select a patient before assigning.");
+        }
+
         PatientEducation education = educationRepository.findById(educationId)
                 .orElseThrow(() -> new RuntimeException("Education not found"));
 
@@ -77,7 +81,7 @@ public class PatientEducationAssignmentService {
 
         // Fetch patient to get their name
         Patient patient = patientRepository.findById(dto.getPatientId())
-                .orElseThrow(() -> new RuntimeException("Patient not found"));
+                .orElseThrow(() -> new RuntimeException("Patient not found with id: " + dto.getPatientId()));
 
         PatientEducationAssignment assignment = PatientEducationAssignment.builder()
                 .education(education)
