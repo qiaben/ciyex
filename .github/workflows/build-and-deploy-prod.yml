@@ -65,7 +65,7 @@ jobs:
 
       - name: Verify deployment
         run: |
-          kubectl rollout status deployment/prod-ciyex-app -n default --timeout=5m
+          kubectl rollout status deployment/prod-ciyex-app -n default --timeout=10m
           kubectl get pods -l app=ciyex-app -n default -o wide
 
   notify:
