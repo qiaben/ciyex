@@ -1,35 +1,23 @@
-name: Build & Deploy Ciyex App Stage
+name: Build & Deploy Ciyex App Production
 
 on:
   push:
-    branches: [ 'stage' ]
-  pull_request:
-    branches: [ 'stage' ]
+    branches:
+      - 'release/**'
+  workflow_dispatch:
 
 env:
-  IMAGE_NAME: ciyex-app-stage
+  IMAGE_NAME: ciyex-app-prod
   REGISTRY: ${{ secrets.REGISTRY_URL }}
   VERSION: v1.0.${{ github.run_number }}
 
 jobs:
-  pr-build:
-    name: PR Build - Validate Docker Image
-    if: github.event_name == 'pull_request'
-    runs-on: [self-hosted, linux, x64]
-
-    steps:
-      - name: Checkout source
-        uses: actions/checkout@v3
-
-      - name: Build Docker image (no push)
-        run: |
-          docker build --build-arg ENVIRONMENT=stage -t $REGISTRY/$IMAGE_NAME:$VERSION .
-          echo "✅ PR image build successful: $REGISTRY/$IMAGE_NAME:$VERSION"
-
   build-and-deploy:
-    name: Deploy to Staging
-    if: github.ref == 'refs/heads/stage'
+    name: Deploy to Production
     runs-on: [self-hosted, linux, x64]
+    environment:
+      name: production
+      url: https://api.ciyex.com
 
     steps:
       - name: Checkout Repo
@@ -49,19 +37,19 @@ jobs:
 
       - name: Build and Push Docker Image
         run: |
-          docker build --build-arg ENVIRONMENT=stage -t $REGISTRY/$IMAGE_NAME:$VERSION .
+          docker build --build-arg ENVIRONMENT=prod -t $REGISTRY/$IMAGE_NAME:$VERSION .
           docker push $REGISTRY/$IMAGE_NAME:$VERSION
           echo "✅ Image pushed: $REGISTRY/$IMAGE_NAME:$VERSION"
 
       - name: Update image in kustomization
         run: |
-          sed -i "s|newName: IMAGE_URL|newName: $REGISTRY/$IMAGE_NAME|g" k8s/overlays/stage/kustomization.yaml
-          sed -i "s|newTag: IMAGE_TAG|newTag: $VERSION|g" k8s/overlays/stage/kustomization.yaml
+          sed -i "s|newName: IMAGE_URL|newName: $REGISTRY/$IMAGE_NAME|g" k8s/overlays/prod/kustomization.yaml
+          sed -i "s|newTag: IMAGE_TAG|newTag: $VERSION|g" k8s/overlays/prod/kustomization.yaml
 
-      - name: Configure kubectl for stage
+      - name: Configure kubectl for production
         run: |
-          echo "${{ secrets.KUBE_CONFIG_STAGE }}" | base64 -d > /tmp/kube-stage.yaml
-          echo "KUBECONFIG=/tmp/kube-stage.yaml" >> $GITHUB_ENV
+          echo "${{ secrets.KUBE_CONFIG_PROD }}" | base64 -d > /tmp/kube-prod.yaml
+          echo "KUBECONFIG=/tmp/kube-prod.yaml" >> $GITHUB_ENV
 
       - name: Create registry pull secret
         run: |
@@ -73,11 +61,11 @@ jobs:
             --dry-run=client -o yaml | kubectl apply -f - --validate=false || true
 
       - name: Deploy to Kubernetes
-        run: kubectl apply -k k8s/overlays/stage --validate=false
+        run: kubectl apply -k k8s/overlays/prod --validate=false
 
       - name: Verify deployment
         run: |
-          kubectl rollout status deployment/stage-ciyex-app --timeout=3m
+          kubectl rollout status deployment/ciyex-app --timeout=5m
           kubectl get pods -l app=ciyex-app -o wide
 
   notify:
@@ -115,16 +103,16 @@ jobs:
             "@type": "MessageCard",
             "@context": "https://schema.org/extensions",
             "themeColor": "'"$STATUS_COLOR"'",
-            "summary": "Ciyex Backend Stage Deployment ${{ steps.status.outputs.status }}",
+            "summary": "Ciyex Backend Production Deployment ${{ steps.status.outputs.status }}",
             "sections": [{
-              "activityTitle": "${{ steps.status.outputs.emoji }} Ciyex Backend Stage Deployment ${{ steps.status.outputs.status }}",
+              "activityTitle": "${{ steps.status.outputs.emoji }} Ciyex Backend Production Deployment ${{ steps.status.outputs.status }}",
               "activitySubtitle": "Version ${{ env.VERSION }}",
               "facts": [
-                {"name": "Environment:", "value": "Stage"},
+                {"name": "Environment:", "value": "Production"},
                 {"name": "Version:", "value": "${{ env.VERSION }}"},
                 {"name": "Deployed by:", "value": "${{ github.actor }}"},
                 {"name": "Commit:", "value": "${{ github.sha }}"},
-                {"name": "URL:", "value": "https://stg.ciyex.com/api"}
+                {"name": "URL:", "value": "https://api.ciyex.com"}
               ],
               "markdown": true
             }],
