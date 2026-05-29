@@ -9,8 +9,6 @@ public interface PaymentPlanRepository extends JpaRepository<PaymentPlan, Long> 
 
     List<PaymentPlan> findByOrgAliasAndPatientIdOrderByCreatedAtDesc(String orgAlias, Long patientId);
 
-    List<PaymentPlan> findByOrgAliasOrderByCreatedAtDesc(String orgAlias);
-
     Optional<PaymentPlan> findByIdAndOrgAlias(Long id, String orgAlias);
 
     List<PaymentPlan> findByOrgAliasAndStatusOrderByNextPaymentDateAsc(String orgAlias, String status);

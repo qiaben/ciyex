@@ -320,12 +320,6 @@ public class PaymentService {
                 .stream().map(this::toPlanDto).toList();
     }
 
-    @Transactional(readOnly = true)
-    public List<PaymentPlanDto> listAllPlans() {
-        return planRepo.findByOrgAliasOrderByCreatedAtDesc(orgAlias())
-                .stream().map(this::toPlanDto).toList();
-    }
-
     @Transactional
     public PaymentPlanDto updatePlan(Long id, PaymentPlanDto dto) {
         var plan = planRepo.findByIdAndOrgAlias(id, orgAlias())
@@ -359,12 +353,6 @@ public class PaymentService {
     @Transactional(readOnly = true)
     public List<PatientLedgerDto> getLedger(Long patientId) {
         return ledgerRepo.findByOrgAliasAndPatientIdOrderByCreatedAtDesc(orgAlias(), patientId)
-                .stream().map(this::toLedgerDto).toList();
-    }
-
-    @Transactional(readOnly = true)
-    public List<PatientLedgerDto> getAllLedger() {
-        return ledgerRepo.findByOrgAliasOrderByCreatedAtDesc(orgAlias())
                 .stream().map(this::toLedgerDto).toList();
     }
 

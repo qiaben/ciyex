@@ -191,17 +191,6 @@ public class PaymentController {
 
     // ── Payment Plans ────────────────────────────────────────────────────
 
-    @GetMapping("/plans")
-    public ResponseEntity<ApiResponse<List<PaymentPlanDto>>> listAllPlans() {
-        try {
-            var plans = service.listAllPlans();
-            return ResponseEntity.ok(ApiResponse.ok("Payment plans retrieved", plans));
-        } catch (Exception e) {
-            log.error("Failed to list payment plans", e);
-            return ResponseEntity.ok(ApiResponse.error("Failed: " + e.getMessage()));
-        }
-    }
-
     @GetMapping("/plans/patient/{patientId}")
     public ResponseEntity<ApiResponse<List<PaymentPlanDto>>> listPlans(@PathVariable Long patientId) {
         try {
@@ -255,17 +244,6 @@ public class PaymentController {
     }
 
     // ── Ledger ───────────────────────────────────────────────────────────
-
-    @GetMapping("/ledger")
-    public ResponseEntity<ApiResponse<List<PatientLedgerDto>>> getAllLedger() {
-        try {
-            var ledger = service.getAllLedger();
-            return ResponseEntity.ok(ApiResponse.ok("Ledger retrieved", ledger));
-        } catch (Exception e) {
-            log.error("Failed to get ledger", e);
-            return ResponseEntity.ok(ApiResponse.error("Failed: " + e.getMessage()));
-        }
-    }
 
     @GetMapping("/ledger/patient/{patientId}")
     public ResponseEntity<ApiResponse<List<PatientLedgerDto>>> getLedger(@PathVariable Long patientId) {

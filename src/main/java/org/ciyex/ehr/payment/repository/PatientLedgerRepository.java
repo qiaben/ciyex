@@ -11,8 +11,6 @@ public interface PatientLedgerRepository extends JpaRepository<PatientLedger, Lo
 
     List<PatientLedger> findByOrgAliasAndPatientIdOrderByCreatedAtDesc(String orgAlias, Long patientId);
 
-    List<PatientLedger> findByOrgAliasOrderByCreatedAtDesc(String orgAlias);
-
     @Query("SELECT COALESCE(SUM(l.amount),0) FROM PatientLedger l WHERE l.orgAlias = :org AND l.patientId = :pid")
     BigDecimal sumByPatient(@Param("org") String orgAlias, @Param("pid") Long patientId);
 
