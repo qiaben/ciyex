@@ -150,9 +150,10 @@ public class ProviderController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<ProviderDto>>> getAllProviders() {
+    public ResponseEntity<ApiResponse<List<ProviderDto>>> getAllProviders(
+            @RequestParam(required = false) String search) {
         try {
-            ApiResponse<List<ProviderDto>> response = service.getAllProviders();
+            ApiResponse<List<ProviderDto>> response = service.getAllProviders(search);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

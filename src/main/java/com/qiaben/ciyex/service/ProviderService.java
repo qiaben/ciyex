@@ -241,8 +241,17 @@ public class ProviderService {
 
     @Transactional(readOnly = true)
     public ApiResponse<List<ProviderDto>> getAllProviders() {
-        // Fetch all providers directly from the database
-        List<Provider> providers = repository.findAll();
+        return getAllProviders(null);
+    }
+
+    @Transactional(readOnly = true)
+    public ApiResponse<List<ProviderDto>> getAllProviders(String search) {
+        List<Provider> providers;
+        if (search != null && !search.isBlank()) {
+            providers = repository.searchBy(search.toLowerCase());
+        } else {
+            providers = repository.findAll();
+        }
         String tenantName = getTenantNameSafely();
         log.info("Retrieved {} providers from DB for orgId: {}", providers.size(), tenantName);
         List<ProviderDto> providerDtos = providers.stream().map(this::mapToDto).collect(Collectors.toList());
