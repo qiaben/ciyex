@@ -125,8 +125,8 @@ public class PaymentService {
                 .paymentMethodId(dto.getPaymentMethodId())
                 .amount(dto.getAmount())
                 .currency(dto.getCurrency() != null ? dto.getCurrency() : "USD")
-                .status("completed")  // mock: mark completed immediately
-                .transactionType("payment")
+                .status(dto.getStatus() != null && !dto.getStatus().isBlank() ? dto.getStatus() : "completed")
+                .transactionType(dto.getTransactionType() != null && !dto.getTransactionType().isBlank() ? dto.getTransactionType() : "payment")
                 .paymentMethodType(dto.getPaymentMethodType())
                 .cardBrand(dto.getCardBrand())
                 .lastFour(dto.getLastFour())
@@ -225,6 +225,8 @@ public class PaymentService {
         if (dto.getDescription() != null) txn.setDescription(dto.getDescription());
         if (dto.getPaymentMethodType() != null) txn.setPaymentMethodType(dto.getPaymentMethodType());
         if (dto.getNotes() != null) txn.setNotes(dto.getNotes());
+        if (dto.getStatus() != null && !dto.getStatus().isBlank()) txn.setStatus(dto.getStatus());
+        if (dto.getTransactionType() != null && !dto.getTransactionType().isBlank()) txn.setTransactionType(dto.getTransactionType());
 
         txn = transactionRepo.save(txn);
         return toTransactionDto(txn);
