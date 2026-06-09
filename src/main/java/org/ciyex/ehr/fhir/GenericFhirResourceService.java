@@ -1375,8 +1375,11 @@ public class GenericFhirResourceService {
                     var name = p.getNameFirstRep();
                     String given = name.hasGiven() ? name.getGiven().get(0).getValue() : "";
                     String family = name.hasFamily() ? name.getFamily() : "";
-                    return (given + " " + family).trim();
+                    String full = (given + " " + family).trim();
+                    if (!full.isBlank()) return full;
                 }
+                String fromForm = nameFromFormData(resource);
+                if (fromForm != null) return fromForm;
             } else if (resource instanceof org.hl7.fhir.r4.model.Location l) {
                 return l.hasName() ? l.getName() : null;
             } else if (resource instanceof org.hl7.fhir.r4.model.Patient p) {
@@ -1384,8 +1387,14 @@ public class GenericFhirResourceService {
                     var name = p.getNameFirstRep();
                     String given = name.hasGiven() ? name.getGiven().get(0).getValue() : "";
                     String family = name.hasFamily() ? name.getFamily() : "";
-                    return (given + " " + family).trim();
+                    String full = (given + " " + family).trim();
+                    if (!full.isBlank()) return full;
                 }
+                // Patients created in a new practice may carry their name only in
+                // the form-data extension, not yet in FHIR HumanName — without this
+                // fallback the encounter rail shows "Unknown" until re-indexed.
+                String fromForm = nameFromFormData(resource);
+                if (fromForm != null) return fromForm;
             }
             // Fallback: try to get "name" property
             var prop = resource.getNamedProperty("name");
@@ -1399,6 +1408,25 @@ public class GenericFhirResourceService {
             log.debug("Could not extract display name from {}: {}", resource.fhirType(), e.getMessage());
         }
         return null;
+    }
+
+    /**
+     * Build a person's display name from the resource's form-data extension
+     * (identification.firstName/lastName, or flat firstName/lastName). Used as a
+     * fallback when the FHIR HumanName is absent. Returns null if no name found.
+     */
+    private String nameFromFormData(Resource resource) {
+        try {
+            Map<String, Object> fd = extractFormDataExtension(resource);
+            if (fd == null || fd.isEmpty()) return null;
+            String label = buildLabel(fd, "identification.firstName", "identification.lastName");
+            if (label == null || label.isBlank()) {
+                label = buildLabel(fd, "firstName", "lastName");
+            }
+            return (label == null || label.isBlank()) ? null : label;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private void storeFormDataExtension(Resource resource, Map<String, Object> formData) {

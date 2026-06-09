@@ -15,6 +15,9 @@ public class PatientEducationAssignmentDto {
     private String assignedDate;
     private String dueDate;
     private String status;
+    private String deliveryMethod;
+    private String educator;
+    private String educatorName;
     private String viewedAt;
     private String completedAt;
     private Long encounterId;

@@ -54,6 +54,7 @@ public class SecurityConfig {
                 "/api/portal/approvals/**",
                 "/api/auth/**",
                 "/api/public/**",
+                "/api/intake/public/**",
                 "/api/internal/**",
                 "/actuator/**"
             )
@@ -75,6 +76,7 @@ public class SecurityConfig {
                 .requestMatchers(
                     "/api/auth/**",
                     "/api/public/**",
+                    "/api/intake/public/**",
                     "/api/portal/auth/**",
                     "/api/portal/approvals/**",
                     "/api/portal/orgs/**",

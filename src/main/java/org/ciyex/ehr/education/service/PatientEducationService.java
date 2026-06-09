@@ -49,7 +49,10 @@ public class PatientEducationService {
                 .assignedBy(dto.getAssignedBy())
                 .assignedDate(dto.getAssignedDate() != null ? parseDate(dto.getAssignedDate()) : LocalDate.now())
                 .dueDate(dto.getDueDate() != null ? parseDate(dto.getDueDate()) : null)
-                .status("assigned")
+                .status(dto.getStatus() != null && !dto.getStatus().isBlank() ? dto.getStatus() : "assigned")
+                .deliveryMethod(dto.getDeliveryMethod())
+                .educator(dto.getEducator())
+                .educatorName(dto.getEducatorName())
                 .encounterId(dto.getEncounterId())
                 .notes(dto.getNotes())
                 .orgAlias(orgAlias())
@@ -91,6 +94,9 @@ public class PatientEducationService {
         if (dto.getAssignedDate() != null) assignment.setAssignedDate(parseDate(dto.getAssignedDate()));
         if (dto.getDueDate() != null) assignment.setDueDate(parseDate(dto.getDueDate()));
         if (dto.getStatus() != null) assignment.setStatus(dto.getStatus());
+        if (dto.getDeliveryMethod() != null) assignment.setDeliveryMethod(dto.getDeliveryMethod());
+        if (dto.getEducator() != null) assignment.setEducator(dto.getEducator());
+        if (dto.getEducatorName() != null) assignment.setEducatorName(dto.getEducatorName());
         if (dto.getEncounterId() != null) assignment.setEncounterId(dto.getEncounterId());
         if (dto.getNotes() != null) assignment.setNotes(dto.getNotes());
         if (dto.getPatientFeedback() != null) assignment.setPatientFeedback(dto.getPatientFeedback());
@@ -187,6 +193,9 @@ public class PatientEducationService {
                 .assignedDate(e.getAssignedDate() != null ? e.getAssignedDate().toString() : null)
                 .dueDate(e.getDueDate() != null ? e.getDueDate().toString() : null)
                 .status(e.getStatus())
+                .deliveryMethod(e.getDeliveryMethod())
+                .educator(e.getEducator())
+                .educatorName(e.getEducatorName())
                 .viewedAt(e.getViewedAt() != null ? e.getViewedAt().toString() : null)
                 .completedAt(e.getCompletedAt() != null ? e.getCompletedAt().toString() : null)
                 .encounterId(e.getEncounterId())

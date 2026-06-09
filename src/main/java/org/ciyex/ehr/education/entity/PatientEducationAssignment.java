@@ -17,6 +17,9 @@ public class PatientEducationAssignment {
     private LocalDate assignedDate;
     private LocalDate dueDate;
     private String status;
+    private String deliveryMethod;
+    private String educator;
+    private String educatorName;
     private LocalDateTime viewedAt;
     private LocalDateTime completedAt;
     private Long encounterId;
