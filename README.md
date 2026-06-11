@@ -261,3 +261,5 @@ ArgoCD Image Updater watches the registry and auto-deploys:
 This project is licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0).
 
 If you modify this software and make it available over a network, you must release your source code under the same license.
+
+<!-- registry-mirror dev pipeline verification 2026-06-11 (commit→prod registry→mirror→dev) -->
