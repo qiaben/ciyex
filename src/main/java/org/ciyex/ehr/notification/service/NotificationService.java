@@ -235,6 +235,40 @@ public class NotificationService {
         return toCampaignDto(campaignRepo.save(campaign));
     }
 
+    /**
+     * Update an existing campaign. Only campaigns that have not started yet
+     * (draft / scheduled) may be edited — once a campaign is sending, completed
+     * or cancelled its content is frozen.
+     */
+    public BulkCampaignDto updateCampaign(Long id, BulkCampaignDto dto) {
+        var campaign = campaignRepo.findByIdAndOrgAlias(id, orgAlias())
+                .orElseThrow(() -> new NoSuchElementException("Campaign not found: " + id));
+
+        if (!"draft".equals(campaign.getStatus()) && !"scheduled".equals(campaign.getStatus())) {
+            throw new IllegalStateException("Campaign cannot be edited from status: " + campaign.getStatus());
+        }
+
+        if (dto.getName() != null) { campaign.setName(dto.getName()); }
+        if (dto.getChannelType() != null) { campaign.setChannelType(dto.getChannelType()); }
+        campaign.setTemplateId(dto.getTemplateId());
+        campaign.setSubject(dto.getSubject());
+        campaign.setBody(dto.getBody());
+
+        if (dto.getTargetCriteria() != null) {
+            campaign.setTargetCriteria(dto.getTargetCriteria());
+            int recipientCount = dto.getTotalRecipients() != null && dto.getTotalRecipients() > 0
+                    ? dto.getTotalRecipients()
+                    : (dto.getTargetCriteria().isBlank() ? 0 : countRecipientsFromCriteria(dto.getTargetCriteria()));
+            campaign.setTotalRecipients(recipientCount);
+        }
+
+        if (dto.getScheduledAt() != null && !dto.getScheduledAt().isBlank()) {
+            campaign.setScheduledAt(parseDateTime(dto.getScheduledAt()));
+        }
+
+        return toCampaignDto(campaignRepo.save(campaign));
+    }
+
     @Transactional(readOnly = true)
     public BulkCampaignDto getCampaign(Long id) {
         return campaignRepo.findByIdAndOrgAlias(id, orgAlias())

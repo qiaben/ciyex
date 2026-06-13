@@ -147,6 +147,22 @@ public class NotificationController {
         }
     }
 
+    @PutMapping("/campaigns/{id}")
+    @PreAuthorize("hasAuthority('SCOPE_user/Communication.write')")
+    public ResponseEntity<ApiResponse<BulkCampaignDto>> updateCampaign(@PathVariable Long id, @RequestBody BulkCampaignDto dto) {
+        try {
+            var updated = service.updateCampaign(id, dto);
+            return ResponseEntity.ok(ApiResponse.ok("Campaign updated", updated));
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.status(404).body(ApiResponse.error(e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+        } catch (Exception e) {
+            log.error("Failed to update campaign {}", id, e);
+            return ResponseEntity.badRequest().body(ApiResponse.error("Failed: " + e.getMessage()));
+        }
+    }
+
     @PostMapping("/campaigns/{id}/start")
     @PreAuthorize("hasAuthority('SCOPE_user/Communication.write')")
     public ResponseEntity<ApiResponse<BulkCampaignDto>> startCampaign(@PathVariable Long id) {
