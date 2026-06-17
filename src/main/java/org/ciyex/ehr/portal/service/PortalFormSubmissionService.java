@@ -34,6 +34,12 @@ public class PortalFormSubmissionService {
         return repo.findByOrgAliasAndStatusOrderBySubmittedDateDesc(orgAlias, "pending");
     }
 
+    /** List submissions in a given status (e.g. pending/accepted/rejected). */
+    public List<PortalFormSubmission> getByStatus(String orgAlias, String status) {
+        return repo.findByOrgAliasAndStatusOrderBySubmittedDateDesc(
+                orgAlias, status == null ? "" : status.trim().toLowerCase());
+    }
+
     public List<PortalFormSubmission> getByPatient(String orgAlias, String patientId) {
         return repo.findByOrgAliasAndPatientIdOrderBySubmittedDateDesc(orgAlias, patientId);
     }
@@ -54,10 +60,17 @@ public class PortalFormSubmissionService {
     }
 
     @Transactional
-    public void reject(String orgAlias, Long submissionId, String reviewedBy, String reason) {
+    public PortalFormSubmission reject(String orgAlias, Long submissionId, String reviewedBy, String reason) {
         var sub = repo.findById(submissionId)
                 .orElseThrow(() -> new RuntimeException("Submission not found"));
         if (!sub.getOrgAlias().equals(orgAlias)) throw new RuntimeException("Access denied");
-        repo.delete(sub);
+        // Mark as rejected (keep the record) so it still shows under the
+        // "Rejected" filter, mirroring accept(). Previously this deleted the
+        // row, which made rejected submissions vanish entirely.
+        sub.setStatus("rejected");
+        sub.setReviewedDate(Instant.now());
+        sub.setReviewedBy(reviewedBy);
+        sub.setReviewNote(reason);
+        return repo.save(sub);
     }
 }

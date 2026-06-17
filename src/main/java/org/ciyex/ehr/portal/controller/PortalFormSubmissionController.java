@@ -91,8 +91,8 @@ public class PortalFormSubmissionController {
     public ResponseEntity<ApiResponse<List<PortalFormSubmission>>> listAll(
             @RequestParam(required = false) String status) {
         try {
-            var subs = status != null
-                    ? submissionService.getPending(orgAlias())
+            var subs = (status != null && !status.isBlank())
+                    ? submissionService.getByStatus(orgAlias(), status)
                     : submissionService.getAll(orgAlias());
             return ResponseEntity.ok(ApiResponse.ok("Submissions retrieved", subs));
         } catch (Exception e) {
@@ -148,7 +148,7 @@ public class PortalFormSubmissionController {
     }
 
     /**
-     * Staff: reject (delete) a submission.
+     * Staff: reject a submission (kept with status "rejected", not deleted).
      */
     @PutMapping("/{id}/reject")
     public ResponseEntity<ApiResponse<String>> reject(
@@ -158,7 +158,7 @@ public class PortalFormSubmissionController {
         try {
             String reviewer = extractName(auth);
             submissionService.reject(orgAlias(), id, reviewer, reason);
-            return ResponseEntity.ok(ApiResponse.ok("Submission deleted", "ok"));
+            return ResponseEntity.ok(ApiResponse.ok("Submission rejected", "ok"));
         } catch (Exception e) {
             log.error("Failed to reject submission id={}", id, e);
             return ResponseEntity.badRequest().body(ApiResponse.error("Failed: " + e.getMessage()));
