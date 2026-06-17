@@ -9,7 +9,8 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
- 
+import org.springframework.web.server.ResponseStatusException;
+
 import java.util.stream.Collectors;
  
 @RestControllerAdvice
@@ -92,6 +93,24 @@ public class GlobalExceptionHandler {
                         .build());
     }
  
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ApiResponse<Object>> handleResponseStatusException(ResponseStatusException ex) {
+        // Preserve the intended HTTP status (e.g. 404/410/409 from the intake
+        // public endpoints). Without this, ResponseStatusException falls through
+        // to the RuntimeException handler below and is wrongly returned as 500 —
+        // which breaks clients that branch on the status code (the patient
+        // intake page shows a blank form instead of "link invalid/expired").
+        String message = ex.getReason() != null ? ex.getReason() : ex.getMessage();
+        log.warn("Request failed ({}): {}", ex.getStatusCode(), message);
+        return ResponseEntity
+                .status(ex.getStatusCode())
+                .body(ApiResponse.builder()
+                        .success(false)
+                        .message(message)
+                        .data(null)
+                        .build());
+    }
+
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<ApiResponse<Object>> handleRuntimeException(RuntimeException ex) {
         log.error("Runtime error: {}", ex.getMessage(), ex);
