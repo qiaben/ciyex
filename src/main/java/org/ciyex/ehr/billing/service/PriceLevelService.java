@@ -31,7 +31,7 @@ public class PriceLevelService {
     @Transactional
     public PriceLevelDto create(PriceLevelDto dto) {
         var pl = PriceLevel.builder()
-                .optionId(dto.getOptionId())
+                .optionId(resolveOptionId(dto.getOptionId(), dto.getTitle()))
                 .title(dto.getTitle())
                 .seq(dto.getSeq() != null ? dto.getSeq() : 0)
                 .isDefault(Boolean.TRUE.equals(dto.getIsDefault()))
@@ -64,6 +64,33 @@ public class PriceLevelService {
                 .filter(p -> p.getOrgAlias().equals(orgAlias()))
                 .orElseThrow(() -> new NoSuchElementException("Price level not found: " + id));
         repo.delete(pl);
+    }
+
+    /**
+     * Resolve the stable {@code optionId} for a price level. The Settings grid no
+     * longer asks the user for an ID — they enter only a Title — so when no ID is
+     * supplied we auto-generate a URL-safe slug from the title (falling back to
+     * {@code level-<n>}) and guarantee it is unique within the organisation.
+     */
+    private String resolveOptionId(String requested, String title) {
+        if (requested != null && !requested.isBlank()) {
+            return requested.trim();
+        }
+        var existing = repo.findByOrgAliasOrderBySeqAsc(orgAlias()).stream()
+                .map(PriceLevel::getOptionId)
+                .collect(java.util.stream.Collectors.toSet());
+        String base = title == null ? "" : title.trim().toLowerCase()
+                .replaceAll("[^a-z0-9]+", "-")
+                .replaceAll("(^-+|-+$)", "");
+        if (base.isBlank()) {
+            base = "level";
+        }
+        String candidate = base;
+        int n = 1;
+        while (candidate.isBlank() || existing.contains(candidate)) {
+            candidate = base + "-" + (++n);
+        }
+        return candidate;
     }
 
     private PriceLevelDto toDto(PriceLevel e) {
