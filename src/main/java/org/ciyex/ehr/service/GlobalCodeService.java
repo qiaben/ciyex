@@ -34,6 +34,7 @@ public class GlobalCodeService {
     private static final String EXT_SERVICE_REPORTING = "http://ciyex.com/fhir/StructureDefinition/service-reporting";
     private static final String EXT_RELATE_TO = "http://ciyex.com/fhir/StructureDefinition/relate-to";
     private static final String EXT_FEE_STANDARD = "http://ciyex.com/fhir/StructureDefinition/fee-standard";
+    private static final String EXT_ACTIVE = "http://ciyex.com/fhir/StructureDefinition/active";
 
     private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
@@ -192,6 +193,11 @@ public class GlobalCodeService {
             basic.addExtension(new Extension(EXT_FEE_STANDARD, new DecimalType(dto.getFeeStandard())));
         }
 
+        // Active status — persist explicitly so toggling Active/Inactive actually
+        // sticks. Default to true when unset (a freshly created code is active).
+        boolean active = dto.getActive() == null || dto.getActive();
+        basic.addExtension(new Extension(EXT_ACTIVE, new BooleanType(active)));
+
         return basic;
     }
 
@@ -267,9 +273,15 @@ public class GlobalCodeService {
             dto.setFeeStandard(((DecimalType) feeExt.getValue()).getValue());
         }
 
-        // Active status (default true)
-        dto.setActive(true);
-        
+        // Active status — read the persisted value; default true for legacy codes
+        // saved before the active extension existed (so they don't flip inactive).
+        Extension activeExt = basic.getExtensionByUrl(EXT_ACTIVE);
+        if (activeExt != null && activeExt.getValue() instanceof BooleanType) {
+            dto.setActive(((BooleanType) activeExt.getValue()).getValue());
+        } else {
+            dto.setActive(true);
+        }
+
         if (basic.hasMeta()) {
             populateAudit(dto, basic.getMeta());
         }

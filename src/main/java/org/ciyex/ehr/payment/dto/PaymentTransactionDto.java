@@ -31,6 +31,17 @@ public class PaymentTransactionDto {
     private String collectedBy;
     private String collectedAt;
     private String notes;
+    // Allocation & adjustment detail from the Post/Edit Payment form.
+    private String dateOfService;
+    private String payerName;
+    private String claimId;
+    private BigDecimal allowedAmount;
+    private BigDecimal paidAmount;
+    private BigDecimal adjustmentAmount;
+    private String adjustmentReason;
+    private BigDecimal patientResponsibility;
+    private BigDecimal remainingBalance;
+    private String eraReference;
     private String createdAt;
     private String updatedAt;
 }

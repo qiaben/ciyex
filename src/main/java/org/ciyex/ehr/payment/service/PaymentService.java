@@ -139,6 +139,16 @@ public class PaymentService {
                 .collectedAt(LocalDateTime.now())
                 .receiptEmail(dto.getReceiptEmail())
                 .notes(dto.getNotes())
+                .dateOfService(parseDate(dto.getDateOfService()))
+                .payerName(dto.getPayerName())
+                .claimId(dto.getClaimId())
+                .allowedAmount(dto.getAllowedAmount())
+                .paidAmount(dto.getPaidAmount())
+                .adjustmentAmount(dto.getAdjustmentAmount())
+                .adjustmentReason(dto.getAdjustmentReason())
+                .patientResponsibility(dto.getPatientResponsibility())
+                .remainingBalance(dto.getRemainingBalance())
+                .eraReference(dto.getEraReference())
                 .orgAlias(orgAlias())
                 .build();
 
@@ -227,6 +237,26 @@ public class PaymentService {
         if (dto.getNotes() != null) txn.setNotes(dto.getNotes());
         if (dto.getStatus() != null && !dto.getStatus().isBlank()) txn.setStatus(dto.getStatus());
         if (dto.getTransactionType() != null && !dto.getTransactionType().isBlank()) txn.setTransactionType(dto.getTransactionType());
+        // Persist the rest of the Edit Payment form so the values round-trip
+        // (previously these were never written, so re-opening the form showed them blank).
+        if (dto.getReferenceType() != null) txn.setReferenceType(dto.getReferenceType());
+        if (dto.getReferenceId() != null) txn.setReferenceId(dto.getReferenceId());
+        if (dto.getInvoiceNumber() != null) txn.setInvoiceNumber(dto.getInvoiceNumber());
+        if (dto.getReceiptEmail() != null) txn.setReceiptEmail(dto.getReceiptEmail());
+        if (dto.getCollectedAt() != null && !dto.getCollectedAt().isBlank()) {
+            var d = parseDate(dto.getCollectedAt());
+            if (d != null) txn.setCollectedAt(d.atStartOfDay());
+        }
+        if (dto.getDateOfService() != null) txn.setDateOfService(parseDate(dto.getDateOfService()));
+        if (dto.getPayerName() != null) txn.setPayerName(dto.getPayerName());
+        if (dto.getClaimId() != null) txn.setClaimId(dto.getClaimId());
+        if (dto.getAllowedAmount() != null) txn.setAllowedAmount(dto.getAllowedAmount());
+        if (dto.getPaidAmount() != null) txn.setPaidAmount(dto.getPaidAmount());
+        if (dto.getAdjustmentAmount() != null) txn.setAdjustmentAmount(dto.getAdjustmentAmount());
+        if (dto.getAdjustmentReason() != null) txn.setAdjustmentReason(dto.getAdjustmentReason());
+        if (dto.getPatientResponsibility() != null) txn.setPatientResponsibility(dto.getPatientResponsibility());
+        if (dto.getRemainingBalance() != null) txn.setRemainingBalance(dto.getRemainingBalance());
+        if (dto.getEraReference() != null) txn.setEraReference(dto.getEraReference());
 
         txn = transactionRepo.save(txn);
         return toTransactionDto(txn);
@@ -442,6 +472,16 @@ public class PaymentService {
                 .collectedBy(e.getCollectedBy())
                 .collectedAt(e.getCollectedAt() != null ? e.getCollectedAt().toString() : null)
                 .notes(e.getNotes())
+                .dateOfService(e.getDateOfService() != null ? e.getDateOfService().toString() : null)
+                .payerName(e.getPayerName())
+                .claimId(e.getClaimId())
+                .allowedAmount(e.getAllowedAmount())
+                .paidAmount(e.getPaidAmount())
+                .adjustmentAmount(e.getAdjustmentAmount())
+                .adjustmentReason(e.getAdjustmentReason())
+                .patientResponsibility(e.getPatientResponsibility())
+                .remainingBalance(e.getRemainingBalance())
+                .eraReference(e.getEraReference())
                 .createdAt(e.getCreatedAt() != null ? e.getCreatedAt().toString() : null)
                 .updatedAt(e.getUpdatedAt() != null ? e.getUpdatedAt().toString() : null)
                 .build();

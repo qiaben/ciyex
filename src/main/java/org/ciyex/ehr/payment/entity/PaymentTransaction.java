@@ -5,6 +5,7 @@ import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Data @Entity @Table(name = "payment_transaction")
@@ -41,6 +42,22 @@ public class PaymentTransaction {
     private LocalDateTime collectedAt;
     @Column(columnDefinition = "TEXT")
     private String notes;
+
+    // Posting / allocation & adjustment detail captured on the Post/Edit Payment
+    // form. These previously had no columns, so everything in the form's
+    // "Allocation & Adjustments" section (plus payer / claim / date of service)
+    // was silently dropped on save and came back blank on edit.
+    private LocalDate dateOfService;
+    private String payerName;
+    private String claimId;
+    private BigDecimal allowedAmount;
+    private BigDecimal paidAmount;
+    private BigDecimal adjustmentAmount;
+    private String adjustmentReason;
+    private BigDecimal patientResponsibility;
+    private BigDecimal remainingBalance;
+    private String eraReference;
+
     private String orgAlias;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
