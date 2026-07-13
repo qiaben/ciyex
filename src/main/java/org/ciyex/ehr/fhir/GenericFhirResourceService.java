@@ -1830,8 +1830,14 @@ public class GenericFhirResourceService {
                         new Coding().setSystem("http://terminology.hl7.org/CodeSystem/v3-ParticipationType").setCode("PART")));
                 participant.setStatus(Appointment.ParticipationStatus.ACCEPTED);
             }
-            // Also add provider participant if provided in form data
+            // Also add provider participant if provided in form data. Quick-create
+            // paths (calendar editor) send providerId rather than the form-config
+            // "provider" key; without this fallback the appointment persists with
+            // no Practitioner participant and telehealth from-appointment fails.
             Object providerVal = formData.get("provider");
+            if (providerVal == null || String.valueOf(providerVal).isBlank()) {
+                providerVal = formData.get("providerId");
+            }
             if (providerVal != null && !String.valueOf(providerVal).isBlank()) {
                 String provRef = String.valueOf(providerVal);
                 if (!provRef.startsWith("Practitioner/")) provRef = "Practitioner/" + provRef;
@@ -1844,6 +1850,25 @@ public class GenericFhirResourceService {
                     prov.addType(new CodeableConcept().addCoding(
                             new Coding().setSystem("http://terminology.hl7.org/CodeSystem/v3-ParticipationType").setCode("PART")));
                     prov.setStatus(Appointment.ParticipationStatus.ACCEPTED);
+                }
+            }
+            // Same fallback for the location participant (locationId from quick-create).
+            Object locationVal = formData.get("location");
+            if (locationVal == null || String.valueOf(locationVal).isBlank()) {
+                locationVal = formData.get("locationId");
+            }
+            if (locationVal != null && !String.valueOf(locationVal).isBlank()) {
+                String locRef = String.valueOf(locationVal);
+                if (!locRef.startsWith("Location/")) locRef = "Location/" + locRef;
+                boolean hasLocation = appt.getParticipant().stream()
+                        .anyMatch(p -> p.hasActor() && p.getActor().hasReference()
+                                && p.getActor().getReference().startsWith("Location/"));
+                if (!hasLocation) {
+                    Appointment.AppointmentParticipantComponent loc = appt.addParticipant();
+                    loc.setActor(new org.hl7.fhir.r4.model.Reference(locRef));
+                    loc.addType(new CodeableConcept().addCoding(
+                            new Coding().setSystem("http://terminology.hl7.org/CodeSystem/v3-ParticipationType").setCode("PART")));
+                    loc.setStatus(Appointment.ParticipationStatus.ACCEPTED);
                 }
             }
             // Ensure ALL participants have a status and valid type system
