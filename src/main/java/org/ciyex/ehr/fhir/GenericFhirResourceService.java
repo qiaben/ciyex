@@ -1822,8 +1822,14 @@ public class GenericFhirResourceService {
             } catch (Exception e) {
                 appt.setStatus(Appointment.AppointmentStatus.BOOKED);
             }
-            // Appointment.participant is required (min 1) — add patient as participant if none present
-            if (!appt.hasParticipant() && patientId != null) {
+            // Appointment.participant is required (min 1) and telehealth needs the
+            // patient actor. Check for a Patient participant specifically — the
+            // config mapper may have already written practitioner/location ones,
+            // which used to suppress this fallback and drop the patient.
+            boolean hasPatient = appt.getParticipant().stream()
+                    .anyMatch(p -> p.hasActor() && p.getActor().hasReference()
+                            && p.getActor().getReference().startsWith("Patient/"));
+            if (!hasPatient && patientId != null) {
                 Appointment.AppointmentParticipantComponent participant = appt.addParticipant();
                 participant.setActor(new org.hl7.fhir.r4.model.Reference("Patient/" + patientId));
                 participant.addType(new CodeableConcept().addCoding(
