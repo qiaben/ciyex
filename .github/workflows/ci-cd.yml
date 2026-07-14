@@ -633,6 +633,19 @@ jobs:
       - name: Build with Gradle
         run: ./gradlew build -x test
 
+      # Runner's docker CLI lacks the buildx plugin; the Dockerfile needs
+      # BuildKit (RUN --mount=type=cache). Install buildx so docker build works.
+      - name: Set up Docker buildx
+        run: |
+          if ! docker buildx version >/dev/null 2>&1; then
+            mkdir -p ~/.docker/cli-plugins
+            ARCH=$(uname -m); [ "$ARCH" = "x86_64" ] && ARCH=amd64; [ "$ARCH" = "aarch64" ] && ARCH=arm64
+            curl -fsSL "https://github.com/docker/buildx/releases/download/v0.17.1/buildx-v0.17.1.linux-$ARCH" \
+              -o ~/.docker/cli-plugins/docker-buildx
+            chmod +x ~/.docker/cli-plugins/docker-buildx
+          fi
+          docker buildx version
+
       - name: Build Docker image (no push)
         env:
           DOCKER_BUILDKIT: 1
@@ -666,6 +679,23 @@ jobs:
       - name: Login to Private Registry
         run: |
           echo "${{ secrets.PROD_REGISTRY_PASSWORD }}" | docker login $REGISTRY -u ${{ secrets.PROD_REGISTRY_USERNAME }} --password-stdin
+
+      # The Dockerfile uses BuildKit-only syntax (RUN --mount=type=cache), so
+      # DOCKER_BUILDKIT=1 is required — but the self-hosted runner's docker CLI
+      # ships without the buildx plugin ("BuildKit is enabled but the buildx
+      # component is missing"). Install it into the CLI-plugins dir. The default
+      # "docker" driver builder loads images into the daemon store, so the
+      # existing docker build + docker push flow works unchanged.
+      - name: Set up Docker buildx
+        run: |
+          if ! docker buildx version >/dev/null 2>&1; then
+            mkdir -p ~/.docker/cli-plugins
+            ARCH=$(uname -m); [ "$ARCH" = "x86_64" ] && ARCH=amd64; [ "$ARCH" = "aarch64" ] && ARCH=arm64
+            curl -fsSL "https://github.com/docker/buildx/releases/download/v0.17.1/buildx-v0.17.1.linux-$ARCH" \
+              -o ~/.docker/cli-plugins/docker-buildx
+            chmod +x ~/.docker/cli-plugins/docker-buildx
+          fi
+          docker buildx version
 
       - name: Build and Push Docker Image
         env:
