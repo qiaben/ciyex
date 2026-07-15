@@ -27,6 +27,7 @@ public class NotificationService {
     private final NotificationTemplateRepository templateRepo;
     private final BulkCampaignRepository campaignRepo;
     private final org.ciyex.ehr.usermgmt.service.EmailService emailService;
+    private final org.ciyex.ehr.usermgmt.service.SmsService smsService;
     private final GenericFhirResourceService fhirResourceService;
 
     private static final Pattern VARIABLE_PATTERN = Pattern.compile("\\{\\{(\\w+)}}");
@@ -70,9 +71,19 @@ public class NotificationService {
                     status = "failed";
                     errorMessage = "Email delivery failed: " + emailEx.getMessage();
                 }
+            } else if ("sms".equals(channelType)) {
+                try {
+                    smsService.sendSms(orgAlias, recipient, body);
+                    status = "sent";
+                } catch (Exception smsEx) {
+                    log.warn("SMS sending failed for org {}: {}. Logging as failed.", orgAlias, smsEx.getMessage());
+                    status = "failed";
+                    errorMessage = "SMS delivery failed: " + smsEx.getMessage();
+                }
             } else {
-                log.info("SMS sending to {} for org {} (not yet implemented)", recipient, orgAlias);
-                status = "sent";
+                status = "failed";
+                errorMessage = "Unknown channel type: " + channelType;
+                log.warn("Unknown channel type {} for org {}", channelType, orgAlias);
             }
         } catch (Exception e) {
             status = "failed";

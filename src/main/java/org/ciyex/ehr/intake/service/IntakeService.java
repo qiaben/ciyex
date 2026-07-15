@@ -2,9 +2,10 @@ package org.ciyex.ehr.intake.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.ciyex.ehr.client.CommServiceClient;
 import org.ciyex.ehr.fhir.FhirClientService;
 import org.ciyex.ehr.intake.dto.IntakePublicView;
+import org.ciyex.ehr.notification.dto.NotificationLogDto;
+import org.ciyex.ehr.notification.service.NotificationService;
 import org.ciyex.ehr.intake.dto.IntakeSendRequest;
 import org.ciyex.ehr.intake.entity.IntakeToken;
 import org.ciyex.ehr.intake.repository.IntakeTokenRepository;
@@ -42,7 +43,7 @@ public class IntakeService {
     private final PortalFormRepository formRepo;
     private final PortalFormSubmissionRepository submissionRepo;
     private final FhirClientService fhirClientService;
-    private final CommServiceClient commServiceClient;
+    private final NotificationService notificationService;
 
     @Value("${services.portal-url:http://localhost:3000}")
     private String portalUrl;
@@ -91,14 +92,24 @@ public class IntakeService {
         String link = portalUrl.replaceAll("/+$", "") + "/intake/" + token;
         String name = entity.getRecipientName() != null ? entity.getRecipientName() : "there";
 
+        // Dispatch via the per-practice notification service so each practice sends
+        // from its own SMS/email provider (configured in Settings > Notifications).
+        NotificationLogDto sendResult;
         if ("SMS".equals(channel)) {
-            commServiceClient.sendSms(phone,
-                    "Hi " + name + ", please complete your intake form before your visit: " + link);
+            sendResult = notificationService.send(orgAlias, "sms", phone, null,
+                    "Hi " + name + ", please complete your intake form before your visit: " + link,
+                    null, "intake");
         } else {
             String body = "Hello " + name + ",\n\n"
                     + "Please complete your patient intake form before your visit:\n"
                     + link + "\n\nThis link expires in 72 hours.";
-            commServiceClient.sendEmail(email, "Complete your patient intake form", body);
+            sendResult = notificationService.send(orgAlias, "email", email,
+                    "Complete your patient intake form", body, null, "intake");
+        }
+        if (sendResult != null && "failed".equals(sendResult.getStatus())) {
+            throw new IllegalStateException(sendResult.getErrorMessage() != null
+                    ? sendResult.getErrorMessage()
+                    : "Failed to send the intake form via " + channel);
         }
 
         Map<String, Object> out = new HashMap<>();
