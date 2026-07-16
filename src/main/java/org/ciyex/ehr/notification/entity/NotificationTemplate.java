@@ -2,6 +2,8 @@ package org.ciyex.ehr.notification.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.time.LocalDateTime;
 
 @Data @Entity @Table(name = "notification_template")
@@ -19,6 +21,7 @@ public class NotificationTemplate {
     private String htmlBody;
     private Boolean isActive;
     private Boolean isDefault;
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private String variables;
     private String orgAlias;

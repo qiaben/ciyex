@@ -116,7 +116,7 @@ public class TestSecurityConfig {
     // --- Patient scope ---
     @Bean
     GenericFhirResourceController genericFhirResourceController() {
-        return new GenericFhirResourceController(mockGenericFhirResourceService());
+        return new GenericFhirResourceController(mockGenericFhirResourceService(), mockAppointmentNotificationService());
     }
 
     // --- Encounter scope ---
@@ -277,6 +277,7 @@ public class TestSecurityConfig {
 
     // Patient / FHIR generic
     @Bean GenericFhirResourceService mockGenericFhirResourceService() { return Mockito.mock(GenericFhirResourceService.class); }
+    @Bean org.ciyex.ehr.notification.service.AppointmentNotificationService mockAppointmentNotificationService() { return Mockito.mock(org.ciyex.ehr.notification.service.AppointmentNotificationService.class); }
     @Bean FhirClientService mockFhirClientService() { return Mockito.mock(FhirClientService.class); }
 
     // Encounter
