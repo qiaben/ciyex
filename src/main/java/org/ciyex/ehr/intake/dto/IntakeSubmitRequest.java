@@ -9,4 +9,6 @@ import java.util.Map;
 @Data
 public class IntakeSubmitRequest {
     private Map<String, Object> responses = new HashMap<>();
+    /** Secret returned by OTP verify; proves this session passed the OTP gate. */
+    private String verificationToken;
 }

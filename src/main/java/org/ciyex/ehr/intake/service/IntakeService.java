@@ -86,6 +86,7 @@ public class IntakeService {
                 .recipientName(trimToNull(req.getRecipientName()))
                 .recipientPhone(phone)
                 .recipientEmail(email)
+                .channel(channel)
                 .status("sent")
                 .expiresAt(Instant.now().plus(72, ChronoUnit.HOURS))
                 .build();
@@ -133,6 +134,107 @@ public class IntakeService {
             throw new ResponseStatusException(HttpStatus.GONE, "This intake link has expired");
         }
 
+        // Gate the form behind the OTP: don't reveal any prefill (PII) until the
+        // patient proves they control the phone/email the link was sent to.
+        return IntakePublicView.builder()
+                .status("otp_required")
+                .practiceName(t.getOrgAlias())
+                .channel(t.getChannel())
+                .maskedRecipient(maskedRecipient(t))
+                .build();
+    }
+
+    /* ------------------------------------------------------------------- otp */
+
+    private static final int OTP_TTL_MIN = 10;
+    private static final long OTP_RESEND_COOLDOWN_SEC = 30;
+    private static final int OTP_MAX_ATTEMPTS = 5;
+
+    /** Send (or resend) a one-time code to the channel the intake link was sent to. */
+    @Transactional
+    public IntakePublicView sendOtp(String token) {
+        IntakeToken t = requireOpenToken(token);
+        if (t.getOtpSentAt() != null
+                && t.getOtpSentAt().isAfter(Instant.now().minusSeconds(OTP_RESEND_COOLDOWN_SEC))) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                    "Please wait a few seconds before requesting another code.");
+        }
+        String code = generateOtp();
+        t.setOtpCode(code);
+        t.setOtpExpiresAt(Instant.now().plus(OTP_TTL_MIN, ChronoUnit.MINUTES));
+        t.setOtpSentAt(Instant.now());
+        t.setOtpAttempts(0);
+        t.setOtpVerified(false);
+        tokenRepo.save(t);
+
+        String channel = t.getChannel();
+        String recipient = "SMS".equalsIgnoreCase(channel) ? t.getRecipientPhone() : t.getRecipientEmail();
+        String msg = "Your intake verification code is " + code + ". It expires in " + OTP_TTL_MIN + " minutes.";
+        try {
+            if ("SMS".equalsIgnoreCase(channel)) {
+                notificationService.send(t.getOrgAlias(), "sms", recipient, null, msg, null, "intake_otp");
+            } else {
+                notificationService.send(t.getOrgAlias(), "email", recipient,
+                        "Your intake verification code", msg, null, "intake_otp");
+            }
+        } catch (Exception e) {
+            log.warn("Intake OTP send failed for token {}: {}", token, e.getMessage());
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "Could not send the verification code. Please try again.");
+        }
+        return IntakePublicView.builder()
+                .status("otp_sent")
+                .channel(channel)
+                .maskedRecipient(maskedRecipient(t))
+                .build();
+    }
+
+    /** Verify the entered code; on success issue a verification token and return prefill. */
+    @Transactional
+    public IntakePublicView verifyOtp(String token, String code) {
+        IntakeToken t = requireOpenToken(token);
+        if (t.getOtpCode() == null || t.getOtpExpiresAt() == null
+                || t.getOtpExpiresAt().isBefore(Instant.now())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Your code has expired. Please request a new one.");
+        }
+        if (t.getOtpAttempts() != null && t.getOtpAttempts() >= OTP_MAX_ATTEMPTS) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                    "Too many incorrect attempts. Please request a new code.");
+        }
+        String entered = code == null ? "" : code.trim();
+        if (!entered.equals(t.getOtpCode())) {
+            t.setOtpAttempts((t.getOtpAttempts() == null ? 0 : t.getOtpAttempts()) + 1);
+            tokenRepo.save(t);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Incorrect code. Please try again.");
+        }
+        String verification = UUID.randomUUID().toString().replace("-", "");
+        t.setOtpVerified(true);
+        t.setVerificationToken(verification);
+        t.setOtpCode(null);
+        tokenRepo.save(t);
+
+        return IntakePublicView.builder()
+                .status("open")
+                .practiceName(t.getOrgAlias())
+                .verificationToken(verification)
+                .prefill(buildPrefill(t))
+                .build();
+    }
+
+    private IntakeToken requireOpenToken(String token) {
+        IntakeToken t = tokenRepo.findByToken(token)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Invalid intake link"));
+        if ("submitted".equals(t.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "This intake form was already submitted");
+        }
+        if (t.getExpiresAt() != null && t.getExpiresAt().isBefore(Instant.now())) {
+            throw new ResponseStatusException(HttpStatus.GONE, "This intake link has expired");
+        }
+        return t;
+    }
+
+    private static Map<String, Object> buildPrefill(IntakeToken t) {
         Map<String, Object> prefill = new HashMap<>();
         if (t.getRecipientName() != null) {
             String[] parts = t.getRecipientName().trim().split("\\s+", 2);
@@ -147,18 +249,33 @@ public class IntakeService {
         if (t.getRecipientEmail() != null) {
             prefill.put("email", t.getRecipientEmail());
         }
+        return prefill;
+    }
 
-        return IntakePublicView.builder()
-                .status("open")
-                .practiceName(t.getOrgAlias())
-                .prefill(prefill)
-                .build();
+    private static String generateOtp() {
+        return String.format("%06d", new java.security.SecureRandom().nextInt(1_000_000));
+    }
+
+    private static String maskedRecipient(IntakeToken t) {
+        if ("SMS".equalsIgnoreCase(t.getChannel()) && t.getRecipientPhone() != null) {
+            String p = t.getRecipientPhone().replaceAll("[^0-9]", "");
+            String last4 = p.length() >= 4 ? p.substring(p.length() - 4) : p;
+            return "•••• " + last4;
+        }
+        String email = t.getRecipientEmail();
+        if (email != null && email.contains("@")) {
+            int at = email.indexOf('@');
+            String user = email.substring(0, at);
+            String shown = user.isEmpty() ? "" : user.substring(0, 1);
+            return shown + "•••" + email.substring(at);
+        }
+        return "your contact on file";
     }
 
     /* ---------------------------------------------------------------- submit */
 
     @Transactional
-    public void submit(String token, Map<String, Object> responses) {
+    public void submit(String token, Map<String, Object> responses, String verificationToken) {
         IntakeToken t = tokenRepo.findByToken(token)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Invalid intake link"));
 
@@ -167,6 +284,13 @@ public class IntakeService {
         }
         if (t.getExpiresAt() != null && t.getExpiresAt().isBefore(Instant.now())) {
             throw new ResponseStatusException(HttpStatus.GONE, "This intake link has expired");
+        }
+        // Enforce the OTP gate: this session must have verified the code.
+        if (!Boolean.TRUE.equals(t.getOtpVerified())
+                || t.getVerificationToken() == null
+                || !t.getVerificationToken().equals(verificationToken)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
+                    "Please verify the code sent to you before submitting.");
         }
 
         Map<String, Object> data = responses == null ? new HashMap<>() : responses;

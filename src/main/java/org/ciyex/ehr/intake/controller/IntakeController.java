@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.ciyex.ehr.dto.ApiResponse;
 import org.ciyex.ehr.dto.integration.RequestContext;
+import org.ciyex.ehr.intake.dto.IntakeOtpVerifyRequest;
 import org.ciyex.ehr.intake.dto.IntakePublicView;
 import org.ciyex.ehr.intake.dto.IntakeSendRequest;
 import org.ciyex.ehr.intake.dto.IntakeSubmitRequest;
@@ -51,12 +52,28 @@ public class IntakeController {
         return ResponseEntity.ok(ApiResponse.ok("Intake form", view));
     }
 
-    /** Public: save the patient's answers (and create the patient if new). */
+    /** Public: send (or resend) the OTP to the channel the link was sent to. */
+    @PostMapping("/public/{token}/otp/send")
+    public ResponseEntity<ApiResponse<IntakePublicView>> sendOtp(@PathVariable String token) {
+        IntakePublicView view = intakeService.sendOtp(token);
+        return ResponseEntity.ok(ApiResponse.ok("Verification code sent", view));
+    }
+
+    /** Public: verify the entered code; returns a verification token + prefill on success. */
+    @PostMapping("/public/{token}/otp/verify")
+    public ResponseEntity<ApiResponse<IntakePublicView>> verifyOtp(
+            @PathVariable String token,
+            @RequestBody IntakeOtpVerifyRequest req) {
+        IntakePublicView view = intakeService.verifyOtp(token, req.getCode());
+        return ResponseEntity.ok(ApiResponse.ok("Verified", view));
+    }
+
+    /** Public: save the patient's answers (and create the patient if new). Requires OTP verification. */
     @PostMapping("/public/{token}/submit")
     public ResponseEntity<ApiResponse<String>> submit(
             @PathVariable String token,
             @RequestBody IntakeSubmitRequest req) {
-        intakeService.submit(token, req.getResponses());
+        intakeService.submit(token, req.getResponses(), req.getVerificationToken());
         return ResponseEntity.ok(ApiResponse.ok("Intake form submitted", "ok"));
     }
 }

@@ -50,6 +50,32 @@ public class IntakeToken {
     @Builder.Default
     private String status = "sent";
 
+    /** Channel the link (and OTP) is delivered through: SMS | EMAIL. */
+    @Column(length = 20)
+    private String channel;
+
+    // --- OTP gate: patient must verify a one-time code before the form opens ---
+    @Column(name = "otp_code", length = 20)
+    private String otpCode;
+
+    @Column(name = "otp_expires_at")
+    private Instant otpExpiresAt;
+
+    @Column(name = "otp_sent_at")
+    private Instant otpSentAt;
+
+    @Column(name = "otp_attempts")
+    @Builder.Default
+    private Integer otpAttempts = 0;
+
+    @Column(name = "otp_verified")
+    @Builder.Default
+    private Boolean otpVerified = false;
+
+    /** Secret issued after a successful OTP verify; required to load prefill and submit. */
+    @Column(name = "verification_token", length = 255)
+    private String verificationToken;
+
     @Column(name = "submission_id")
     private Long submissionId;
 
