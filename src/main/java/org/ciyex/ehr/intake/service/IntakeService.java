@@ -354,9 +354,18 @@ public class IntakeService {
         String company = str(r, prefix + "InsuranceCompany");
         String subscriberId = str(r, prefix + "SubscriberId");
         String group = str(r, prefix + "GroupId");
-        if (company == null && subscriberId == null && group == null) {
+        String planName = str(r, prefix + "PlanName");
+        if (company == null && subscriberId == null && group == null && planName == null) {
             return; // nothing entered for this tier
         }
+        String planType = str(r, prefix + "PlanType");
+        String copay = str(r, prefix + "Copay");
+        String effective = str(r, prefix + "EffectiveDate");
+        String termination = str(r, prefix + "TerminationDate");
+        String insuredName = str(r, prefix + "InsuredName");
+        String insuredDob = str(r, prefix + "InsuredDob");
+        String relationship = str(r, prefix + "RelationshipToInsured");
+
         Coverage cov = new Coverage();
         cov.setStatus(Coverage.CoverageStatus.ACTIVE);
         cov.setBeneficiary(new Reference("Patient/" + patientId));
@@ -373,15 +382,37 @@ public class IntakeService {
         }
         String covId = fhirClientService.create(cov, orgAlias).getId().getIdPart();
 
-        // Mirror the fields the Insurance page reads (payerName/policyNumber/groupNumber/priority).
+        // Mirror the chart's Insurance tab fields so the intake insurance fully populates it.
+        String tier = order == 1 ? "primary" : order == 2 ? "secondary" : "tertiary";
         Map<String, Object> ins = new HashMap<>();
+        putIf(ins, "insuranceType", tier);
+        putIf(ins, "status", "active");
         putIf(ins, "payerName", company);
         putIf(ins, "insuranceCompany", company);
+        putIf(ins, "planName", planName);
+        putIf(ins, "policyType", planType);
         putIf(ins, "policyNumber", subscriberId);
         putIf(ins, "groupNumber", group);
+        putIf(ins, "copayAmount", copay);
+        putIf(ins, "policyEffectiveDate", effective);
+        putIf(ins, "policyEndDate", termination);
         putIf(ins, "priority", String.valueOf(order));
-        putIf(ins, "relationship", str(r, prefix + "RelationshipToInsured"));
+        putIf(ins, "subscriberRelationship", mapSubscriberRelationship(relationship));
+        putIf(ins, "subscriberName", insuredName);
+        putIf(ins, "subscriberDOB", insuredDob);
         fhirResourceService.storeFormData("Coverage", covId, orgAlias, ins);
+    }
+
+    /** Intake relationship label → Insurance-tab subscriberRelationship value (self/spouse/child/parent/other). */
+    private static String mapSubscriberRelationship(String rel) {
+        if (rel == null) {
+            return null;
+        }
+        String v = rel.trim().toLowerCase();
+        return switch (v) {
+            case "self", "spouse", "child", "parent" -> v;
+            default -> "other";
+        };
     }
 
     private static void putIf(Map<String, Object> m, String key, String value) {
