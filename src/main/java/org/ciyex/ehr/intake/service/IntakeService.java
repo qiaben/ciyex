@@ -3,6 +3,7 @@ package org.ciyex.ehr.intake.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.ciyex.ehr.fhir.FhirClientService;
+import org.ciyex.ehr.fhir.GenericFhirResourceService;
 import org.ciyex.ehr.intake.dto.IntakePublicView;
 import org.ciyex.ehr.notification.dto.NotificationLogDto;
 import org.ciyex.ehr.notification.service.NotificationService;
@@ -43,6 +44,7 @@ public class IntakeService {
     private final PortalFormRepository formRepo;
     private final PortalFormSubmissionRepository submissionRepo;
     private final FhirClientService fhirClientService;
+    private final GenericFhirResourceService fhirResourceService;
     private final NotificationService notificationService;
 
     @Value("${services.portal-url:http://localhost:3000}")
@@ -176,6 +178,13 @@ public class IntakeService {
             patientId = createPatient(orgAlias, data);
         }
 
+        // Populate the intake insurance onto the patient's Insurance page (Coverage records).
+        try {
+            createCoverages(orgAlias, patientId, data);
+        } catch (Exception e) {
+            log.warn("Intake: failed to create coverages for patient {}: {}", patientId, e.getMessage());
+        }
+
         PortalFormSubmission submission = PortalFormSubmission.builder()
                 .orgAlias(orgAlias)
                 .patientId(patientId)
@@ -218,6 +227,7 @@ public class IntakeService {
 
         String first = str(r, "firstName");
         String last = str(r, "lastName");
+        String middle = str(r, "middleInitial");
         if (first != null || last != null) {
             HumanName name = patient.addName();
             if (last != null) {
@@ -225,6 +235,9 @@ public class IntakeService {
             }
             if (first != null) {
                 name.addGiven(first);
+            }
+            if (middle != null) {
+                name.addGiven(middle);
             }
         }
 
@@ -245,6 +258,13 @@ public class IntakeService {
                     .setSystem(ContactPoint.ContactPointSystem.PHONE)
                     .setUse(ContactPoint.ContactPointUse.HOME)
                     .setValue(home);
+        }
+        String work = str(r, "workPhone");
+        if (work != null) {
+            patient.addTelecom()
+                    .setSystem(ContactPoint.ContactPointSystem.PHONE)
+                    .setUse(ContactPoint.ContactPointUse.WORK)
+                    .setValue(work);
         }
 
         String sex = str(r, "sex");
@@ -291,7 +311,129 @@ public class IntakeService {
 
         patient.setActive(true);
         var outcome = fhirClientService.create(patient, orgAlias);
-        return outcome.getId().getIdPart();
+        String patientId = outcome.getId().getIdPart();
+
+        // Surface the intake answers on the chart's Demographics page. The chart merges
+        // the local form_data table over the FHIR fields, so we store the exact
+        // demographics keys the edit form uses — only the intake fields that map to an
+        // existing demographics field (no new fields, no extra phone numbers).
+        storeDemographics(orgAlias, patientId, r);
+        return patientId;
+    }
+
+    /** Store only the intake fields that have a matching Demographics-page field. */
+    private void storeDemographics(String orgAlias, String patientId, Map<String, Object> r) {
+        Map<String, Object> demo = new HashMap<>();
+        putIf(demo, "firstName", str(r, "firstName"));
+        putIf(demo, "lastName", str(r, "lastName"));
+        putIf(demo, "middleName", str(r, "middleInitial"));
+        putIf(demo, "dateOfBirth", str(r, "dateOfBirth"));
+        putIf(demo, "gender", mapGender(str(r, "sex")));
+        putIf(demo, "ssn", str(r, "ssn"));
+        putIf(demo, "maritalStatus", mapMarital(str(r, "maritalStatus")));
+        putIf(demo, "race", str(r, "race"));
+        putIf(demo, "ethnicity", str(r, "ethnicity"));
+        putIf(demo, "preferredLanguage", str(r, "language"));
+        putIf(demo, "phoneNumber", str(r, "mobilePhone"));
+        putIf(demo, "homePhone", str(r, "homePhone"));
+        putIf(demo, "workPhone", str(r, "workPhone"));
+        putIf(demo, "email", str(r, "email"));
+        putIf(demo, "address", composeAddress(r));
+        if (!demo.isEmpty()) {
+            fhirResourceService.storeFormData("Patient", patientId, orgAlias, demo);
+        }
+    }
+
+    /** Create Coverage records so the intake insurance shows on the patient's Insurance page. */
+    private void createCoverages(String orgAlias, String patientId, Map<String, Object> r) {
+        createCoverage(orgAlias, patientId, r, "primary", 1);
+        createCoverage(orgAlias, patientId, r, "secondary", 2);
+    }
+
+    private void createCoverage(String orgAlias, String patientId, Map<String, Object> r, String prefix, int order) {
+        String company = str(r, prefix + "InsuranceCompany");
+        String subscriberId = str(r, prefix + "SubscriberId");
+        String group = str(r, prefix + "GroupId");
+        if (company == null && subscriberId == null && group == null) {
+            return; // nothing entered for this tier
+        }
+        Coverage cov = new Coverage();
+        cov.setStatus(Coverage.CoverageStatus.ACTIVE);
+        cov.setBeneficiary(new Reference("Patient/" + patientId));
+        cov.addPayor(new Reference().setDisplay(company != null ? company : "Unknown Payor"));
+        if (subscriberId != null) {
+            cov.setSubscriberId(subscriberId);
+        }
+        cov.setOrder(order);
+        if (group != null) {
+            cov.addClass_()
+                    .setValue(group)
+                    .setType(new CodeableConcept().addCoding(new Coding()
+                            .setSystem("http://terminology.hl7.org/CodeSystem/coverage-class").setCode("group")));
+        }
+        String covId = fhirClientService.create(cov, orgAlias).getId().getIdPart();
+
+        // Mirror the fields the Insurance page reads (payerName/policyNumber/groupNumber/priority).
+        Map<String, Object> ins = new HashMap<>();
+        putIf(ins, "payerName", company);
+        putIf(ins, "insuranceCompany", company);
+        putIf(ins, "policyNumber", subscriberId);
+        putIf(ins, "groupNumber", group);
+        putIf(ins, "priority", String.valueOf(order));
+        putIf(ins, "relationship", str(r, prefix + "RelationshipToInsured"));
+        fhirResourceService.storeFormData("Coverage", covId, orgAlias, ins);
+    }
+
+    private static void putIf(Map<String, Object> m, String key, String value) {
+        if (value != null && !value.isBlank()) {
+            m.put(key, value);
+        }
+    }
+
+    /** Intake sex (Female/Male/Transgender) → Demographics "Sex at Birth" (Male/Female/Other/Unknown). */
+    private static String mapGender(String sex) {
+        if (sex == null) {
+            return null;
+        }
+        return switch (sex.trim().toLowerCase()) {
+            case "male" -> "Male";
+            case "female" -> "Female";
+            default -> "Other";
+        };
+    }
+
+    /** Intake marital labels → Demographics marital options (Legally Separated → Separated). */
+    private static String mapMarital(String m) {
+        if (m == null) {
+            return null;
+        }
+        return "Legally Separated".equalsIgnoreCase(m.trim()) ? "Separated" : m.trim();
+    }
+
+    private static String composeAddress(Map<String, Object> r) {
+        StringBuilder sb = new StringBuilder();
+        String line1 = str(r, "addressLine1");
+        String line2 = str(r, "addressLine2");
+        String city = str(r, "city");
+        String state = str(r, "state");
+        String postal = str(r, "postalCode");
+        String country = str(r, "country");
+        if (line1 != null) {
+            sb.append(line1);
+        }
+        if (line2 != null) {
+            sb.append(sb.length() > 0 ? ", " : "").append(line2);
+        }
+        String cityState = (city != null ? city : "")
+                + (state != null ? (city != null ? ", " : "") + state : "")
+                + (postal != null ? " " + postal : "");
+        if (!cityState.isBlank()) {
+            sb.append(sb.length() > 0 ? ", " : "").append(cityState.trim());
+        }
+        if (country != null) {
+            sb.append(sb.length() > 0 ? ", " : "").append(country);
+        }
+        return sb.length() > 0 ? sb.toString() : null;
     }
 
     private static String displayName(Map<String, Object> r, String fallback) {

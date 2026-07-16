@@ -1474,6 +1474,17 @@ public class GenericFhirResourceService {
     /**
      * Store form data in local database (called after FHIR resource is created/updated).
      */
+    /**
+     * Store raw form data for a resource so patient-facing chart pages (which merge the
+     * local form_data table over the FHIR-mapped fields) surface it. Used by system/public
+     * flows like patient intake that build FHIR resources directly and need the same
+     * display fields the edit forms would have saved.
+     */
+    public void storeFormData(String resourceType, String resourceId, String orgAlias,
+                              Map<String, Object> formData) {
+        storeFormDataLocally(resourceType, resourceId, orgAlias, formData, java.util.List.of());
+    }
+
     private void storeFormDataLocally(String resourceType, String resourceId, String orgAlias,
                                       Map<String, Object> formData, Collection<FhirPathMapper.FieldMapping> mappings) {
         try {
