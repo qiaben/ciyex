@@ -6,6 +6,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -184,7 +186,13 @@ public class LocalFileStorageStrategy implements FileStorageStrategy {
 
     @Override
     public String getPresignedUrlByKey(String key, int expirySeconds) {
-        return "/api/files-proxy/by-key/download?key=" + key;
+        // The key is org/scanning/<uuid>_<originalFilename> and routinely contains
+        // spaces and characters ('&', '#', '+', ',') that are unsafe in a query
+        // string. Left raw, the browser/backend truncate or mangle the key so the
+        // stored file can't be located and the download fails. Percent-encode it so
+        // Spring's @RequestParam decodes back to the exact stored key.
+        String encodedKey = URLEncoder.encode(key, StandardCharsets.UTF_8);
+        return "/api/files-proxy/by-key/download?key=" + encodedKey;
     }
 
     @Override
