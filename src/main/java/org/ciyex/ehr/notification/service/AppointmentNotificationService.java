@@ -142,8 +142,18 @@ public class AppointmentNotificationService {
 
         if (templateOpt.isPresent() && Boolean.TRUE.equals(templateOpt.get().getIsActive())) {
             try {
-                String templateSubject = resolveVars(templateOpt.get().getSubject(), variables);
-                String templateBody = resolveVars(templateOpt.get().getBody(), variables);
+                var tmpl = templateOpt.get();
+                String templateSubject = resolveVars(tmpl.getSubject(), variables);
+                // Emails are always sent as HTML (EmailService uses setText(body, true)).
+                // Prefer the template's html_body so paragraph/line breaks render; the
+                // plain-text body uses "\n" newlines which collapse into a single
+                // run-on paragraph when injected into an HTML message. Fall back to the
+                // plain body (with newlines converted to <br/>) for older templates that
+                // have no html_body seeded.
+                String rawBody = (tmpl.getHtmlBody() != null && !tmpl.getHtmlBody().isBlank())
+                        ? tmpl.getHtmlBody()
+                        : plainToHtml(tmpl.getBody());
+                String templateBody = resolveVars(rawBody, variables);
                 // Use default subject if template subject is empty
                 if (templateSubject == null || templateSubject.isBlank()) {
                     templateSubject = buildDefaultSubject(eventType, patientName, displayDate, displayTime);
@@ -165,6 +175,20 @@ public class AppointmentNotificationService {
         String body = buildDefaultBody(eventType, variables);
         notificationService.send(orgAlias, "email", patientEmail, subject, body, patientId, "auto_" + eventType);
         log.info("Sent {} email (default template) to {} for org {}", eventType, patientEmail, orgAlias);
+    }
+
+    /**
+     * Convert a plain-text template body into minimal HTML so its line breaks
+     * survive being sent in an HTML email. Used only as a fallback when a
+     * template has no dedicated html_body.
+     */
+    private String plainToHtml(String plain) {
+        if (plain == null || plain.isBlank()) {
+            return "";
+        }
+        return "<div style=\"font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;color:#333\">"
+                + plain.replace("\r\n", "\n").replace("\n", "<br/>")
+                + "</div>";
     }
 
     private String resolveVars(String template, Map<String, String> variables) {
