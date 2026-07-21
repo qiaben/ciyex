@@ -553,6 +553,12 @@ public class GenericFhirResourceService {
                 }
                 // This is used by encounter forms and other "raw data" forms
                 resource = createRawDataResource(meta.type, formData);
+                // Even with no field-level mappings, required FHIR fields still need
+                // valid defaults — otherwise HAPI rejects the save with e.g.
+                // "Composition.status: minimum required = 1, but only found 0" for the
+                // encounter-form tab (which has no status field and never reached the
+                // field-mapping path where defaults were applied).
+                ensureRequiredDefaults(resource, formData, patientId);
             } else {
                 // Normal path: field-level FHIR mapping
                 boolean hasData = resourceMappings.stream()
@@ -1738,6 +1744,16 @@ public class GenericFhirResourceService {
             if (!claim.hasPatient() && patientId != null) {
                 claim.setPatient(new org.hl7.fhir.r4.model.Reference("Patient/" + patientId));
             }
+            // Claim.provider is required (1..1). The claim tabs mark the provider
+            // field required in the UI, but the field-key varies (provider /
+            // providerId / billingProvider / providerNpi), and none of them was
+            // defaulted here — so a claim reached HAPI without a provider and was
+            // rejected ("Claim.provider: minimum required = 1, but only found 0").
+            // Derive it from whichever provider key the form sent, else fall back to
+            // a display-only reference so the claim still validates.
+            if (!claim.hasProvider()) {
+                claim.setProvider(providerReferenceFromForm(formData, "Billing Provider"));
+            }
             // Claim.insurance is required (min 1) — add self-pay if none present
             if (!claim.hasInsurance()) {
                 org.hl7.fhir.r4.model.Claim.InsuranceComponent ins = claim.addInsurance();
@@ -2067,7 +2083,142 @@ public class GenericFhirResourceService {
             if (!rp.hasPatient() && patientId != null) {
                 rp.setPatient(new Reference("Patient/" + patientId));
             }
+        } else if (resource instanceof org.hl7.fhir.r4.model.QuestionnaireResponse qr) {
+            // QuestionnaireResponse.status is required (1..1). The History tab has no
+            // status field and no mapping to status, so default to COMPLETED (honoring
+            // an explicit body value if one is ever sent) — otherwise HAPI rejects with
+            // "QuestionnaireResponse.status: minimum required = 1, but only found 0".
+            if (qr.getStatus() == null
+                    || qr.getStatus() == org.hl7.fhir.r4.model.QuestionnaireResponse.QuestionnaireResponseStatus.NULL) {
+                String statusStr = formData.get("status") != null ? String.valueOf(formData.get("status")) : "completed";
+                try {
+                    qr.setStatus(org.hl7.fhir.r4.model.QuestionnaireResponse.QuestionnaireResponseStatus.fromCode(statusStr));
+                } catch (Exception e) {
+                    qr.setStatus(org.hl7.fhir.r4.model.QuestionnaireResponse.QuestionnaireResponseStatus.COMPLETED);
+                }
+            }
+            if (!qr.hasSubject() && patientId != null) {
+                qr.setSubject(new Reference("Patient/" + patientId));
+            }
+        } else if (resource instanceof org.hl7.fhir.r4.model.ExplanationOfBenefit eob) {
+            // EOB has many required (1..1) fields plus insurance (1..*). The ERA /
+            // Remittance tab config maps most of them but has NO mapping for
+            // `insurance`, and there was no server default — so every posting was
+            // rejected with "ExplanationOfBenefit.insurance: minimum required = 1,
+            // but only found 0". Default insurance here, and defensively fill the
+            // other required fields so we don't trade one 422 for the next.
+            if (eob.getStatus() == null
+                    || eob.getStatus() == org.hl7.fhir.r4.model.ExplanationOfBenefit.ExplanationOfBenefitStatus.NULL) {
+                String s = formData.get("status") != null ? String.valueOf(formData.get("status")) : "active";
+                try {
+                    eob.setStatus(org.hl7.fhir.r4.model.ExplanationOfBenefit.ExplanationOfBenefitStatus.fromCode(s));
+                } catch (Exception e) {
+                    eob.setStatus(org.hl7.fhir.r4.model.ExplanationOfBenefit.ExplanationOfBenefitStatus.ACTIVE);
+                }
+            }
+            if (!eob.hasType()) {
+                eob.getType().addCoding()
+                        .setSystem("http://terminology.hl7.org/CodeSystem/claim-type")
+                        .setCode("professional");
+            }
+            if (eob.getUse() == null
+                    || eob.getUse() == org.hl7.fhir.r4.model.ExplanationOfBenefit.Use.NULL) {
+                eob.setUse(org.hl7.fhir.r4.model.ExplanationOfBenefit.Use.CLAIM);
+            }
+            if (!eob.hasPatient() && patientId != null) {
+                eob.setPatient(new Reference("Patient/" + patientId));
+            }
+            if (!eob.hasCreated() || eob.getCreatedElement().isEmpty()) {
+                eob.setCreated(new java.util.Date());
+            }
+            if (eob.getOutcome() == null
+                    || eob.getOutcome() == org.hl7.fhir.r4.model.ExplanationOfBenefit.RemittanceOutcome.NULL) {
+                eob.setOutcome(org.hl7.fhir.r4.model.ExplanationOfBenefit.RemittanceOutcome.COMPLETE);
+            }
+            String eobPayer = firstNonBlankForm(formData, "insurer", "payerName", "payorName", "payer", "insuranceName");
+            if (!eob.hasInsurer()) {
+                eob.setInsurer(new Reference().setDisplay(eobPayer != null ? eobPayer : "Insurer"));
+            }
+            if (!eob.hasProvider()) {
+                eob.setProvider(providerReferenceFromForm(formData, "Provider"));
+            }
+            // EOB.insurance (1..*): each entry requires focal (1..1) + coverage (1..1)
+            if (!eob.hasInsurance()) {
+                eob.addInsurance()
+                        .setFocal(true)
+                        .setCoverage(new Reference().setDisplay(eobPayer != null ? eobPayer : "Self-pay"));
+            }
+        } else if (resource instanceof org.hl7.fhir.r4.model.ClaimResponse cr) {
+            // ClaimResponse required (1..1): status, type, use, patient, created,
+            // insurer, outcome. The Denials tab maps `type` but marked it optional and
+            // provided no server default, so a denial with a blank Claim Type was
+            // rejected ("ClaimResponse.type: minimum required = 1, but only found 0").
+            if (cr.getStatus() == null
+                    || cr.getStatus() == org.hl7.fhir.r4.model.ClaimResponse.ClaimResponseStatus.NULL) {
+                cr.setStatus(org.hl7.fhir.r4.model.ClaimResponse.ClaimResponseStatus.ACTIVE);
+            }
+            if (!cr.hasType()) {
+                String t = formData.get("type") != null ? String.valueOf(formData.get("type")) : "professional";
+                cr.getType().addCoding()
+                        .setSystem("http://terminology.hl7.org/CodeSystem/claim-type")
+                        .setCode(t);
+            }
+            if (cr.getUse() == null
+                    || cr.getUse() == org.hl7.fhir.r4.model.ClaimResponse.Use.NULL) {
+                cr.setUse(org.hl7.fhir.r4.model.ClaimResponse.Use.CLAIM);
+            }
+            if (!cr.hasPatient() && patientId != null) {
+                cr.setPatient(new Reference("Patient/" + patientId));
+            }
+            if (!cr.hasCreated() || cr.getCreatedElement().isEmpty()) {
+                cr.setCreated(new java.util.Date());
+            }
+            if (cr.getOutcome() == null
+                    || cr.getOutcome() == org.hl7.fhir.r4.model.ClaimResponse.RemittanceOutcome.NULL) {
+                cr.setOutcome(org.hl7.fhir.r4.model.ClaimResponse.RemittanceOutcome.COMPLETE);
+            }
+            if (!cr.hasInsurer()) {
+                String payer = firstNonBlankForm(formData, "insurer", "payerName", "payorName", "payer", "insuranceName");
+                cr.setInsurer(new Reference().setDisplay(payer != null ? payer : "Insurer"));
+            }
         }
+    }
+
+    /**
+     * Build a FHIR provider {@link Reference} from whichever provider-ish key the
+     * form sent (provider / providerId / billingProvider / providerName /
+     * providerNpi / renderingProvider). A bare numeric id becomes
+     * "Practitioner/{id}"; an already-qualified "Type/{id}" reference is used
+     * as-is; anything else becomes a display-only reference. Falls back to a
+     * display-only reference using {@code fallbackDisplay} when nothing was sent.
+     */
+    private Reference providerReferenceFromForm(Map<String, Object> formData, String fallbackDisplay) {
+        String prov = firstNonBlankForm(formData,
+                "provider", "providerId", "billingProvider", "providerName", "providerNpi", "renderingProvider");
+        if (prov == null) {
+            return new Reference().setDisplay(fallbackDisplay);
+        }
+        if (prov.contains("/")) {
+            return new Reference(prov);
+        }
+        if (prov.matches("\\d+")) {
+            return new Reference("Practitioner/" + prov);
+        }
+        return new Reference().setDisplay(prov);
+    }
+
+    /** First non-blank string value among the given form-data keys, or null. */
+    private String firstNonBlankForm(Map<String, Object> formData, String... keys) {
+        for (String key : keys) {
+            Object v = formData.get(key);
+            if (v != null) {
+                String s = String.valueOf(v).trim();
+                if (!s.isEmpty()) {
+                    return s;
+                }
+            }
+        }
+        return null;
     }
 
     /**
