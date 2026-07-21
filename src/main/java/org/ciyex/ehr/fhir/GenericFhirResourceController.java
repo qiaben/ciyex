@@ -381,6 +381,51 @@ public class GenericFhirResourceController {
                     log.debug("Could not look up provider for notification: {}", e.getMessage());
                 }
             }
+            // Resolve location name if not present — the email template's
+            // {{location_name}} otherwise renders blank ("Location: ").
+            if (!notifData.containsKey("locationName") || String.valueOf(notifData.getOrDefault("locationName", "")).isBlank()) {
+                try {
+                    String locationId = null;
+                    Object locRef = formData.get("location");
+                    if (locRef instanceof String ref && ref.contains("/")) {
+                        locationId = ref.substring(ref.lastIndexOf("/") + 1);
+                    } else if (locRef instanceof String ref && !ref.isBlank()) {
+                        locationId = ref;
+                    } else if (locRef instanceof Number num) {
+                        locationId = String.valueOf(num.longValue());
+                    }
+                    if (locationId == null || locationId.isBlank()) {
+                        Object lid = notifData.get("locationId");
+                        if (lid == null) lid = formData.get("locationId");
+                        if (lid == null) lid = created.get("locationId");
+                        if (lid != null) locationId = String.valueOf(lid);
+                    }
+                    if ((locationId == null || locationId.isBlank()) && created.get("participant") instanceof List<?> participants) {
+                        for (Object p : participants) {
+                            if (p instanceof Map<?, ?> pm) {
+                                String actorRef = pm.get("actor") != null ? String.valueOf(pm.get("actor")) : "";
+                                if (actorRef.contains("Location/")) {
+                                    locationId = actorRef.substring(actorRef.lastIndexOf("/") + 1);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if (locationId != null && !locationId.isBlank() && !"null".equals(locationId)) {
+                        Map<String, Object> locData = null;
+                        for (String tab : new String[]{"facilities", "locations"}) {
+                            try { locData = resourceService.get(tab, null, locationId); } catch (Exception ignored) { /* try next */ }
+                            if (locData != null) break;
+                        }
+                        if (locData != null) {
+                            Object name = locData.get("name") != null ? locData.get("name") : locData.get("facilityName");
+                            if (name != null && !String.valueOf(name).isBlank()) notifData.put("locationName", String.valueOf(name));
+                        }
+                    }
+                } catch (Exception e) {
+                    log.debug("Could not look up location for notification: {}", e.getMessage());
+                }
+            }
             appointmentNotificationService.onAppointmentCreated(orgAlias, notifData);
         } catch (Exception e) {
             log.warn("Failed to trigger appointment notification: {}", e.getMessage());

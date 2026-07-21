@@ -1981,6 +1981,26 @@ public class FhirFacadeController {
                         }
                     }
                 }
+                // Resolve location name if not already present — the email
+                // template's {{location_name}} otherwise renders blank.
+                if (!notifData.containsKey("locationName") || String.valueOf(notifData.get("locationName")).isBlank()) {
+                    Long locationId = toLong(body.get("locationId"));
+                    if (locationId != null) {
+                        try {
+                            Map<String, Object> locData = null;
+                            for (String tab : new String[]{"facilities", "locations"}) {
+                                try { locData = fhirService.get(tab, null, String.valueOf(locationId)); } catch (Exception ignored) { /* try next */ }
+                                if (locData != null) break;
+                            }
+                            if (locData != null) {
+                                Object name = locData.get("name") != null ? locData.get("name") : locData.get("facilityName");
+                                if (name != null && !String.valueOf(name).isBlank()) notifData.put("locationName", String.valueOf(name));
+                            }
+                        } catch (Exception e) {
+                            log.debug("Could not look up location {} for notification: {}", locationId, e.getMessage());
+                        }
+                    }
+                }
                 // Ensure practice name is set
                 notifData.putIfAbsent("practiceName", orgAlias);
                 appointmentNotificationService.onAppointmentCreated(orgAlias, notifData);

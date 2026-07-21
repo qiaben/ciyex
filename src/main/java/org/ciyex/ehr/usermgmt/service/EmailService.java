@@ -55,13 +55,27 @@ public class EmailService {
             }
             helper.setTo(to);
             helper.setSubject(subject);
-            helper.setText(htmlBody, true);
+            helper.setText(ensureHtml(htmlBody), true);
             ctx.mailSender.send(message);
             log.info("Email sent to {} from {} with subject '{}'", to, fromAddress, subject);
         } catch (Exception e) {
             log.error("Failed to send email to {}: {}", to, e.getMessage(), e);
             throw new RuntimeException("Failed to send email", e);
         }
+    }
+
+    /**
+     * Every email goes out as text/html, but notification templates are commonly
+     * authored as plain text with \n line breaks — which HTML rendering collapses
+     * into a single paragraph. Leave real HTML untouched; escape and wrap
+     * plain-text bodies so their line structure survives.
+     */
+    private static String ensureHtml(String body) {
+        if (body == null) return "";
+        if (body.matches("(?s).*<[a-zA-Z!/][^>]*>.*")) return body; // already HTML
+        String escaped = body.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+        return "<div style=\"font-family:'Segoe UI',Arial,sans-serif;max-width:600px;color:#333;white-space:pre-line\">"
+                + escaped + "</div>";
     }
 
     /** Holds the JavaMailSender plus sender identity from notification_config. */
