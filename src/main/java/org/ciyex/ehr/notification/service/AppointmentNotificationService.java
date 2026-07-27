@@ -113,7 +113,16 @@ public class AppointmentNotificationService {
         } catch (Exception ignored) { /* keep raw */ }
         // Include both camelCase and snake_case keys so templates work regardless of naming convention
         String pName = patientName != null ? patientName : "";
-        String provName = extractString(data, "providerName", "");
+        // Provider / location: the caller normally resolves the display name, but
+        // different callers (FHIR facade, generic resource controller, scheduler)
+        // hand us the value under different keys — and when none of them carried a
+        // name the confirmation email went out with a bare "Provider:" / "Location:"
+        // line, which is exactly what QA reported. Accept every spelling before
+        // giving up.
+        String provName = firstNonBlank(data, "providerName", "provider_name", "practitionerName",
+                "providerFullName", "provider", "practitioner");
+        String locName = firstNonBlank(data, "locationName", "location_name", "facilityName",
+                "facility", "locationDisplay", "location");
         String dDate = displayDate != null ? displayDate : "";
         String dTime = displayTime != null ? displayTime : "";
         String prcName = extractString(data, "practiceName", orgAlias);
@@ -133,7 +142,8 @@ public class AppointmentNotificationService {
         variables.put("practicePhone", prcPhone);
         variables.put("practice_phone", prcPhone);
         variables.put("portalLink", "");
-        variables.put("location_name", extractString(data, "locationName", ""));
+        variables.put("location_name", locName);
+        variables.put("locationName", locName);
 
         // Try to send using template first
         String templateKey = eventType;
@@ -145,15 +155,23 @@ public class AppointmentNotificationService {
                 var tmpl = templateOpt.get();
                 String templateSubject = resolveVars(tmpl.getSubject(), variables);
                 // Emails are always sent as HTML (EmailService uses setText(body, true)).
-                // Prefer the template's html_body so paragraph/line breaks render; the
-                // plain-text body uses "\n" newlines which collapse into a single
-                // run-on paragraph when injected into an HTML message. Fall back to the
-                // plain body (with newlines converted to <br/>) for older templates that
-                // have no html_body seeded.
-                String rawBody = (tmpl.getHtmlBody() != null && !tmpl.getHtmlBody().isBlank())
-                        ? tmpl.getHtmlBody()
-                        : plainToHtml(tmpl.getBody());
-                String templateBody = resolveVars(rawBody, variables);
+                // An org that authored its own html_body wins — that is a deliberate
+                // customisation. Otherwise the row only carries the seeded plain-text
+                // body, whose "\n" newlines collapse into the single run-on paragraph
+                // QA reported ("Dear X, Your appointment has been confirmed. Date: …
+                // Time: … Provider: Location: …"). For the appointment events we own a
+                // properly laid-out HTML version of exactly that content — labelled
+                // rows, blank ones omitted — so use it instead of a <br/>-ified blob.
+                // Anything else still falls back to the plain body.
+                String html = tmpl.getHtmlBody();
+                String templateBody;
+                if (html != null && !html.isBlank()) {
+                    templateBody = resolveVars(html, variables);
+                } else if (hasStructuredDefaultBody(eventType)) {
+                    templateBody = buildDefaultBody(eventType, variables);
+                } else {
+                    templateBody = resolveVars(plainToHtml(tmpl.getBody()), variables);
+                }
                 // Use default subject if template subject is empty
                 if (templateSubject == null || templateSubject.isBlank()) {
                     templateSubject = buildDefaultSubject(eventType, patientName, displayDate, displayTime);
@@ -191,6 +209,33 @@ public class AppointmentNotificationService {
                 + "</div>";
     }
 
+    /**
+     * Events for which {@link #buildDefaultBody} renders a laid-out HTML body
+     * (labelled Date / Time / Provider / Location rows). For these we prefer that
+     * layout over a plain-text template body, which renders as one run-on
+     * paragraph once it is sent as HTML.
+     */
+    private boolean hasStructuredDefaultBody(String eventType) {
+        return "appointment_confirmation".equals(eventType) || "appointment_reminder".equals(eventType);
+    }
+
+    /**
+     * First non-blank value among {@code keys}, skipping values that are clearly
+     * an id or a FHIR reference ("Location/12", "42") rather than a display name —
+     * putting one of those in an email reads worse than omitting the line.
+     */
+    private String firstNonBlank(Map<String, Object> data, String... keys) {
+        for (String key : keys) {
+            Object val = data.get(key);
+            if (val == null) continue;
+            String s = String.valueOf(val).trim();
+            if (s.isEmpty() || "null".equals(s)) continue;
+            if (s.matches("\\d+") || s.matches("[A-Za-z]+/[A-Za-z0-9\\-.]+")) continue;
+            return s;
+        }
+        return "";
+    }
+
     private String resolveVars(String template, Map<String, String> variables) {
         if (template == null) return "";
         String result = template;
@@ -225,37 +270,47 @@ public class AppointmentNotificationService {
 
     private String buildDefaultBody(String eventType, Map<String, String> vars) {
         String name = vars.getOrDefault("patientName", "Patient");
-        String provider = vars.getOrDefault("providerName", "your provider");
+        String provider = vars.getOrDefault("providerName", "");
         String date = vars.getOrDefault("appointmentDate", "");
         String time = vars.getOrDefault("appointmentTime", "");
         String practice = vars.getOrDefault("practiceName", "");
         String location = vars.getOrDefault("location_name", "");
+        String phone = vars.getOrDefault("practicePhone", "");
+
+        // Appointment details table: every row is a label/value pair on its own
+        // line, and a row whose value never resolved is dropped rather than sent as
+        // a dangling "Provider:" (QA 27-Jul).
+        StringBuilder details = new StringBuilder("<table style=\"border-collapse:collapse;margin:0 0 16px\">");
+        appendDetailRow(details, "Date", date);
+        appendDetailRow(details, "Time", time);
+        appendDetailRow(details, "Provider", provider);
+        appendDetailRow(details, "Location", location);
+        details.append("</table>");
+        String detailTable = details.toString();
+        // "call us at ." with no number reads as a typo — only offer the number
+        // when the practice actually has one on file.
+        String reschedule = phone.isBlank()
+                ? "<p style=\"margin:0 0 16px\">Please arrive 15 minutes early. Contact us if you need to reschedule.</p>"
+                : "<p style=\"margin:0 0 16px\">Please arrive 15 minutes early. If you need to reschedule, please call us at "
+                    + phone + ".</p>";
 
         String innerHtml = switch (eventType) {
             case "appointment_confirmation" -> String.format(
                     "<p style=\"margin:0 0 16px\">Dear %s,</p>" +
                     "<p style=\"margin:0 0 16px\">Your appointment has been confirmed.</p>" +
-                    "<table style=\"border-collapse:collapse;margin:0 0 16px\">" +
-                    "<tr><td style=\"padding:4px 12px 4px 0;font-weight:bold\">Date:</td><td style=\"padding:4px 0\">%s</td></tr>" +
-                    "<tr><td style=\"padding:4px 12px 4px 0;font-weight:bold\">Time:</td><td style=\"padding:4px 0\">%s</td></tr>" +
-                    "<tr><td style=\"padding:4px 12px 4px 0;font-weight:bold\">Provider:</td><td style=\"padding:4px 0\">%s</td></tr>" +
-                    (location.isBlank() ? "" : "<tr><td style=\"padding:4px 12px 4px 0;font-weight:bold\">Location:</td><td style=\"padding:4px 0\">" + location + "</td></tr>") +
-                    "</table>" +
+                    "%s" +
+                    "%s" +
                     "<p style=\"margin:0 0 16px\">We look forward to seeing you!</p>" +
                     "<p style=\"margin:0\">Thank you,<br/>%s</p>",
-                    name, date, time, provider, practice);
+                    name, detailTable, reschedule, practice);
             case "appointment_reminder" -> String.format(
                     "<p style=\"margin:0 0 16px\">Dear %s,</p>" +
                     "<p style=\"margin:0 0 16px\">This is a reminder about your upcoming appointment.</p>" +
-                    "<table style=\"border-collapse:collapse;margin:0 0 16px\">" +
-                    "<tr><td style=\"padding:4px 12px 4px 0;font-weight:bold\">Date:</td><td style=\"padding:4px 0\">%s</td></tr>" +
-                    "<tr><td style=\"padding:4px 12px 4px 0;font-weight:bold\">Time:</td><td style=\"padding:4px 0\">%s</td></tr>" +
-                    "<tr><td style=\"padding:4px 12px 4px 0;font-weight:bold\">Provider:</td><td style=\"padding:4px 0\">%s</td></tr>" +
-                    (location.isBlank() ? "" : "<tr><td style=\"padding:4px 12px 4px 0;font-weight:bold\">Location:</td><td style=\"padding:4px 0\">" + location + "</td></tr>") +
-                    "</table>" +
+                    "%s" +
+                    "%s" +
                     "<p style=\"margin:0 0 16px\">We look forward to seeing you!</p>" +
                     "<p style=\"margin:0\">Thank you,<br/>%s</p>",
-                    name, date, time, provider, practice);
+                    name, detailTable, reschedule, practice);
             default -> String.format(
                     "<p style=\"margin:0 0 16px\">Dear %s,</p>" +
                     "<p style=\"margin:0\">You have a new notification from %s.</p>",
@@ -265,6 +320,18 @@ public class AppointmentNotificationService {
         // Wrap in a responsive HTML email wrapper for proper alignment
         return "<div style=\"font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#333\">" +
                 innerHtml + "</div>";
+    }
+
+    /** Append one label/value row to the appointment-details table, skipping blanks. */
+    private void appendDetailRow(StringBuilder table, String label, String value) {
+        if (value == null || value.isBlank()) {
+            return;
+        }
+        table.append("<tr><td style=\"padding:4px 12px 4px 0;font-weight:bold;white-space:nowrap\">")
+                .append(label)
+                .append(":</td><td style=\"padding:4px 0\">")
+                .append(value)
+                .append("</td></tr>");
     }
 
     private String extractString(Map<String, Object> data, String key) {
