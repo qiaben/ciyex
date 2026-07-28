@@ -5,7 +5,7 @@
 -- org_alias (app-level filter, consistent with fee_sheet / price_level in V197).
 -- =============================================
 
-CREATE TABLE waitlist (
+CREATE TABLE IF NOT EXISTS waitlist (
     id              BIGSERIAL PRIMARY KEY,
     patient_id      VARCHAR(64),
     patient_name    VARCHAR(255),
@@ -19,4 +19,4 @@ CREATE TABLE waitlist (
     updated_at      TIMESTAMP    NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_waitlist_org ON waitlist(org_alias, priority, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_waitlist_org ON waitlist(org_alias, priority, created_at DESC);

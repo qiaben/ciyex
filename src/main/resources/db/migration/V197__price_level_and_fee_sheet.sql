@@ -5,7 +5,7 @@
 -- =============================================
 
 -- ── Price levels (OpenEMR-style fee-sheet price-level options) ──
-CREATE TABLE price_level (
+CREATE TABLE IF NOT EXISTS price_level (
     id          BIGSERIAL PRIMARY KEY,
     option_id   VARCHAR(60)  NOT NULL,
     title       VARCHAR(255) NOT NULL,
@@ -19,10 +19,10 @@ CREATE TABLE price_level (
     updated_at  TIMESTAMP    NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_price_level_org ON price_level(org_alias, seq);
+CREATE INDEX IF NOT EXISTS idx_price_level_org ON price_level(org_alias, seq);
 
 -- ── Fee sheets (per-encounter billable charges) ──
-CREATE TABLE fee_sheet (
+CREATE TABLE IF NOT EXISTS fee_sheet (
     id                      BIGSERIAL PRIMARY KEY,
     encounter_id            VARCHAR(64),
     patient_id              VARCHAR(64),
@@ -43,5 +43,5 @@ CREATE TABLE fee_sheet (
     updated_at              TIMESTAMP     NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_fee_sheet_org ON fee_sheet(org_alias, created_at DESC);
-CREATE INDEX idx_fee_sheet_encounter ON fee_sheet(org_alias, encounter_id);
+CREATE INDEX IF NOT EXISTS idx_fee_sheet_org ON fee_sheet(org_alias, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_fee_sheet_encounter ON fee_sheet(org_alias, encounter_id);
