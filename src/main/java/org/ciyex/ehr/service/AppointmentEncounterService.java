@@ -26,6 +26,9 @@ import java.util.*;
 @Slf4j
 public class AppointmentEncounterService {
 
+    /** Appointment.supportingInformation reference prefix for the visit's encounter. */
+    private static final String ENCOUNTER_REF_PREFIX = "Encounter/";
+
     private final FhirClientService fhirClientService;
     private final PracticeContextService practiceContextService;
     private final TabFieldConfigService tabFieldConfigService;
@@ -157,9 +160,27 @@ public class AppointmentEncounterService {
 
     /**
      * Find existing encounter linked to an appointment. Returns encounter FHIR ID or null.
+     *
+     * Reads the back-link off the Appointment first and only then falls back to
+     * searching Encounters by their `appointment` reference. The search is the
+     * obvious way round, but it goes through the FHIR server's search index,
+     * which is NOT immediately consistent — measured on both stage and
+     * production, a freshly created encounter stays invisible to
+     * `Encounter?appointment=Appointment/{id}` for up to a minute. Every caller
+     * here is a duplicate guard, so during that window the guard reported "no
+     * encounter" and the visit produced a second (third, …) encounter for the
+     * same appointment. Reading the Appointment by id hits the resource
+     * directly, so the back-link written by {@link #linkEncounterToAppointment}
+     * is visible the instant the encounter exists.
      */
     public String findEncounterForAppointment(String appointmentFhirId) {
         String orgAlias = practiceContextService.getPracticeId();
+
+        String linked = readEncounterBackLink(appointmentFhirId, orgAlias);
+        if (linked != null) {
+            return linked;
+        }
+
         try {
             Bundle bundle = fhirClientService.getClient(orgAlias).search()
                     .forResource(Encounter.class)
@@ -175,6 +196,54 @@ public class AppointmentEncounterService {
             log.warn("Failed to find encounter for appointment {}: {}", appointmentFhirId, e.getMessage());
         }
         return null;
+    }
+
+    /** Encounter id recorded on the appointment itself, or null when absent. */
+    private String readEncounterBackLink(String appointmentFhirId, String orgAlias) {
+        try {
+            Optional<Appointment> appointment = fhirClientService.readOptional(Appointment.class, appointmentFhirId, orgAlias);
+            if (appointment.isEmpty()) {
+                return null;
+            }
+            for (Reference ref : appointment.get().getSupportingInformation()) {
+                String value = ref.getReference();
+                if (value != null && value.startsWith(ENCOUNTER_REF_PREFIX)) {
+                    String id = value.substring(ENCOUNTER_REF_PREFIX.length());
+                    if (!id.isBlank()) {
+                        return id;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to read encounter back-link off appointment {}: {}", appointmentFhirId, e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * Record the encounter on the appointment so the duplicate guard can find it
+     * without waiting for the search index. Best-effort: a failure here only
+     * costs the guard its fast path, so it must not fail the encounter creation
+     * that just succeeded.
+     */
+    private void linkEncounterToAppointment(String appointmentFhirId, String encounterFhirId, String orgAlias) {
+        try {
+            Optional<Appointment> found = fhirClientService.readOptional(Appointment.class, appointmentFhirId, orgAlias);
+            if (found.isEmpty()) {
+                return;
+            }
+            Appointment appointment = found.get();
+            String reference = ENCOUNTER_REF_PREFIX + encounterFhirId;
+            boolean present = appointment.getSupportingInformation().stream()
+                    .anyMatch(ref -> reference.equals(ref.getReference()));
+            if (present) {
+                return;
+            }
+            appointment.addSupportingInformation(new Reference(reference));
+            fhirClientService.update(appointment, orgAlias);
+        } catch (Exception e) {
+            log.warn("Failed to link encounter {} to appointment {}: {}", encounterFhirId, appointmentFhirId, e.getMessage());
+        }
     }
 
     /**
@@ -257,6 +326,10 @@ public class AppointmentEncounterService {
             // Create in FHIR
             var outcome = fhirClientService.create(encounter, orgAlias);
             String fhirId = outcome.getId().getIdPart();
+
+            // Write the back-link immediately so the next duplicate check finds
+            // this encounter without depending on the search index catching up.
+            linkEncounterToAppointment(appointmentId, fhirId, orgAlias);
 
             log.info("Auto-created encounter {} for appointment {} (note: {})", fhirId, appointmentId, encounterNote);
             return fhirId;
