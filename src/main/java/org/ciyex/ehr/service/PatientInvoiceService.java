@@ -12,7 +12,9 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -258,6 +260,58 @@ public class PatientInvoiceService {
             log.error("Error listing invoices for patient {}", patientId, e);
             throw e;
         }
+    }
+
+    /**
+     * Flatten every invoice line across ALL patients in the practice into
+     * CPT-utilization report rows (one row per procedure line: CPT code,
+     * description, provider, charge, date). Backs the Financial > CPT
+     * Utilization report — its previous source ({@code /encounters/report/
+     * encounterAll}) carried no procedure codes, so the CPT Code and Description
+     * columns were always blank. CPT codes live only on invoice line items.
+     */
+    public List<Map<String, Object>> listAllInvoiceLines() {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        try {
+            List<Observation> allObs = new ArrayList<>();
+            Bundle bundle = fhirClientService.search(Observation.class, getPracticeId());
+            // Follow FHIR pagination so every invoice in the practice is scanned,
+            // mirroring listInvoices() (just without the per-patient filter).
+            while (bundle != null) {
+                allObs.addAll(fhirClientService.extractResources(bundle, Observation.class));
+                String nextLink = bundle.getLink(Bundle.LINK_NEXT) != null
+                        ? bundle.getLink(Bundle.LINK_NEXT).getUrl() : null;
+                bundle = nextLink != null ? fhirClientService.loadPage(nextLink, getPracticeId()) : null;
+            }
+            for (Observation obs : allObs) {
+                String type = getStringExt(obs, EXT_INVOICE_TYPE);
+                boolean isInvoiceByCode = obs.hasCode() && obs.getCode().hasCoding()
+                        && obs.getCode().getCoding().stream().anyMatch(c ->
+                            "http://ciyex.com/fhir/CodeSystem/invoice".equals(c.getSystem())
+                            && "INVOICE".equals(c.getCode()));
+                if (!("INVOICE".equals(type) || isInvoiceByCode)) {
+                    continue;
+                }
+                Long pid = getPatientIdFromObs(obs);
+                for (PatientInvoiceLineDto line : extractInvoiceLines(obs)) {
+                    // Skip empty lines — a CPT code is the whole point of this report.
+                    if (line.code() == null || line.code().isBlank()) {
+                        continue;
+                    }
+                    Map<String, Object> row = new HashMap<>();
+                    row.put("cptCode", line.code());
+                    row.put("description", line.treatment());
+                    row.put("providerDisplay", line.provider());
+                    row.put("totalAmount", line.charge());
+                    row.put("startDate", line.dos() != null ? line.dos().toString() : null);
+                    row.put("patientId", pid);
+                    rows.add(row);
+                }
+            }
+        } catch (Exception e) {
+            log.error("Error building CPT-utilization report from invoice lines", e);
+        }
+        return rows;
     }
 
     /**

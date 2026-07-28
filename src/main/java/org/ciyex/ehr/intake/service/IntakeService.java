@@ -22,8 +22,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -103,9 +106,14 @@ public class IntakeService {
                     "Hi " + name + ", please complete your intake form before your visit: " + link,
                     null, "intake");
         } else {
-            String body = "Hello " + name + ",\n\n"
-                    + "Please complete your patient intake form before your visit:\n"
-                    + link + "\n\nThis link expires in 72 hours.";
+            // Matches the appointment-confirmation email's layout (labeled lines,
+            // practice-name signoff) so patients see a consistent format across
+            // the app's emails.
+            String body = "Dear " + name + ",\n\n"
+                    + "Please complete your patient intake form before your visit.\n\n"
+                    + "Form Link: " + link + "\n"
+                    + "Expires: " + formatExpiry(entity.getExpiresAt()) + "\n\n"
+                    + "Thank you,\n" + resolvePracticeName(orgAlias);
             sendResult = notificationService.send(orgAlias, "email", email,
                     "Complete your patient intake form", body, null, "intake");
         }
@@ -119,6 +127,32 @@ public class IntakeService {
         out.put("link", link);
         out.put("channel", channel);
         return out;
+    }
+
+    private static final DateTimeFormatter EXPIRY_FORMAT = DateTimeFormatter.ofPattern("MMMM d, yyyy 'at' h:mm a");
+
+    /** Same date/time style as the appointment-confirmation email
+     *  (AppointmentNotificationService: "MMMM d, yyyy" / "h:mm a"). */
+    private String formatExpiry(Instant expiresAt) {
+        return expiresAt.atZone(ZoneId.systemDefault()).format(EXPIRY_FORMAT);
+    }
+
+    /** Best-effort practice display name (Settings > Practice) for the email
+     *  signoff — falls back to the raw org alias slug when no practice record
+     *  exists yet, same fallback SettingsController.findFirstPractice() uses. */
+    private String resolvePracticeName(String orgAlias) {
+        try {
+            Map<String, Object> result = fhirResourceService.listAll("practice", 0, 1);
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> content = (List<Map<String, Object>>) result.get("content");
+            if (content != null && !content.isEmpty()) {
+                Object name = content.get(0).get("name");
+                if (name != null && !String.valueOf(name).isBlank()) { return String.valueOf(name); }
+            }
+        } catch (Exception e) {
+            log.debug("Could not resolve practice name for {}: {}", orgAlias, e.getMessage());
+        }
+        return orgAlias;
     }
 
     /* ------------------------------------------------------------ public view */

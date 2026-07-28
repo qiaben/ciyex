@@ -122,7 +122,22 @@ public class SecurityConfig {
                 try {
                     keycloakDecoder[0] = (NimbusJwtDecoder) JwtDecoders.fromIssuerLocation(issuerUri);
                 } catch (Exception e) {
-                    // Keycloak unavailable, use local only
+                    // fromIssuerLocation requires the realm's advertised `issuer`
+                    // (Keycloak frontend URL) to equal `issuerUri`. When the realm
+                    // is reached through a reverse proxy (e.g. issuerUri is
+                    // https://dev.aran.me/... but the realm advertises its public
+                    // frontend URL), that strict check throws and Keycloak tokens
+                    // can never be validated. Fall back to validating signatures
+                    // against the realm's JWKS — reachable at the issuerUri host —
+                    // with standard timestamp checks.
+                    try {
+                        String jwksUri = issuerUri.replaceAll("/+$", "") + "/protocol/openid-connect/certs";
+                        NimbusJwtDecoder proxied = NimbusJwtDecoder.withJwkSetUri(jwksUri).build();
+                        proxied.setJwtValidator(JwtValidators.createDefault());
+                        keycloakDecoder[0] = proxied;
+                    } catch (Exception ignored) {
+                        // Keycloak unavailable, use local only
+                    }
                 }
             }
             
