@@ -2001,6 +2001,29 @@ public class FhirFacadeController {
                         }
                     }
                 }
+                // Resolve the practice's display name / phone for the email
+                // signoff and reschedule line. Without this the signoff showed
+                // the raw org-alias slug ("universe-star-care") and "call us at
+                // ." had no number — Settings > Practice carries the real values.
+                boolean needPracticeName = !notifData.containsKey("practiceName") || String.valueOf(notifData.get("practiceName")).isBlank();
+                boolean needPracticePhone = !notifData.containsKey("practicePhone") || String.valueOf(notifData.get("practicePhone")).isBlank();
+                if (needPracticeName || needPracticePhone) {
+                    try {
+                        Map<String, Object> practice = findFirstPractice();
+                        if (practice != null) {
+                            if (needPracticeName) {
+                                Object name = practice.get("name");
+                                if (name != null && !String.valueOf(name).isBlank()) { notifData.put("practiceName", String.valueOf(name)); }
+                            }
+                            if (needPracticePhone) {
+                                Object phone = practice.get("phone");
+                                if (phone != null && !String.valueOf(phone).isBlank()) { notifData.put("practicePhone", String.valueOf(phone)); }
+                            }
+                        }
+                    } catch (Exception e) {
+                        log.debug("Could not look up practice info for notification: {}", e.getMessage());
+                    }
+                }
                 // Ensure practice name is set
                 notifData.putIfAbsent("practiceName", orgAlias);
                 appointmentNotificationService.onAppointmentCreated(orgAlias, notifData);

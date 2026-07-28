@@ -426,6 +426,27 @@ public class GenericFhirResourceController {
                     log.debug("Could not look up location for notification: {}", e.getMessage());
                 }
             }
+            // Resolve the practice's display name / phone for the email signoff
+            // and reschedule line — without this the signoff falls back to the
+            // raw org-alias slug and the phone stays blank. Mirrors the same
+            // lookup FhirFacadeController.createAppointment() does.
+            if (!notifData.containsKey("practiceName") || String.valueOf(notifData.getOrDefault("practiceName", "")).isBlank()
+                    || !notifData.containsKey("practicePhone") || String.valueOf(notifData.getOrDefault("practicePhone", "")).isBlank()) {
+                try {
+                    Map<String, Object> practiceData = resourceService.listAll("practice", 0, 1);
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> practiceContent = (List<Map<String, Object>>) practiceData.getOrDefault("content", List.of());
+                    if (!practiceContent.isEmpty()) {
+                        Map<String, Object> practice = practiceContent.get(0);
+                        Object name = practice.get("name");
+                        if (name != null && !String.valueOf(name).isBlank()) { notifData.putIfAbsent("practiceName", String.valueOf(name)); }
+                        Object phone = practice.get("phone");
+                        if (phone != null && !String.valueOf(phone).isBlank()) { notifData.putIfAbsent("practicePhone", String.valueOf(phone)); }
+                    }
+                } catch (Exception e) {
+                    log.debug("Could not look up practice info for notification: {}", e.getMessage());
+                }
+            }
             appointmentNotificationService.onAppointmentCreated(orgAlias, notifData);
         } catch (Exception e) {
             log.warn("Failed to trigger appointment notification: {}", e.getMessage());
