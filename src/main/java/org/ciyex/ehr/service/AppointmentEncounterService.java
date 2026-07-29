@@ -47,12 +47,23 @@ public class AppointmentEncounterService {
 
     /**
      * Read status options with metadata from tab_field_config for appointments.
+     *
+     * The encounter is created by the <b>Completed</b> transition, not by
+     * Check-in. Checking a patient in only records that they arrived — there is
+     * nothing to document yet — and the visit workflow says as much: its
+     * Encounter step is labelled "Auto on complete" and the client creates the
+     * encounter in exactly one place, the Completed transition. Triggering on
+     * Checked-in contradicted that twice over: the encounter showed up in the
+     * patient's Encounter History the moment the front desk checked the patient
+     * in, and the Completed step then created a SECOND one, because the client
+     * had no way to see the first (the search-backed lookup it uses is blind to
+     * a new encounter for about a minute).
      */
     private static final List<StatusOption> DEFAULT_STATUS_OPTIONS = List.of(
             new StatusOption("Scheduled",    "Scheduled",    "#3b82f6", false, false, 0, "Confirmed", null),
             new StatusOption("Confirmed",    "Confirmed",    "#6366f1", false, false, 1, "Checked-in", null),
-            new StatusOption("Checked-in",   "Checked-in",   "#f59e0b", true,  false, 2, "Completed",  null),
-            new StatusOption("Completed",    "Completed",    "#10b981", false, true,  3, null,         null),
+            new StatusOption("Checked-in",   "Checked-in",   "#f59e0b", false, false, 2, "Completed",  null),
+            new StatusOption("Completed",    "Completed",    "#10b981", true,  true,  3, null,         null),
             new StatusOption("Re-Scheduled", "Re-Scheduled", "#8b5cf6", false, false, 4, "Scheduled",  null),
             new StatusOption("No Show",      "No Show",      "#ef4444", false, true,  5, null,         null),
             new StatusOption("Cancelled",    "Cancelled",    "#6b7280", false, true,  6, null,         null)
