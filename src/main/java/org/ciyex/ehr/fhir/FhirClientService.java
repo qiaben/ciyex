@@ -36,6 +36,7 @@ public class FhirClientService {
     private final int socketTimeout;
     private final int connectTimeout;
     private final FhirBearerTokenInterceptor bearerTokenInterceptor;
+    private final FhirSearchCacheBypassInterceptor searchCacheBypassInterceptor;
 
     // Cache clients per partition to avoid recreating them
     private final ConcurrentHashMap<String, IGenericClient> clientCache = new ConcurrentHashMap<>();
@@ -43,11 +44,13 @@ public class FhirClientService {
     public FhirClientService(
             FhirContext fhirContext,
             FhirBearerTokenInterceptor bearerTokenInterceptor,
+            FhirSearchCacheBypassInterceptor searchCacheBypassInterceptor,
             @Value("${fhir.server.url}") String baseServerUrl,
             @Value("${fhir.client.socket-timeout:60000}") int socketTimeout,
             @Value("${fhir.client.connect-timeout:10000}") int connectTimeout) {
         this.fhirContext = fhirContext;
         this.bearerTokenInterceptor = bearerTokenInterceptor;
+        this.searchCacheBypassInterceptor = searchCacheBypassInterceptor;
         this.baseServerUrl = baseServerUrl.endsWith("/") ? baseServerUrl.substring(0, baseServerUrl.length() - 1) : baseServerUrl;
         this.socketTimeout = socketTimeout;
         this.connectTimeout = connectTimeout;
@@ -71,6 +74,11 @@ public class FhirClientService {
 
             IGenericClient client = fhirContext.newRestfulGenericClient(partitionUrl);
             client.registerInterceptor(bearerTokenInterceptor);
+            // Registered here, on the shared client, so every read path opts out of
+            // the server's 60s search result cache — a write must be visible to the
+            // next read. Most searches are issued straight off getClient(), so a
+            // per-call-site directive would miss them.
+            client.registerInterceptor(searchCacheBypassInterceptor);
             return client;
         });
     }
@@ -176,26 +184,18 @@ public class FhirClientService {
 
     /**
      * Search with pagination — returns a single page Bundle.
-     * Uses FHIR _count and next-link paging (skips pages via link following).
+     *
+     * <p>Uses FHIR {@code _offset} so any page costs one request. Walking the
+     * "next" links instead made page N cost N sequential round trips, so paging
+     * got steadily slower the deeper the user went.</p>
      */
     public <T extends IBaseResource> Bundle searchPaged(Class<T> resourceClass, String orgAlias, int count, int offset) {
-        // First request — get page with _count
-        Bundle bundle = getClientForPartition(orgAlias).search()
+        return getClientForPartition(orgAlias).search()
                 .forResource(resourceClass)
                 .count(count)
-                .cacheControl(new ca.uhn.fhir.rest.api.CacheControlDirective().setNoCache(true))
+                .offset(offset)
                 .returnBundle(Bundle.class)
                 .execute();
-
-        // Skip pages to reach the requested offset
-        int pagesToSkip = offset / count;
-        for (int i = 0; i < pagesToSkip && bundle.getLink(Bundle.LINK_NEXT) != null; i++) {
-            bundle = getClientForPartition(orgAlias).loadPage()
-                    .next(bundle)
-                    .execute();
-        }
-
-        return bundle;
     }
 
     /**
@@ -205,7 +205,6 @@ public class FhirClientService {
         Bundle bundle = getClientForPartition(orgAlias).search()
                 .forResource(resourceClass)
                 .count(1000)
-                .cacheControl(new ca.uhn.fhir.rest.api.CacheControlDirective().setNoCache(true))
                 .returnBundle(Bundle.class)
                 .execute();
 
@@ -231,7 +230,6 @@ public class FhirClientService {
             Class<T> resourceClass, String orgAlias, Map<String, String> params) {
         var query = getClientForPartition(orgAlias).search()
                 .forResource(resourceClass)
-                .cacheControl(new ca.uhn.fhir.rest.api.CacheControlDirective().setNoCache(true))
                 .returnBundle(Bundle.class);
         for (var e : params.entrySet()) {
             query = query.where(new ca.uhn.fhir.rest.gclient.StringClientParam(e.getKey()).matches().value(e.getValue()));

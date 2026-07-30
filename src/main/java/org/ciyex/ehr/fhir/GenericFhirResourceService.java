@@ -342,16 +342,14 @@ public class GenericFhirResourceService {
                         .hasId(encounterRef));
             }
 
+            // Jump straight to the requested page with _offset. Skipping via the
+            // "next" links cost one sequential round trip per page skipped, so
+            // opening page N was N times slower than opening page 1.
             Bundle bundle = search.count(size)
+                    .offset(page * size)
                     .totalMode(ca.uhn.fhir.rest.api.SearchTotalModeEnum.ACCURATE)
                     .returnBundle(Bundle.class)
                     .execute();
-            // Skip to requested page via next links
-            for (int i = 0; i < page && bundle.getLink(Bundle.LINK_NEXT) != null; i++) {
-                bundle = fhirClient.getClient(orgAlias).loadPage()
-                        .next(bundle)
-                        .execute();
-            }
 
             if (bundle.getTotal() > 0) {
                 totalCount += bundle.getTotal();
