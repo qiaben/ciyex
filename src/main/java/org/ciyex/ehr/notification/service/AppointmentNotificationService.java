@@ -218,6 +218,11 @@ public class AppointmentNotificationService {
                 // Use default subject if template subject is empty
                 if (templateSubject == null || templateSubject.isBlank()) {
                     templateSubject = buildDefaultSubject(eventType, patientName, displayDate, displayTime, prcName);
+                } else {
+                    // A custom template's own subject text predates the practice-name
+                    // requirement and won't contain {{practiceName}} — prefix it rather
+                    // than silently omitting the practice name for orgs with a template.
+                    templateSubject = withPracticeName(templateSubject, prcName);
                 }
                 notificationService.send(
                         orgAlias, "email", patientEmail,
@@ -306,7 +311,18 @@ public class AppointmentNotificationService {
             case "prescription_ready" -> "Prescription Ready for Pickup";
             default -> "Notification from Your Healthcare Provider";
         };
-        return (practiceName != null && !practiceName.isBlank()) ? practiceName + ": " + base : base;
+        return withPracticeName(base, practiceName);
+    }
+
+    /** Prefixes {@code practiceName} onto a subject unless it's already present (case-insensitive). */
+    private String withPracticeName(String subject, String practiceName) {
+        if (practiceName == null || practiceName.isBlank()) {
+            return subject;
+        }
+        if (subject.toLowerCase().contains(practiceName.toLowerCase())) {
+            return subject;
+        }
+        return practiceName + ": " + subject;
     }
 
     private String buildDefaultBody(String eventType, Map<String, String> vars) {
