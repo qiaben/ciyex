@@ -98,22 +98,21 @@ public class IntakeService {
         String link = portalUrl.replaceAll("/+$", "") + "/intake/" + token;
         String name = entity.getRecipientName() != null ? entity.getRecipientName() : "there";
 
+        // Matches the appointment-confirmation email's layout (labeled lines,
+        // practice-name signoff) so patients see a consistent format across
+        // the app's emails and texts.
+        String body = "Dear " + name + ",\n\n"
+                + "Please complete your patient intake form before your visit.\n\n"
+                + "Form Link: " + link + "\n"
+                + "Expires: " + formatExpiry(entity.getExpiresAt()) + "\n\n"
+                + "Thank you,\n" + resolvePracticeName(orgAlias);
+
         // Dispatch via the per-practice notification service so each practice sends
         // from its own SMS/email provider (configured in Settings > Notifications).
         NotificationLogDto sendResult;
         if ("SMS".equals(channel)) {
-            sendResult = notificationService.send(orgAlias, "sms", phone, null,
-                    "Hi " + name + ", please complete your intake form before your visit: " + link,
-                    null, "intake");
+            sendResult = notificationService.send(orgAlias, "sms", phone, null, body, null, "intake");
         } else {
-            // Matches the appointment-confirmation email's layout (labeled lines,
-            // practice-name signoff) so patients see a consistent format across
-            // the app's emails.
-            String body = "Dear " + name + ",\n\n"
-                    + "Please complete your patient intake form before your visit.\n\n"
-                    + "Form Link: " + link + "\n"
-                    + "Expires: " + formatExpiry(entity.getExpiresAt()) + "\n\n"
-                    + "Thank you,\n" + resolvePracticeName(orgAlias);
             sendResult = notificationService.send(orgAlias, "email", email,
                     "Complete your patient intake form", body, null, "intake");
         }
