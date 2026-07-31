@@ -56,26 +56,35 @@ public class AppointmentNotificationService {
     }
 
     private void sendEventNotification(String orgAlias, String eventType, Map<String, Object> data) {
-        // Check if this event type is enabled for email
+        // Check if this event type is enabled at all
         var prefOpt = prefRepo.findByOrgAliasAndEventType(orgAlias, eventType);
         if (prefOpt.isEmpty()) {
             log.debug("No preference found for event '{}' in org '{}', skipping", eventType, orgAlias);
             return;
         }
-
         var pref = prefOpt.get();
-        if (!Boolean.TRUE.equals(pref.getEmailEnabled())) {
-            log.debug("Email disabled for event '{}' in org '{}', skipping", eventType, orgAlias);
-            return;
-        }
 
-        // Get patient info from appointment data (email must be resolved by caller)
+        // Get patient info from appointment data (must be resolved by caller — FHIR/security
+        // context is not available in this @Async method's thread).
         String patientEmail = extractString(data, "patientEmail");
+        String patientPhone = extractString(data, "patientPhone");
         String patientName = extractString(data, "patientName");
         Long patientId = extractLong(data, "patientId");
 
-        if (patientEmail == null || patientEmail.isBlank()) {
-            log.info("No patient email found for notification (event={}, patientId={}), skipping", eventType, patientId);
+        // Each channel requires BOTH the org's event preference AND the patient's own
+        // Communication Consent (Demographics > allowEmail/allowSms) — a practice enabling
+        // SMS reminders doesn't override a patient who hasn't consented to text messages.
+        boolean patientAllowsEmail = Boolean.TRUE.equals(data.get("patientAllowEmail"));
+        boolean patientAllowsSms = Boolean.TRUE.equals(data.get("patientAllowSms"));
+        boolean sendEmail = Boolean.TRUE.equals(pref.getEmailEnabled()) && patientAllowsEmail
+                && patientEmail != null && !patientEmail.isBlank();
+        boolean sendSms = Boolean.TRUE.equals(pref.getSmsEnabled()) && patientAllowsSms
+                && patientPhone != null && !patientPhone.isBlank();
+
+        if (!sendEmail && !sendSms) {
+            log.info("Skipping {} notification for org {} (patientId={}): emailEnabled={}/consent={}, "
+                            + "smsEnabled={}/consent={}", eventType, orgAlias, patientId,
+                    pref.getEmailEnabled(), patientAllowsEmail, pref.getSmsEnabled(), patientAllowsSms);
             return;
         }
 
@@ -145,10 +154,23 @@ public class AppointmentNotificationService {
         variables.put("location_name", locName);
         variables.put("locationName", locName);
 
-        // Try to send using template first
-        String templateKey = eventType;
-        var templateOpt = templateRepo.findByOrgAliasAndTemplateKeyAndChannelType(
-                orgAlias, templateKey, "email");
+        if (sendEmail) {
+            sendEmailNotification(orgAlias, eventType, patientEmail, patientId, patientName,
+                    displayDate, displayTime, prcName, variables);
+        }
+        if (sendSms) {
+            String smsSubject = buildDefaultSubject(eventType, patientName, displayDate, displayTime, prcName);
+            String smsBody = buildDefaultSmsBody(eventType, variables);
+            notificationService.send(orgAlias, "sms", patientPhone, smsSubject, smsBody, patientId, "auto_" + eventType);
+            log.info("Sent {} SMS to {} for org {}", eventType, patientPhone, orgAlias);
+        }
+    }
+
+    /** Email send: prefers the org's custom template (subject/HTML body) over the built-in default. */
+    private void sendEmailNotification(String orgAlias, String eventType, String patientEmail, Long patientId,
+                                        String patientName, String displayDate, String displayTime,
+                                        String prcName, Map<String, String> variables) {
+        var templateOpt = templateRepo.findByOrgAliasAndTemplateKeyAndChannelType(orgAlias, eventType, "email");
 
         if (templateOpt.isPresent() && Boolean.TRUE.equals(templateOpt.get().getIsActive())) {
             try {
@@ -174,7 +196,7 @@ public class AppointmentNotificationService {
                 }
                 // Use default subject if template subject is empty
                 if (templateSubject == null || templateSubject.isBlank()) {
-                    templateSubject = buildDefaultSubject(eventType, patientName, displayDate, displayTime);
+                    templateSubject = buildDefaultSubject(eventType, patientName, displayDate, displayTime, prcName);
                 }
                 notificationService.send(
                         orgAlias, "email", patientEmail,
@@ -189,7 +211,7 @@ public class AppointmentNotificationService {
         }
 
         // Fallback: send with default subject/body
-        String subject = buildDefaultSubject(eventType, patientName, displayDate, displayTime);
+        String subject = buildDefaultSubject(eventType, patientName, displayDate, displayTime, prcName);
         String body = buildDefaultBody(eventType, variables);
         notificationService.send(orgAlias, "email", patientEmail, subject, body, patientId, "auto_" + eventType);
         log.info("Sent {} email (default template) to {} for org {}", eventType, patientEmail, orgAlias);
@@ -245,11 +267,8 @@ public class AppointmentNotificationService {
         return result;
     }
 
-    private String buildDefaultSubject(String eventType, String patientName, String appointmentDate) {
-        return buildDefaultSubject(eventType, patientName, appointmentDate, null);
-    }
-
-    private String buildDefaultSubject(String eventType, String patientName, String appointmentDate, String appointmentTime) {
+    private String buildDefaultSubject(String eventType, String patientName, String appointmentDate,
+                                        String appointmentTime, String practiceName) {
         String dateStr = (appointmentDate != null && !appointmentDate.isBlank())
                 ? appointmentDate
                 : LocalDate.now().format(DateTimeFormatter.ofPattern("MMMM d, yyyy"));
@@ -257,7 +276,7 @@ public class AppointmentNotificationService {
         String timeStr = (appointmentTime != null && !appointmentTime.isBlank())
                 ? " at " + appointmentTime
                 : "";
-        return switch (eventType) {
+        String base = switch (eventType) {
             case "appointment_confirmation" -> "Appointment Confirmation" +
                     (patientName != null ? " for " + patientName : "") + " | " + dateStr + timeStr;
             case "appointment_reminder" -> "Appointment Reminder" +
@@ -266,6 +285,7 @@ public class AppointmentNotificationService {
             case "prescription_ready" -> "Prescription Ready for Pickup";
             default -> "Notification from Your Healthcare Provider";
         };
+        return (practiceName != null && !practiceName.isBlank()) ? practiceName + ": " + base : base;
     }
 
     private String buildDefaultBody(String eventType, Map<String, String> vars) {
@@ -320,6 +340,41 @@ public class AppointmentNotificationService {
         // Wrap in a responsive HTML email wrapper for proper alignment
         return "<div style=\"font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#333\">" +
                 innerHtml + "</div>";
+    }
+
+    /** Plain-text counterpart of {@link #buildDefaultBody} for SMS, which has no HTML rendering. */
+    private String buildDefaultSmsBody(String eventType, Map<String, String> vars) {
+        String name = vars.getOrDefault("patientName", "Patient");
+        String provider = vars.getOrDefault("providerName", "");
+        String date = vars.getOrDefault("appointmentDate", "");
+        String time = vars.getOrDefault("appointmentTime", "");
+        String practice = vars.getOrDefault("practiceName", "");
+        String location = vars.getOrDefault("location_name", "");
+
+        StringBuilder details = new StringBuilder();
+        appendDetailLine(details, "Date", date);
+        appendDetailLine(details, "Time", time);
+        appendDetailLine(details, "Provider", provider);
+        appendDetailLine(details, "Location", location);
+
+        String intro = switch (eventType) {
+            case "appointment_confirmation" -> "Your appointment has been confirmed.";
+            case "appointment_reminder" -> "This is a reminder about your upcoming appointment.";
+            default -> "You have a new notification from " + practice + ".";
+        };
+
+        if ("appointment_confirmation".equals(eventType) || "appointment_reminder".equals(eventType)) {
+            return "Dear " + name + ",\n\n" + intro + "\n\n" + details + "\nThank you,\n" + practice;
+        }
+        return "Dear " + name + ",\n\n" + intro;
+    }
+
+    /** Append one "Label: value" line, skipping blanks — mirrors {@link #appendDetailRow}'s HTML behavior. */
+    private void appendDetailLine(StringBuilder sb, String label, String value) {
+        if (value == null || value.isBlank()) {
+            return;
+        }
+        sb.append(label).append(": ").append(value).append("\n");
     }
 
     /** Append one label/value row to the appointment-details table, skipping blanks. */

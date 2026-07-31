@@ -97,6 +97,8 @@ public class IntakeService {
 
         String link = portalUrl.replaceAll("/+$", "") + "/intake/" + token;
         String name = entity.getRecipientName() != null ? entity.getRecipientName() : "there";
+        String practiceName = resolvePracticeName(orgAlias);
+        String subject = practiceName + ": Complete your patient intake form";
 
         // Matches the appointment-confirmation email's layout (labeled lines,
         // practice-name signoff) so patients see a consistent format across
@@ -105,16 +107,17 @@ public class IntakeService {
                 + "Please complete your patient intake form before your visit.\n\n"
                 + "Form Link: " + link + "\n"
                 + "Expires: " + formatExpiry(entity.getExpiresAt()) + "\n\n"
-                + "Thank you,\n" + resolvePracticeName(orgAlias);
+                + "Thank you,\n" + practiceName;
 
         // Dispatch via the per-practice notification service so each practice sends
         // from its own SMS/email provider (configured in Settings > Notifications).
+        // SMS has no real "subject" wire concept, but passing it through anyway keeps
+        // the Message Log's SUBJECT column populated the same as email.
         NotificationLogDto sendResult;
         if ("SMS".equals(channel)) {
-            sendResult = notificationService.send(orgAlias, "sms", phone, null, body, null, "intake");
+            sendResult = notificationService.send(orgAlias, "sms", phone, subject, body, null, "intake");
         } else {
-            sendResult = notificationService.send(orgAlias, "email", email,
-                    "Complete your patient intake form", body, null, "intake");
+            sendResult = notificationService.send(orgAlias, "email", email, subject, body, null, "intake");
         }
         if (sendResult != null && "failed".equals(sendResult.getStatus())) {
             throw new IllegalStateException(sendResult.getErrorMessage() != null

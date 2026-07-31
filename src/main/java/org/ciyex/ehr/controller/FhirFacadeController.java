@@ -1932,8 +1932,11 @@ public class FhirFacadeController {
                 String orgAlias = RequestContext.get().getOrgName();
                 Map<String, Object> notifData = new HashMap<>(body);
                 notifData.putAll(response);
-                // Look up patient email now (in request thread where context is available)
-                if (patientId != null && !notifData.containsKey("patientEmail")) {
+                // Look up patient email/phone/consent now (in request thread where context is available)
+                boolean needsPatientLookup = patientId != null && (!notifData.containsKey("patientEmail")
+                        || !notifData.containsKey("patientPhone") || !notifData.containsKey("patientAllowEmail")
+                        || !notifData.containsKey("patientAllowSms"));
+                if (needsPatientLookup) {
                     try {
                         Map<String, Object> patientData = fhirService.get("demographics", patientId, null);
                         if (patientData != null) {
@@ -1950,6 +1953,14 @@ public class FhirFacadeController {
                                     }
                                 }
                             }
+                            Object phone = patientData.get("phoneNumber");
+                            if (phone != null && !String.valueOf(phone).isBlank()) {
+                                notifData.put("patientPhone", String.valueOf(phone));
+                            }
+                            // Communication Consent (Demographics): gates whether appointment
+                            // notifications may go out on each channel at all.
+                            notifData.putIfAbsent("patientAllowEmail", toBoolean(patientData.get("allowEmail")));
+                            notifData.putIfAbsent("patientAllowSms", toBoolean(patientData.get("allowSms")));
                             String fn = patientData.get("firstName") != null ? String.valueOf(patientData.get("firstName")) : "";
                             String ln = patientData.get("lastName") != null ? String.valueOf(patientData.get("lastName")) : "";
                             String name = (fn + " " + ln).trim();
@@ -2968,6 +2979,11 @@ public class FhirFacadeController {
         if (value == null) return null;
         if (value instanceof Number n) return n.longValue();
         try { return Long.parseLong(String.valueOf(value)); } catch (NumberFormatException e) { return null; }
+    }
+
+    private Boolean toBoolean(Object val) {
+        if (val instanceof Boolean b) return b;
+        return val != null && Boolean.parseBoolean(String.valueOf(val));
     }
 
     private Map<String, Object> emptyPage(int page, int size) {

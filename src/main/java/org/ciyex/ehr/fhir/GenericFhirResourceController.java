@@ -300,7 +300,10 @@ public class GenericFhirResourceController {
             Map<String, Object> notifData = new HashMap<>(formData);
             notifData.putAll(created);
             if (patientId != null) notifData.put("patientId", patientId);
-            if (patientId != null && !notifData.containsKey("patientEmail")) {
+            boolean needsPatientLookup = patientId != null && (!notifData.containsKey("patientEmail")
+                    || !notifData.containsKey("patientPhone") || !notifData.containsKey("patientAllowEmail")
+                    || !notifData.containsKey("patientAllowSms"));
+            if (needsPatientLookup) {
                 try {
                     Map<String, Object> pd = resourceService.get("demographics", patientId, String.valueOf(patientId));
                     if (pd != null) {
@@ -316,6 +319,14 @@ public class GenericFhirResourceController {
                                 }
                             }
                         }
+                        Object phone = pd.get("phoneNumber");
+                        if (phone != null && !String.valueOf(phone).isBlank()) {
+                            notifData.put("patientPhone", String.valueOf(phone));
+                        }
+                        // Communication Consent (Demographics): gates whether appointment
+                        // notifications may go out on each channel at all.
+                        notifData.putIfAbsent("patientAllowEmail", toBoolean(pd.get("allowEmail")));
+                        notifData.putIfAbsent("patientAllowSms", toBoolean(pd.get("allowSms")));
                         String fn = pd.get("firstName") != null ? String.valueOf(pd.get("firstName")) : "";
                         String ln = pd.get("lastName") != null ? String.valueOf(pd.get("lastName")) : "";
                         String name = (fn + " " + ln).trim();
@@ -457,5 +468,10 @@ public class GenericFhirResourceController {
         if (val == null) return null;
         if (val instanceof Number n) return n.longValue();
         try { return Long.parseLong(String.valueOf(val)); } catch (Exception e) { return null; }
+    }
+
+    private Boolean toBoolean(Object val) {
+        if (val instanceof Boolean b) return b;
+        return val != null && Boolean.parseBoolean(String.valueOf(val));
     }
 }
