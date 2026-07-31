@@ -41,7 +41,8 @@ public class SmsService {
         NotificationConfig nc = requireSmsConfig(orgAlias);
         String provider = nc.getProvider() == null ? "" : nc.getProvider().trim().toLowerCase();
         Map<String, Object> cfg = parseConfig(nc);
-        String toE164 = toE164Us(to, orgAlias);
+        String countryCode = str(cfg, "default_country_code");
+        String toE164 = toE164(to, countryCode, orgAlias);
         switch (provider) {
             case "twilio" -> sendViaTwilio(orgAlias, cfg, toE164, body);
             case "vonage" -> sendViaVonage(orgAlias, cfg, toE164, body);
@@ -50,12 +51,16 @@ public class SmsService {
         }
     }
 
+    private static final String DEFAULT_COUNTRY_CODE_DIGITS = "1";
+
     /**
      * Normalizes a recipient number to E.164 for Twilio/Vonage. Patient phone numbers are
-     * stored/entered in US display format (e.g. "(720) 555-1234"), which providers reject
-     * (Twilio error 21211) — this strips formatting and applies the US country code.
+     * often stored/entered without a country code (e.g. "(720) 586-7797"), which providers
+     * reject (Twilio error 21211) — this strips formatting and applies the practice's
+     * configured default country code (Settings &gt; Notifications &gt; SMS Configuration
+     * "Default Country Code"), falling back to +1 for practices that haven't set one.
      */
-    private static String toE164Us(String raw, String orgAlias) {
+    private static String toE164(String raw, String countryCode, String orgAlias) {
         if (raw == null) {
             throw new RuntimeException("Missing recipient phone number for practice '" + orgAlias + "'");
         }
@@ -64,13 +69,20 @@ public class SmsService {
             return "+" + trimmed.substring(1).replaceAll("[^0-9]", "");
         }
         String digits = trimmed.replaceAll("[^0-9]", "");
-        if (digits.length() == 10) {
-            return "+1" + digits;
+        if (digits.isEmpty()) {
+            throw new RuntimeException("Invalid recipient phone number '" + raw + "' for practice '" + orgAlias + "'");
         }
-        if (digits.length() == 11 && digits.startsWith("1")) {
+        String ccDigits = (countryCode == null || countryCode.isBlank())
+                ? DEFAULT_COUNTRY_CODE_DIGITS
+                : countryCode.replaceAll("[^0-9]", "");
+        if (ccDigits.isEmpty()) {
+            ccDigits = DEFAULT_COUNTRY_CODE_DIGITS;
+        }
+        // Already carries the country code (e.g. "17205551234" for +1, "917200586797" for +91) — don't double-prepend.
+        if (digits.length() > 10 && digits.startsWith(ccDigits)) {
             return "+" + digits;
         }
-        throw new RuntimeException("Invalid recipient phone number '" + raw + "' for practice '" + orgAlias + "'");
+        return "+" + ccDigits + digits;
     }
 
     private void sendViaTwilio(String orgAlias, Map<String, Object> cfg, String to, String body) {
