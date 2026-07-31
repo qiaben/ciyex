@@ -104,7 +104,7 @@ public class SecureMessageNotificationService {
                             continue;
                         }
                         notificationService.send(orgAlias, "email",
-                                recipientEmail, subject, body, null, "auto_secure_message");
+                                recipientEmail, recipient.getDisplayName(), subject, body, null, "auto_secure_message");
                         log.info("Sent secure message notification to {} ({}) in org {}",
                                 recipient.getDisplayName(), recipientEmail, orgAlias);
                     }

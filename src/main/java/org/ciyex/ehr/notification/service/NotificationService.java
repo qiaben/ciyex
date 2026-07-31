@@ -41,7 +41,7 @@ public class NotificationService {
     @Transactional
     public NotificationLogDto send(String channelType, String recipient, String subject,
                                    String body, Long patientId, String triggerType) {
-        return send(orgAlias(), channelType, recipient, subject, body, patientId, triggerType);
+        return send(orgAlias(), channelType, recipient, null, subject, body, patientId, triggerType);
     }
 
     /**
@@ -50,6 +50,17 @@ public class NotificationService {
      */
     @Transactional
     public NotificationLogDto send(String orgAlias, String channelType, String recipient,
+                                   String subject, String body, Long patientId, String triggerType) {
+        return send(orgAlias, channelType, recipient, null, subject, body, patientId, triggerType);
+    }
+
+    /**
+     * Overload that also records the recipient's display name (e.g. patient name) so the
+     * Message Log's RECIPIENT column — distinct from the raw email/phone ADDRESS column —
+     * isn't blank.
+     */
+    @Transactional
+    public NotificationLogDto send(String orgAlias, String channelType, String recipient, String recipientName,
                                    String subject, String body, Long patientId, String triggerType) {
         // Check config exists and is enabled
         var configOpt = configRepo.findByOrgAliasAndChannelType(orgAlias, channelType);
@@ -94,6 +105,7 @@ public class NotificationService {
         var logEntry = NotificationLog.builder()
                 .channelType(channelType)
                 .recipient(recipient)
+                .recipientName(recipientName)
                 .subject(subject)
                 .body(body)
                 .status(status)

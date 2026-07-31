@@ -115,9 +115,9 @@ public class IntakeService {
         // the Message Log's SUBJECT column populated the same as email.
         NotificationLogDto sendResult;
         if ("SMS".equals(channel)) {
-            sendResult = notificationService.send(orgAlias, "sms", phone, subject, body, null, "intake");
+            sendResult = notificationService.send(orgAlias, "sms", phone, entity.getRecipientName(), subject, body, null, "intake");
         } else {
-            sendResult = notificationService.send(orgAlias, "email", email, subject, body, null, "intake");
+            sendResult = notificationService.send(orgAlias, "email", email, entity.getRecipientName(), subject, body, null, "intake");
         }
         if (sendResult != null && "failed".equals(sendResult.getStatus())) {
             throw new IllegalStateException(sendResult.getErrorMessage() != null
@@ -208,9 +208,9 @@ public class IntakeService {
         String msg = "Your intake verification code is " + code + ". It expires in " + OTP_TTL_MIN + " minutes.";
         try {
             if ("SMS".equalsIgnoreCase(channel)) {
-                notificationService.send(t.getOrgAlias(), "sms", recipient, null, msg, null, "intake_otp");
+                notificationService.send(t.getOrgAlias(), "sms", recipient, t.getRecipientName(), null, msg, null, "intake_otp");
             } else {
-                notificationService.send(t.getOrgAlias(), "email", recipient,
+                notificationService.send(t.getOrgAlias(), "email", recipient, t.getRecipientName(),
                         "Your intake verification code", msg, null, "intake_otp");
             }
         } catch (Exception e) {

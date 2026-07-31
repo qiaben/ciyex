@@ -182,7 +182,7 @@ public class AppointmentNotificationService {
         if (sendSms) {
             String smsSubject = buildDefaultSubject(eventType, patientName, displayDate, displayTime, prcName);
             String smsBody = buildDefaultSmsBody(eventType, variables);
-            notificationService.send(orgAlias, "sms", patientPhone, smsSubject, smsBody, patientId, "auto_" + eventType);
+            notificationService.send(orgAlias, "sms", patientPhone, patientName, smsSubject, smsBody, patientId, "auto_" + eventType);
             log.info("Sent {} SMS to {} for org {}", eventType, patientPhone, orgAlias);
         }
     }
@@ -225,7 +225,7 @@ public class AppointmentNotificationService {
                     templateSubject = withPracticeName(templateSubject, prcName);
                 }
                 notificationService.send(
-                        orgAlias, "email", patientEmail,
+                        orgAlias, "email", patientEmail, patientName,
                         templateSubject,
                         templateBody,
                         patientId, "auto_" + eventType);
@@ -239,7 +239,7 @@ public class AppointmentNotificationService {
         // Fallback: send with default subject/body
         String subject = buildDefaultSubject(eventType, patientName, displayDate, displayTime, prcName);
         String body = buildDefaultBody(eventType, variables);
-        notificationService.send(orgAlias, "email", patientEmail, subject, body, patientId, "auto_" + eventType);
+        notificationService.send(orgAlias, "email", patientEmail, patientName, subject, body, patientId, "auto_" + eventType);
         log.info("Sent {} email (default template) to {} for org {}", eventType, patientEmail, orgAlias);
     }
 
