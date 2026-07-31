@@ -2,6 +2,7 @@ package org.ciyex.ehr.notification.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.ciyex.ehr.notification.entity.NotificationPreference;
 import org.ciyex.ehr.notification.repository.NotificationPreferenceRepository;
 import org.ciyex.ehr.notification.repository.NotificationTemplateRepository;
 import org.springframework.scheduling.annotation.Async;
@@ -23,6 +24,9 @@ import java.util.Map;
 @RequiredArgsConstructor
 @Slf4j
 public class AppointmentNotificationService {
+
+    /** Org alias holding the platform-wide default notification preferences. */
+    private static final String SYSTEM_ORG_ALIAS = "__SYSTEM__";
 
     private final NotificationService notificationService;
     private final NotificationPreferenceRepository prefRepo;
@@ -56,13 +60,30 @@ public class AppointmentNotificationService {
     }
 
     private void sendEventNotification(String orgAlias, String eventType, Map<String, Object> data) {
-        // Check if this event type is enabled at all
+        // Check if this event type is enabled at all. A per-org row only ever comes
+        // into existence when somebody opens Settings > Notifications
+        // (NotificationConfigService seeds defaults lazily on read) — org
+        // provisioning never writes one. Treating "no row" as "disabled" meant a
+        // practice that had never visited that page silently sent no appointment
+        // notification at all: no send, no notification_log entry, no error. Fall
+        // back to the '__SYSTEM__' default row the way secure-message
+        // notifications do, and if even that is absent synthesise an
+        // email-enabled default — these events are opt-out, not opt-in. The
+        // patient's own Communication Consent below still has the final say.
         var prefOpt = prefRepo.findByOrgAliasAndEventType(orgAlias, eventType);
         if (prefOpt.isEmpty()) {
-            log.debug("No preference found for event '{}' in org '{}', skipping", eventType, orgAlias);
-            return;
+            prefOpt = prefRepo.findByOrgAliasAndEventType(SYSTEM_ORG_ALIAS, eventType);
         }
-        var pref = prefOpt.get();
+        if (prefOpt.isEmpty()) {
+            log.debug("No preference row for event '{}' in org '{}' (and no {} default), "
+                    + "defaulting to email-enabled", eventType, orgAlias, SYSTEM_ORG_ALIAS);
+        }
+        var pref = prefOpt.orElseGet(() -> NotificationPreference.builder()
+                .orgAlias(orgAlias)
+                .eventType(eventType)
+                .emailEnabled(true)
+                .smsEnabled(false)
+                .build());
 
         // Get patient info from appointment data (must be resolved by caller — FHIR/security
         // context is not available in this @Async method's thread).
