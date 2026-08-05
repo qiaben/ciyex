@@ -31,6 +31,7 @@ public class PaymentService {
     private final PaymentPlanRepository planRepo;
     private final PatientLedgerRepository ledgerRepo;
     private final org.ciyex.ehr.util.OrgIntegrationConfigProvider configProvider;
+    private final org.ciyex.ehr.client.RcmServiceClient rcmServiceClient;
 
     private String orgAlias() {
         return RequestContext.get().getOrgName();
@@ -167,7 +168,40 @@ public class PaymentService {
             ledgerRepo.save(ledger);
         }
 
+        // Tell RCM the patient has paid. Only patient payments: an insurance payment
+        // arriving here was posted BY rcm, and echoing it back would double-post it.
+        // Without this the two services disagreed — the desk took the patient's share
+        // and RCM still showed the full balance, ready to bill them for it again.
+        if (!"insurance_payment".equalsIgnoreCase(txn.getTransactionType())) {
+            rcmServiceClient.recordPatientPayment(
+                    String.valueOf(dto.getPatientId()), dto.getPatientName(), dto.getAmount(),
+                    dto.getPaymentMethodType(), referenceOf(dto), claimNumberFrom(dto));
+        }
+
         return toTransactionDto(txn);
+    }
+
+    /** The cheque or receipt reference, as text — the DTO carries it as an id. */
+    private String referenceOf(PaymentTransactionDto dto) {
+        if (dto.getInvoiceNumber() != null && !dto.getInvoiceNumber().isBlank()) {
+            return dto.getInvoiceNumber();
+        }
+        return dto.getReferenceId() != null ? String.valueOf(dto.getReferenceId()) : null;
+    }
+
+    /**
+     * The claim a payment was taken against, when the caller named one. The Collect
+     * Payment screen writes it into the description as "claim CLM-1234" when the user
+     * picks a claim, so RCM can attach the money to the right claim rather than leaving
+     * it floating against the patient.
+     */
+    private String claimNumberFrom(PaymentTransactionDto dto) {
+        for (String source : new String[]{dto.getInvoiceNumber(), dto.getDescription(), dto.getNotes()}) {
+            if (source == null) { continue; }
+            var matcher = java.util.regex.Pattern.compile("CLM-[A-Za-z0-9-]+").matcher(source);
+            if (matcher.find()) { return matcher.group(); }
+        }
+        return null;
     }
 
     @Transactional(readOnly = true)
