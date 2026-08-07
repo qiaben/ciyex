@@ -2386,7 +2386,7 @@ public class FhirFacadeController {
             @PathVariable Long patientId, @PathVariable String encounterId,
             @RequestBody Map<String, Object> body) {
         try {
-            Map<String, Object> created = fhirService.create("vitals", patientId, body, "Encounter/" + encounterId);
+            Map<String, Object> created = fhirService.create("vitals", patientId, body, encounterId);
             return ResponseEntity.ok(ApiResponse.ok("Vitals saved", created));
         } catch (AccessDeniedException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error(e.getMessage()));
