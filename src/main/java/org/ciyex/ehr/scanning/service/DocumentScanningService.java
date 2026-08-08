@@ -23,6 +23,7 @@ public class DocumentScanningService {
 
     private final ScannedDocumentRepository repo;
     private final FileStorageStrategyResolver storageResolver;
+    private final DocumentTextExtractor textExtractor;
 
     private String orgAlias() {
         RequestContext rc = RequestContext.get();
@@ -60,9 +61,10 @@ public class DocumentScanningService {
         String storageKey = org + "/scanning/" + UUID.randomUUID() + "_" + file.getOriginalFilename();
 
         // Upload to storage
+        byte[] fileBytes;
         try {
             FileStorageStrategy strategy = storageResolver.resolve(org);
-            byte[] fileBytes = file.getBytes();
+            fileBytes = file.getBytes();
             strategy.uploadByKey(fileBytes, storageKey, file.getContentType(), org,
                     "document-scanning", patientId != null ? patientId.toString() : null,
                     file.getOriginalFilename());
@@ -80,22 +82,67 @@ public class DocumentScanningService {
                 .patientId(patientId)
                 .patientName(patientName)
                 .category(category != null ? category : "other")
-                .ocrStatus("pending")
+                .ocrStatus(DocumentTextExtractor.STATUS_PENDING)
                 .uploadedBy(currentUser())
                 .orgAlias(org)
                 .build();
 
+        // Extract straight away using the bytes still in hand — the upload is the
+        // only moment the content is guaranteed local, and leaving the row at
+        // "pending" until someone clicks Run OCR was why the Document Scanning
+        // table only ever showed pending/processing.
+        applyExtraction(doc, fileBytes);
         return repo.save(doc);
     }
 
+    /**
+     * Re-run text extraction for a document and persist the terminal status.
+     *
+     * <p>Previously this only flipped the row to "processing" and returned — with
+     * no worker behind it, that status was permanent, so Completed / Failed / N/A
+     * never appeared in the table (and filtering by them returned nothing).
+     * Extraction is cheap (a PDF text layer, not raster OCR), so it runs inline
+     * and the caller gets the finished record back.
+     */
     public ScannedDocument triggerOcr(Long id) {
         String org = orgAlias();
         ScannedDocument doc = repo.findById(id)
                 .filter(d -> org.equals(d.getOrgAlias()))
                 .orElseThrow(() -> new RuntimeException("Document not found: " + id));
-        // Mark as processing; actual OCR would be done asynchronously
-        doc.setOcrStatus("processing");
+
+        byte[] bytes = null;
+        if (doc.getStorageKey() != null) {
+            try {
+                bytes = storageResolver.resolve(org).downloadByKey(doc.getStorageKey());
+            } catch (Exception e) {
+                log.warn("Could not read stored file for doc {}: {}", id, e.getMessage());
+            }
+        }
+        if (bytes == null) {
+            doc.setOcrStatus(DocumentTextExtractor.STATUS_FAILED);
+            doc.setOcrText(null);
+            doc.setOcrConfidence(null);
+            return repo.save(doc);
+        }
+        applyExtraction(doc, bytes);
         return repo.save(doc);
+    }
+
+    /** Run the extractor over {@code bytes} and stamp the outcome onto {@code doc}. */
+    private void applyExtraction(ScannedDocument doc, byte[] bytes) {
+        DocumentTextExtractor.Result result;
+        try {
+            result = textExtractor.extract(bytes, doc.getOriginalFileName(), doc.getMimeType());
+        } catch (Exception e) {
+            log.warn("Text extraction blew up for '{}': {}", doc.getOriginalFileName(), e.getMessage());
+            result = DocumentTextExtractor.Result.failed(e.getMessage());
+        }
+        doc.setOcrStatus(result.status());
+        doc.setOcrText(result.text());
+        doc.setOcrConfidence(result.confidence());
+        if (result.message() != null) {
+            log.info("Document '{}' -> {}: {}", doc.getOriginalFileName(), result.status(), result.message());
+        }
     }
 
     public void delete(Long id) {
