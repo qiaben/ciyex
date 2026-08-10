@@ -1489,14 +1489,13 @@ public class GenericFhirResourceService {
         storeFormDataLocally(resourceType, resourceId, orgAlias, formData, java.util.List.of());
     }
 
+    @SuppressWarnings("unchecked")
     private void storeFormDataLocally(String resourceType, String resourceId, String orgAlias,
                                       Map<String, Object> formData, Collection<FhirPathMapper.FieldMapping> mappings) {
         try {
             // Store ALL form data locally — FHIR-mapped fields are also stored as backup
             // since custom extension mappings get stripped before sending to FHIR server.
-            Map<String, Object> dataToStore = formData;
-            if (dataToStore.isEmpty()) return;
-            String json = objectMapper.writeValueAsString(dataToStore);
+            if (formData.isEmpty()) return;
             FhirFormDataEntity entity = formDataRepository
                     .findByResourceTypeAndResourceIdAndOrgAlias(resourceType, resourceId, orgAlias)
                     .orElseGet(() -> {
@@ -1506,6 +1505,25 @@ public class GenericFhirResourceService {
                         e.setOrgAlias(orgAlias);
                         return e;
                     });
+            // Merge onto whatever's already stored — a partial update (e.g. correcting just
+            // one field) must not blow away every other field's last-submitted value. This
+            // previously did entity.setFormData(newJson) unconditionally, which replaced the
+            // whole blob: since mergeExtData() prefers this local row over the FHIR-derived
+            // value on read, any field missing from a partial update's formData (e.g. MRN,
+            // which has no FHIR-native home at all) silently vanished from the chart even
+            // though the underlying FHIR resource itself was untouched.
+            Map<String, Object> merged = new java.util.LinkedHashMap<>();
+            String existingJson = entity.getFormData();
+            if (existingJson != null && !existingJson.isBlank()) {
+                try {
+                    merged.putAll(objectMapper.readValue(existingJson, Map.class));
+                } catch (Exception e) {
+                    log.warn("Could not parse existing form data for {}/{}, overwriting: {}",
+                            resourceType, resourceId, e.getMessage());
+                }
+            }
+            merged.putAll(formData);
+            String json = objectMapper.writeValueAsString(merged);
             entity.setFormData(json);
             formDataRepository.save(entity);
         } catch (Exception e) {
