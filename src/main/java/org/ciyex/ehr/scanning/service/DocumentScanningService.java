@@ -164,20 +164,25 @@ public class DocumentScanningService {
         }
         log.info("Reprocessing {} scanned document(s) stuck at pending/processing", stuck.size());
         for (ScannedDocument doc : stuck) {
-            try {
-                byte[] bytes = doc.getStorageKey() != null
-                        ? storageResolver.resolve(doc.getOrgAlias()).downloadByKey(doc.getStorageKey())
-                        : null;
-                if (bytes == null) {
-                    doc.setOcrStatus(DocumentTextExtractor.STATUS_FAILED);
-                    doc.setOcrText(null);
-                    doc.setOcrConfidence(null);
-                } else {
-                    applyExtraction(doc, bytes);
+            byte[] bytes = null;
+            if (doc.getStorageKey() != null) {
+                try {
+                    bytes = storageResolver.resolve(doc.getOrgAlias()).downloadByKey(doc.getStorageKey());
+                } catch (Exception e) {
+                    log.warn("Could not read stored file for doc {}: {}", doc.getId(), e.getMessage());
                 }
+            }
+            if (bytes == null) {
+                doc.setOcrStatus(DocumentTextExtractor.STATUS_FAILED);
+                doc.setOcrText(null);
+                doc.setOcrConfidence(null);
+            } else {
+                applyExtraction(doc, bytes);
+            }
+            try {
                 repo.save(doc);
             } catch (Exception e) {
-                log.warn("Failed to reprocess stuck document {}: {}", doc.getId(), e.getMessage());
+                log.warn("Failed to save reprocessed document {}: {}", doc.getId(), e.getMessage());
             }
         }
     }
