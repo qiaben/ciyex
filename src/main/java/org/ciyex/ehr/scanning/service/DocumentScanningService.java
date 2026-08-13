@@ -7,6 +7,8 @@ import org.ciyex.ehr.scanning.entity.ScannedDocument;
 import org.ciyex.ehr.scanning.repository.ScannedDocumentRepository;
 import org.ciyex.ehr.service.storage.FileStorageStrategy;
 import org.ciyex.ehr.service.storage.FileStorageStrategyResolver;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.Authentication;
@@ -14,6 +16,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -142,6 +145,40 @@ public class DocumentScanningService {
         doc.setOcrConfidence(result.confidence());
         if (result.message() != null) {
             log.info("Document '{}' -> {}: {}", doc.getOriginalFileName(), result.status(), result.message());
+        }
+    }
+
+    /**
+     * Catch rows left behind by the old {@code triggerOcr}, which only ever set
+     * "processing" and never moved them on (see {@link #triggerOcr}). Those documents
+     * pre-date {@link #applyExtraction} being wired into the upload/re-run paths and
+     * would otherwise sit at pending/processing forever with no way to reach a
+     * terminal status. Runs once at startup; a no-op once every row has one.
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    public void reprocessStuck() {
+        List<ScannedDocument> stuck = repo.findByOcrStatusIn(List.of(
+                DocumentTextExtractor.STATUS_PENDING, DocumentTextExtractor.STATUS_PROCESSING));
+        if (stuck.isEmpty()) {
+            return;
+        }
+        log.info("Reprocessing {} scanned document(s) stuck at pending/processing", stuck.size());
+        for (ScannedDocument doc : stuck) {
+            try {
+                byte[] bytes = doc.getStorageKey() != null
+                        ? storageResolver.resolve(doc.getOrgAlias()).downloadByKey(doc.getStorageKey())
+                        : null;
+                if (bytes == null) {
+                    doc.setOcrStatus(DocumentTextExtractor.STATUS_FAILED);
+                    doc.setOcrText(null);
+                    doc.setOcrConfidence(null);
+                } else {
+                    applyExtraction(doc, bytes);
+                }
+                repo.save(doc);
+            } catch (Exception e) {
+                log.warn("Failed to reprocess stuck document {}: {}", doc.getId(), e.getMessage());
+            }
         }
     }
 
